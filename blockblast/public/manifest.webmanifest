@@ -1,0 +1,35 @@
+{
+  "name": "Blok İki — iki kişilik blok oyunu",
+  "short_name": "Blok İki",
+  "description": "Block Blast'ın iki kişilik hâli. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın.",
+  "lang": "tr",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#F3EAD8",
+  "theme_color": "#F3EAD8",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

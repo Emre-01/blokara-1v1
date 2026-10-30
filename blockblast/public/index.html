@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Blok İki — iki kişilik blok oyunu</title>
+  <meta name="description" content="Block Blast'ın iki kişilik hâli. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın. Aynı cihazda veya oda koduyla uzaktan.">
+  <meta name="theme-color" content="#F3EAD8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Blok İki">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<a class="skip" href="#screen-home">İçeriğe geç</a>
+
+<header class="topbar">
+  <button class="brand" id="brand" type="button" aria-label="Ana menüye dön">
+    <span class="brand-mark" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></span>
+    <span class="brand-word">Blok<em>İki</em></span>
+  </button>
+  <div class="top-actions">
+    <span class="room-badge" id="room-badge" hidden></span>
+    <button class="icon-btn" id="sound-btn" type="button" aria-label="Sesi kapat" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+    </button>
+    <button class="icon-btn" id="help-btn" type="button" aria-label="Nasıl oynanır?">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9a3 3 0 1 1 4.8 2.4c-1.1.8-2 1.5-2 3.1"/><circle cx="12" cy="18" r="1"/></svg>
+    </button>
+    <button class="icon-btn exit-btn" id="exit-btn" type="button" aria-label="Oyundan çık" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============================== ANA SAYFA ============================== -->
+  <section class="screen home" id="screen-home">
+    <div class="home-hero">
+      <div class="home-copy">
+        <p class="kicker">İki kişilik blok oyunu</p>
+        <h1>Blokları <span class="marker">iki kişi</span><br> dizersiniz.</h1>
+        <p class="lead">Block Blast'ın iki kişilik hâli. Aynı tahtada omuz omuza
+          hayatta kalın ya da ayrı tahtalarda birbirinizi geçin.
+          Aynı telefonda veya oda koduyla uzaktan.</p>
+        <div class="hero-facts" aria-label="Oyun bilgileri">
+          <span><b>8×8</b> tahta</span>
+          <span><b>2</b> oyuncu</span>
+          <span><b>sınırsız</b> tur</span>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="hero-board" id="hero-board"></div>
+        <div class="hero-float hero-float-a"></div>
+        <div class="hero-float hero-float-b"></div>
+        <div class="hero-note">sıra sende</div>
+        <div class="hero-score">+120</div>
+      </div>
+    </div>
+
+    <div class="mode-grid">
+      <article class="mode-card coop">
+        <div class="mode-art coop-art" aria-hidden="true">
+          <div class="mini-board">
+            <span class="mb c-coral" style="--mr:5;--mc:1"></span>
+            <span class="mb c-coral" style="--mr:5;--mc:2"></span>
+            <span class="mb c-mustard" style="--mr:4;--mc:2"></span>
+            <span class="mb c-mint" style="--mr:5;--mc:3"></span>
+            <span class="mb c-mustard" style="--mr:5;--mc:4"></span>
+            <span class="mb c-sky" style="--mr:4;--mc:4"></span>
+          </div>
+          <span class="tag tag-a">P1</span>
+          <span class="tag tag-b">P2</span>
+        </div>
+        <div class="mode-body">
+          <h2>Ortak tahta</h2>
+          <p>Tek tahta, tek skor. Sırayla blok koyun, satırları birlikte patlatın.
+            Ne kadar dayanırsınız?</p>
+          <div class="mode-actions">
+            <button class="btn btn-ink" type="button" data-local="coop">Aynı cihazda oyna</button>
+            <button class="btn btn-outline" type="button" data-host="coop">Oda kur</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="mode-card versus">
+        <div class="mode-art versus-art" aria-hidden="true">
+          <div class="mini-board left">
+            <span class="mb c-cobalt" style="--mr:3;--mc:2"></span>
+            <span class="mb c-sky" style="--mr:4;--mc:2"></span>
+            <span class="mb c-cobalt" style="--mr:4;--mc:3"></span>
+            <span class="mb c-sky" style="--mr:5;--mc:2"></span>
+          </div>
+          <span class="vs-stamp">VS</span>
+          <div class="mini-board right">
+            <span class="mb c-coral" style="--mr:2;--mc:4"></span>
+            <span class="mb c-grape" style="--mr:3;--mc:4"></span>
+            <span class="mb c-coral" style="--mr:4;--mc:4"></span>
+            <span class="mb c-mustard" style="--mr:4;--mc:3"></span>
+          </div>
+        </div>
+        <div class="mode-body">
+          <h2>Rakip</h2>
+          <p>Herkesin kendi tahtası var, blok dizisi aynı. İlk tıkanan kaybeder;
+            skor tablosu seni bekliyor.</p>
+          <div class="mode-actions">
+            <button class="btn btn-ink" type="button" data-local="versus">Aynı cihazda oyna</button>
+            <button class="btn btn-outline" type="button" data-host="versus">Oda kur</button>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <section class="online-card" aria-labelledby="online-title">
+      <div class="online-copy">
+        <h2 id="online-title">Uzaktan oyna</h2>
+        <p>Bir oda kurup kodu paylaş. Arkadaşın aynı sayfayı açsın, kodu girsin.
+          Sunucu iki tahtayı da anlık eşitler.</p>
+        <ol class="online-steps">
+          <li>Adını yaz.</li>
+          <li>Modu seçip oda kur ya da kodu gir.</li>
+          <li>Oda kodunu paylaş, oyunu başlat.</li>
+        </ol>
+      </div>
+      <div class="online-form">
+        <div class="field">
+          <label for="player-name">Adın</label>
+          <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
+                 placeholder="Örn. Ada" enterkeyhint="next">
+        </div>
+        <form id="join-form" class="join-form" novalidate>
+          <div class="field">
+            <label for="join-code">Oda kodu</label>
+            <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
+                   autocapitalize="characters" autocomplete="off" spellcheck="false"
+                   inputmode="text" enterkeyhint="go">
+          </div>
+          <button class="btn btn-coral" type="submit" id="join-btn">Odaya katıl</button>
+        </form>
+        <p class="form-note">Oda kodunu arkadaşınla paylaş. Aynı ağdaysanız
+          <code>http://bilgisayar-ip:8080</code> adresini de kullanabilirsiniz.</p>
+      </div>
+    </section>
+
+    <details class="rules-card">
+      <summary>Nasıl oynanır?</summary>
+      <div class="rules-body">
+        <p>Her turda elinde üç blok olur. Blokları 8×8 tahtaya sürükle.
+          Bir satır veya sütunu tamamen doldurursan patlar ve yer açılır.
+          Yeni bloklar ancak üçü de kullanıldığında gelir.</p>
+        <ul>
+          <li><b>Ortak tahta:</b> Sırayla oynarsınız. Skor ortaktır; her oyuncunun katkısı ayrı görünür.</li>
+          <li><b>Rakip:</b> Ayrı tahtalar, aynı blok sırası. Tahtası dolan kaybeder.</li>
+          <li>Blokların hiçbiri sığmıyorsa tur biter.</li>
+          <li>Üst üste satır patlatmak combo çarpanını yükseltir.</li>
+        </ul>
+        <p class="tiny">İpucu: telefondaysan bloğu parmağınla sürükle. Kısa dokunuşla
+          bloğu seçip tahtadaki bir kareye de dokunabilirsin.</p>
+      </div>
+    </details>
+
+    <footer class="site-foot">
+      <p>Blok İki — arkadaşlar arası bir blok oyunu.</p>
+      <p class="tiny">Block Blast ile bağlantılı değildir; ona saygıyla yapılmış iki kişilik bir yorumdur.</p>
+    </footer>
+  </section>
+
+  <!-- ============================== LOBİ ============================== -->
+  <section class="screen lobby" id="screen-lobby" hidden>
+    <div class="lobby-card">
+      <p class="kicker">Oda hazır</p>
+      <h1 id="lobby-title">Arkadaşını bekle</h1>
+      <div class="code-row">
+        <div class="code-box">
+          <span class="code-label">Oda kodu</span>
+          <strong id="lobby-code">-----</strong>
+        </div>
+        <div class="code-actions">
+          <button class="btn btn-outline btn-sm" id="copy-code" type="button">Kopyala</button>
+          <button class="btn btn-outline btn-sm" id="share-code" type="button">Paylaş</button>
+        </div>
+      </div>
+
+      <div class="mode-switch" id="lobby-mode" aria-label="Oyun modu">
+        <button type="button" data-mode="coop">Ortak tahta</button>
+        <button type="button" data-mode="versus">Rakip</button>
+      </div>
+
+      <ul class="slots" id="lobby-slots"></ul>
+
+      <p class="lobby-hint" id="lobby-hint">Oda kodunu arkadaşına gönder.</p>
+
+      <div class="lobby-actions">
+        <button class="btn btn-coral" id="start-btn" type="button">Oyunu başlat</button>
+        <button class="btn btn-ghost" id="leave-lobby" type="button">Odadan ayrıl</button>
+      </div>
+      <p class="tiny">Sekmeyi kapatırsan 90 saniye içinde kaldığın yerden dönebilirsin.</p>
+    </div>
+  </section>
+
+  <!-- ============================== OYUN ============================== -->
+  <section class="screen game" id="screen-game" hidden>
+    <div class="scoreboard" id="scoreboard"></div>
+    <div class="table-area" id="table-area"></div>
+    <div class="game-foot">
+      <button class="btn btn-ghost btn-sm" id="game-menu" type="button">Menü</button>
+      <span class="game-hint" id="game-hint">Bloğu tahtaya sürükle</span>
+      <button class="btn btn-coral btn-sm" id="game-restart" type="button" hidden>Yeniden</button>
+    </div>
+  </section>
+
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="overlay-title"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/game-core.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "blok-iki",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Blok İki — iki kişilik Block Blast ve oda kodlu online multiplayer",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "dev": "node server.cjs",
+    "test": "node test/socket-test.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
