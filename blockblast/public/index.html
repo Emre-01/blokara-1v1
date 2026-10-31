@@ -10,13 +10,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Blok İki">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon-192.png" sizes="192x192">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -66,6 +66,48 @@
         <div class="hero-score">+120</div>
       </div>
     </div>
+
+    <section class="profile-strip" aria-label="Profilin">
+      <div class="profile-level">
+        <span class="level-badge" id="level-badge">1</span>
+        <div class="level-meta">
+          <span class="level-title">Seviye <b id="level-num">1</b></span>
+          <div class="xp-bar" aria-hidden="true"><i id="xp-fill"></i></div>
+          <span class="tiny" id="xp-label">0 / 80 XP</span>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <span><b id="stat-coins">0</b> coin</span>
+        <span><b id="stat-best">0</b> rekor</span>
+        <span><b id="stat-streak">0</b> gün seri</span>
+      </div>
+    </section>
+
+    <section class="quick-card" aria-labelledby="quick-title">
+      <div class="quick-head">
+        <h2 id="quick-title">Hızlı başla</h2>
+        <p>Süre modunu seç, bota karşı tek başına oyna.</p>
+      </div>
+      <div class="quick-controls">
+        <div class="setup-field">
+          <span class="setup-label">Süre</span>
+          <div class="seg" id="time-mode" role="group" aria-label="Süre modu">
+            <button type="button" data-time="shared">Ortak 2:00</button>
+            <button type="button" data-time="turn">Sıra 0:30</button>
+            <button type="button" data-time="none">Süresiz</button>
+          </div>
+        </div>
+        <div class="setup-field">
+          <span class="setup-label">Bot zorluğu</span>
+          <div class="seg" id="bot-level" role="group" aria-label="Bot zorluğu">
+            <button type="button" data-bot="easy">Kolay</button>
+            <button type="button" data-bot="normal">Orta</button>
+            <button type="button" data-bot="hard">Zor</button>
+          </div>
+        </div>
+        <button class="btn btn-ink quick-play-btn" type="button" id="play-bot">Bota karşı oyna</button>
+      </div>
+    </section>
 
     <div class="mode-grid">
       <article class="mode-card coop">
@@ -120,6 +162,24 @@
       </article>
     </div>
 
+    <section class="daily-card" id="daily-card" aria-labelledby="daily-title">
+      <div class="daily-copy">
+        <p class="kicker">Günün tahtası</p>
+        <h2 id="daily-title">Herkes aynı blokları alır</h2>
+        <p id="daily-desc">Bugünün tohumuyla bota karşı oyna. Her gün bir tur, seriyi bozma.</p>
+      </div>
+      <div class="daily-side">
+        <div class="daily-streak"><b id="daily-streak">0</b><span>gün seri</span></div>
+        <button class="btn btn-coral" type="button" id="play-daily">Bugünü oyna</button>
+        <span class="tiny" id="daily-state">Bugün henüz oynanmadı</span>
+      </div>
+    </section>
+
+    <details class="ach-card" id="ach-card">
+      <summary>Başarımlar <span class="ach-count" id="ach-count">0 / 12</span></summary>
+      <div class="ach-list" id="ach-list"></div>
+    </details>
+
     <section class="online-card" aria-labelledby="online-title">
       <div class="online-copy">
         <h2 id="online-title">Uzaktan oyna</h2>
@@ -148,6 +208,17 @@
         </form>
         <p class="form-note">Oda kodunu arkadaşınla paylaş. Aynı ağdaysanız
           <code>http://bilgisayar-ip:8080</code> adresini de kullanabilirsiniz.</p>
+
+        <details class="server-field" id="server-field">
+          <summary>Sunucu adresi</summary>
+          <div class="field">
+            <label for="server-url">Oyun sunucusu</label>
+            <input id="server-url" type="url" inputmode="url" autocomplete="off"
+                   spellcheck="false" placeholder="https://blok-iki.onrender.com">
+          </div>
+          <p class="tiny">Uygulama sürümünde uzaktan oyun için gerekli. Web sürümünde boş
+            bırakırsan aynı adres kullanılır.</p>
+        </details>
       </div>
     </section>
 
@@ -195,6 +266,12 @@
         <button type="button" data-mode="versus">Rakip</button>
       </div>
 
+      <div class="mode-switch lobby-timer" id="lobby-timer" aria-label="Süre modu">
+        <button type="button" data-time="shared">Ortak süre</button>
+        <button type="button" data-time="turn">Sıra süresi</button>
+        <button type="button" data-time="none">Süresiz</button>
+      </div>
+
       <ul class="slots" id="lobby-slots"></ul>
 
       <p class="lobby-hint" id="lobby-hint">Oda kodunu arkadaşına gönder.</p>
@@ -210,6 +287,7 @@
   <!-- ============================== OYUN ============================== -->
   <section class="screen game" id="screen-game" hidden>
     <div class="scoreboard" id="scoreboard"></div>
+    <div class="timer-track" id="timer-track" hidden aria-hidden="true"><i id="timer-fill"></i></div>
     <div class="table-area" id="table-area"></div>
     <div class="game-foot">
       <button class="btn btn-ghost btn-sm" id="game-menu" type="button">Menü</button>
@@ -226,7 +304,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/game-core.js"></script>
-<script src="/app.js"></script>
+<script src="game-core.js"></script>
+<script src="progress.js"></script>
+<script src="fx.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

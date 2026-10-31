@@ -4,10 +4,13 @@
 
   var CORE = window.BlokIki;
   if (!CORE) return;
+  var PROGRESS = window.BlokProgress;
+  var FX = window.BlokFx;
 
   var SIZE = CORE.SIZE;
   var LS_NAME = "blokiki.name";
   var LS_SOUND = "blokiki.sound";
+  var LS_SERVER = "blokiki.server";
   var LS_SESSION_PREFIX = "blokiki.session.";
   var SS_ACTIVE = "blokiki.activeRoom";
   var MAX_RECONNECT = 6;
@@ -35,7 +38,22 @@
     audio: null,
     toastTimer: null,
     overlayClosable: true,
-    busy: false
+    busy: false,
+    profile: null,
+    timeMode: "shared",
+    botLevel: null,
+    daily: false,
+    botThinking: false,
+    botTimer: null,
+    clockTimer: null,
+    lastClockAt: 0,
+    onlineAt: 0,
+    lastSignature: "",
+    recordedKey: null,
+    lastReward: null,
+    lastClockWhole: -1,
+    soundOn: true,
+    vibrate: true
   };
 
   /* ------------------------------------------------------------------ */
@@ -145,6 +163,20 @@
     tone(330, 0.18, { slide: -120, volume: 0.05 });
     setTimeout(function () { tone(220, 0.28, { slide: -100, volume: 0.05 }); }, 150);
   }
+  function sfxWin() {
+    [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, index) {
+      setTimeout(function () { tone(freq, 0.18, { type: "triangle", volume: 0.055 }); }, index * 100);
+    });
+  }
+  function sfxPenalty() {
+    tone(180, 0.16, { type: "sawtooth", slide: -60, volume: 0.04 });
+    setTimeout(function () { tone(140, 0.2, { type: "sawtooth", volume: 0.035 }); }, 110);
+  }
+  function sfxReward() {
+    [783.99, 1046.5, 1318.5].forEach(function (freq, index) {
+      setTimeout(function () { tone(freq, 0.12, { type: "triangle", volume: 0.05 }); }, index * 80);
+    });
+  }
 
   /* ------------------------------------------------------------------ */
   /* yükleme                                                             */
@@ -159,11 +191,218 @@
     app.sound = soundPref !== "0";
     updateSoundButton();
 
+    if (PROGRESS) {
+      app.profile = PROGRESS.load();
+      PROGRESS.refreshDailyStreak(app.profile);
+      PROGRESS.save(app.profile);
+      app.timeMode = CORE.TIME_MODES.indexOf(app.profile.timeMode) >= 0 ? app.profile.timeMode : "shared";
+      app.vibrate = app.profile.vibrate !== false;
+    } else {
+      app.profile = null;
+    }
+    if (FX) FX.init();
+
+    initServerField();
+    initHomeControls();
     buildHeroBoard();
     bindStaticEvents();
+    renderHomeMeta();
     registerServiceWorker();
     prepareSharedLink();
     attemptSessionRejoin();
+    exposeDebug();
+  }
+
+  /* Yalnızca ?test=1 ile açılır; otomatik testler durumu sürebilsin diye. */
+  function exposeDebug() {
+    if (!/[?&]test=1/.test(location.search)) return;
+    window.BlokDebug = {
+      start: startLocal,
+      game: function () { return app.game; },
+      send: function (message) {
+        if (app.ws && app.ws.readyState === WebSocket.OPEN) app.ws.send(JSON.stringify(message));
+        return !!app.ws;
+      },
+      snapshot: function () { return app.state; },
+      finish: function (winner, reason) {
+        if (!app.game) return null;
+        app.game.finish(winner, reason || "Test bitişi.");
+        app.state = app.game.snapshot();
+        renderGame();
+        checkResult();
+        return app.state;
+      },
+      tick: function (seconds) {
+        if (!app.game) return null;
+        var result = app.game.tick(seconds);
+        app.state = app.game.snapshot();
+        renderGame();
+        checkResult();
+        return result;
+      }
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* profil / başarımlar / günlük                                        */
+  /* ------------------------------------------------------------------ */
+
+  function fmtTime(seconds) {
+    var value = Math.max(0, Math.ceil(seconds || 0));
+    var m = Math.floor(value / 60);
+    var s = value % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function profileStats() {
+    var p = app.profile;
+    if (!p) return null;
+    var level = PROGRESS.levelInfo(p.xp);
+    var unlocked = Object.keys(p.unlocked || {}).length;
+    return { level: level, unlocked: unlocked, total: PROGRESS.ACHIEVEMENTS.length };
+  }
+
+  function renderHomeMeta() {
+    if (!PROGRESS || !app.profile) return;
+    var p = app.profile;
+    var info = PROGRESS.levelInfo(p.xp);
+    var badge = $("#level-badge");
+    if (badge) badge.textContent = info.level;
+    var num = $("#level-num");
+    if (num) num.textContent = info.level;
+    var fill = $("#xp-fill");
+    if (fill) fill.style.width = info.percent + "%";
+    var label = $("#xp-label");
+    if (label) label.textContent = info.into + " / " + info.need + " XP";
+    var coins = $("#stat-coins");
+    if (coins) coins.textContent = fmt(p.coins);
+    var best = $("#stat-best");
+    if (best) best.textContent = fmt(p.bestAny || 0);
+    var streak = $("#stat-streak");
+    if (streak) streak.textContent = p.dailyStreak || 0;
+
+    renderDailyCard();
+    renderAchievements();
+    syncSetupButtons();
+  }
+
+  function renderDailyCard() {
+    if (!PROGRESS || !app.profile) return;
+    var p = app.profile;
+    var ready = PROGRESS.dailyReady(p);
+    var streak = $("#daily-streak");
+    if (streak) streak.textContent = p.dailyStreak || 0;
+    var state = $("#daily-state");
+    if (state) {
+      state.textContent = ready
+        ? "Bugün henüz oynanmadı"
+        : "Bugün oynandı · en iyi " + fmt(p.dailyBest || 0);
+    }
+    var button = $("#play-daily");
+    if (button) {
+      button.textContent = ready ? "Bugünü oyna" : "Tekrar oyna";
+      button.classList.toggle("btn-coral", ready);
+      button.classList.toggle("btn-outline", !ready);
+    }
+  }
+
+  function renderAchievements() {
+    if (!PROGRESS || !app.profile) return;
+    var list = $("#ach-list");
+    if (!list) return;
+    var p = app.profile;
+    var html = "";
+    var unlockedCount = 0;
+    PROGRESS.ACHIEVEMENTS.forEach(function (item) {
+      var done = !!p.unlocked[item.id];
+      if (done) unlockedCount++;
+      var value = Math.min(item.goal, Math.max(0, item.metric(p)));
+      var pct = Math.round((value / item.goal) * 100);
+      html += '<div class="ach-item' + (done ? " done" : "") + '">' +
+        '<div class="ach-head"><b>' + item.title + '</b>' +
+        '<span>' + (done ? "alındı" : "+" + item.reward + " coin") + '</span></div>' +
+        '<p>' + item.desc + '</p>' +
+        '<div class="ach-progress"><i style="width:' + pct + '%"></i></div>' +
+        '<span class="tiny">' + item.value(p) + ' / ' + item.goal + '</span>' +
+        '</div>';
+    });
+    list.innerHTML = html;
+    var count = $("#ach-count");
+    if (count) count.textContent = unlockedCount + " / " + PROGRESS.ACHIEVEMENTS.length;
+  }
+
+  function syncSetupButtons() {
+    $$("#time-mode button").forEach(function (button) {
+      var on = button.dataset.time === app.timeMode;
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    $$("#bot-level button").forEach(function (button) {
+      var on = button.dataset.bot === (app.botLevel || "normal");
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function initHomeControls() {
+    $$("#time-mode button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        app.timeMode = CORE.TIME_MODES.indexOf(button.dataset.time) >= 0 ? button.dataset.time : "shared";
+        if (app.profile) { app.profile.timeMode = app.timeMode; PROGRESS.save(app.profile); }
+        syncSetupButtons();
+        sfxPlace();
+      });
+    });
+    $$("#bot-level button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        app.botLevel = CORE.BOT_LEVELS.indexOf(button.dataset.bot) >= 0 ? button.dataset.bot : "normal";
+        if (app.profile) { app.profile.botLevel = app.botLevel; PROGRESS.save(app.profile); }
+        syncSetupButtons();
+        sfxPlace();
+      });
+    });
+    var playBot = $("#play-bot");
+    if (playBot) {
+      playBot.addEventListener("click", function () {
+        audio();
+        startLocal("versus", { bot: app.botLevel || "normal", timeMode: app.timeMode });
+      });
+    }
+    var playDaily = $("#play-daily");
+    if (playDaily) {
+      playDaily.addEventListener("click", function () {
+        audio();
+        startLocal("versus", {
+          bot: "normal",
+          timeMode: "shared",
+          daily: true,
+          seed: PROGRESS.dailySeed()
+        });
+      });
+    }
+  }
+
+  /* APK'da sayfa file:// üzerinden açılır; orada sunucu alanı hep görünür olmalı. */
+  function initServerField() {
+    var details = $("#server-field");
+    var input = $("#server-url");
+    if (!details || !input) return;
+    var base = serverBase();
+    if (base) input.value = base;
+    var fromFile = location.protocol === "file:";
+    if (fromFile || base) details.open = true;
+    var apply = function () {
+      var parsed = parseServer(input.value);
+      if (parsed) save(LS_SERVER, parsed.base);
+      else remove(LS_SERVER);
+      if (app.ws) {
+        try { app.ws.close(); } catch (error) { /* yoksay */ }
+        app.ws = null;
+      }
+      app.reconnectAttempts = 0;
+    };
+    input.addEventListener("change", apply);
+    input.addEventListener("blur", apply);
   }
 
   function buildHeroBoard() {
@@ -206,6 +445,11 @@
     if (inRoom && app.room) badge.textContent = "ODA " + app.room;
     if (name === "game") {
       app.lastAnimated = -1;
+      startClock();
+    } else {
+      stopClock();
+      stopBot();
+      if (name === "home") renderHomeMeta();
     }
     window.scrollTo({ top: 0, behavior: "auto" });
   }
@@ -214,7 +458,8 @@
   /* yerel oyun                                                          */
   /* ------------------------------------------------------------------ */
 
-  function startLocal(mode) {
+  function startLocal(mode, options) {
+    options = options || {};
     app.online = false;
     app.me = 0;
     app.room = null;
@@ -222,16 +467,201 @@
     app.pending = false;
     app.shownResultKey = null;
     app.lastAnimated = -1;
+    app.lastReward = null;
+    app.recordedKey = null;
+    app.daily = !!options.daily;
+    app.botLevel = options.bot ? (CORE.BOT_LEVELS.indexOf(options.bot) >= 0 ? options.bot : "normal") : null;
+    app.timeMode = CORE.TIME_MODES.indexOf(options.timeMode) >= 0 ? options.timeMode : (app.timeMode || "shared");
+    app.botThinking = false;
+    stopBot();
+    var names = app.daily
+      ? ["Sen", "Günün Botu"]
+      : (app.botLevel ? ["Sen", "Bot"] : ["Oyuncu 1", "Oyuncu 2"]);
     app.game = new CORE.Game({
       mode: mode,
-      names: ["Oyuncu 1", "Oyuncu 2"],
-      turnBased: true
+      names: names,
+      seed: options.seed,
+      turnBased: true,
+      timeMode: app.timeMode
     });
     app.state = app.game.snapshot();
+    app.lastSignature = stateSignature(app.state);
+    app.onlineAt = 0;
     showScreen("game");
     renderGame();
+    startClock();
     sfxStart();
     checkResult();
+    scheduleBot();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* saat                                                               */
+  /* ------------------------------------------------------------------ */
+
+  function startClock() {
+    stopClock();
+    app.lastClockAt = performance.now();
+    app.lastClockWhole = -1;
+    app.clockTimer = setInterval(clockStep, 200);
+    updateClock();
+  }
+
+  function stopClock() {
+    if (app.clockTimer) {
+      clearInterval(app.clockTimer);
+      app.clockTimer = null;
+    }
+  }
+
+  function clockStep() {
+    var now = performance.now();
+    var dt = (now - app.lastClockAt) / 1000;
+    app.lastClockAt = now;
+    if (!app.state || app.screen !== "game" || app.state.phase !== "playing") return;
+
+    if (!app.online && app.game) {
+      var result = app.game.tick(dt);
+      if (result.penalty != null) {
+        var p = app.state.players[result.penalty];
+        toast("Süre doldu: " + (p ? p.name : "oyuncu") + " −" + CORE.TURN_PENALTY + " puan");
+        sfxPenalty();
+        if (app.vibrate && FX) FX.vibrate(40);
+        var board = $(".board");
+        if (FX) FX.shake(board);
+      }
+      app.state = app.game.snapshot();
+      if (app.state.phase === "over") {
+        renderGame();
+        checkResult();
+        return;
+      }
+      if (result.penalty != null) renderGame();
+    }
+    updateClock();
+  }
+
+  function clockValue(state, index) {
+    if (!state) return null;
+    var elapsed = app.online && app.onlineAt ? Math.max(0, (performance.now() - app.onlineAt) / 1000) : 0;
+    if (state.timeMode === "shared") return Math.max(0, (state.timeLeft || 0) - elapsed);
+    if (state.timeMode === "turn") {
+      if (state.turnBased) return Math.max(0, (state.turnLeft || 0) - elapsed);
+      var p = state.players[index == null ? 0 : index];
+      return p ? Math.max(0, (p.timeLeft || 0) - elapsed) : null;
+    }
+    return null;
+  }
+
+  function updateClock() {
+    var s = app.state;
+    var track = $("#timer-track");
+    var fill = $("#timer-fill");
+    var pill = $("#time-left");
+    if (!s) return;
+    var active = s.timeMode && s.timeMode !== "none";
+    if (track) track.hidden = !active;
+    if (!active) {
+      if (pill) pill.textContent = "∞";
+      return;
+    }
+    if (s.timeMode === "shared") {
+      var value = clockValue(s);
+      if (pill) pill.textContent = fmtTime(value);
+      var limit = Math.max(1, s.timeLimit || 120);
+      var pct = Math.max(0, Math.min(100, (value / limit) * 100));
+      if (fill) {
+        fill.style.width = pct + "%";
+        fill.classList.toggle("low", value <= 10);
+        fill.classList.toggle("reward", value > limit);
+      }
+      markLow(value);
+      playTick(value);
+    } else if (s.timeMode === "turn") {
+      if (s.turnBased) {
+        var turnValue = clockValue(s);
+        if (pill) pill.textContent = fmtTime(turnValue);
+        var tlimit = Math.max(1, s.turnLimit || 30);
+        if (fill) {
+          fill.style.width = Math.max(0, Math.min(100, (turnValue / tlimit) * 100)) + "%";
+          fill.classList.toggle("low", turnValue <= 8);
+          fill.classList.remove("reward");
+        }
+        markLow(turnValue);
+        playTick(turnValue);
+      } else {
+        if (pill) pill.textContent = "canlı";
+        if (fill) { fill.style.width = "100%"; fill.classList.remove("low", "reward"); }
+      }
+      $$("[data-clock]").forEach(function (el) {
+        var index = Number(el.dataset.clock);
+        var v = clockValue(s, index);
+        el.textContent = v == null ? "" : fmtTime(v);
+        el.classList.toggle("low", v != null && v <= 8);
+      });
+    }
+    updateClockClasses();
+  }
+
+  function updateClockClasses() {
+    var value = clockValue(app.state);
+    var low = app.state && app.state.timeMode !== "none" && value != null && value <= 10;
+    var board = $("#table-area");
+    if (board) board.classList.toggle("time-low", !!low);
+  }
+
+  function markLow(value) {
+    var scoreboard = $("#scoreboard");
+    if (!scoreboard) return;
+    scoreboard.classList.toggle("time-low", value != null && value <= 10);
+  }
+
+  function playTick(value) {
+    var whole = Math.ceil(value || 0);
+    if (whole === app.lastClockWhole) return;
+    app.lastClockWhole = whole;
+    if (whole > 0 && whole <= 5) tone(620 + (5 - whole) * 60, 0.05, { type: "square", volume: 0.02 });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* bot                                                                */
+  /* ------------------------------------------------------------------ */
+
+  function scheduleBot() {
+    stopBot();
+    var s = app.state;
+    if (app.online || !s || !app.botLevel) return;
+    if (s.phase !== "playing" || s.mode !== "versus" || !s.turnBased) return;
+    if (s.turn !== 1) return;
+    app.botThinking = true;
+    updateHint();
+    app.botTimer = setTimeout(botPlay, 650 + Math.random() * 550);
+  }
+
+  function stopBot() {
+    if (app.botTimer) {
+      clearTimeout(app.botTimer);
+      app.botTimer = null;
+    }
+    app.botThinking = false;
+  }
+
+  function botPlay() {
+    app.botTimer = null;
+    var s = app.state;
+    app.botThinking = false;
+    if (!s || app.online || s.phase !== "playing" || !app.botLevel || s.turn !== 1) return;
+    var player = s.players[1];
+    if (!player) return;
+    var move = CORE.botMove(player.board, player.tray, app.botLevel, Math.random);
+    if (!move) {
+      if (app.game) app.game.finish(0, "Bot sıkıştı. Kazandın!");
+      app.state = app.game.snapshot();
+      renderGame();
+      checkResult();
+      return;
+    }
+    performMove(move.piece, move.row, move.col);
   }
 
   function actorIndex() {
@@ -291,8 +721,10 @@
     app.cursor = null;
     app.pending = false;
     app.state = app.game.snapshot();
+    app.lastSignature = stateSignature(app.state);
     renderGame();
     checkResult();
+    scheduleBot();
   }
 
   /* ------------------------------------------------------------------ */
@@ -300,15 +732,51 @@
   /* ------------------------------------------------------------------ */
 
   function wsUrl() {
+    var base = serverBase();
+    if (base) {
+      var parsed = parseServer(base);
+      if (parsed) return (parsed.secure ? "wss:" : "ws:") + "//" + parsed.host + "/ws";
+    }
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
     return protocol + "//" + location.host + "/ws";
+  }
+
+  /* "10.0.2.2:8080", "http://x", "https://x/" gibi girdileri normalize eder. */
+  function parseServer(value) {
+    var text = String(value == null ? "" : value).trim();
+    if (!text) return null;
+    if (!/^[a-z]+:\/\//i.test(text)) text = "http://" + text;
+    var url;
+    try { url = new URL(text); } catch (error) { return null; }
+    if (!url.host) return null;
+    return { secure: url.protocol === "https:", host: url.host, base: url.protocol + "//" + url.host };
+  }
+
+  /* Öncelik: ?sunucu= parametresi > kayıtlı ayar > Android köprüsü > aynı köken. */
+  function serverBase() {
+    var params = new URLSearchParams(location.search);
+    var fromQuery = parseServer(params.get("sunucu"));
+    if (fromQuery) return fromQuery.base;
+    var saved = parseServer(read(LS_SERVER));
+    if (saved) return saved.base;
+    if (window.BlokIkiServer) {
+      var raw = null;
+      try {
+        raw = typeof window.BlokIkiServer.serverUrl === "function"
+          ? window.BlokIkiServer.serverUrl()
+          : window.BlokIkiServer.base;
+      } catch (error) { raw = null; }
+      var bridged = parseServer(raw);
+      if (bridged) return bridged.base;
+    }
+    return "";
   }
 
   function ensureSocket() {
     return new Promise(function (resolve, reject) {
       if (app.ws && app.ws.readyState === WebSocket.OPEN) return resolve(app.ws);
-      if (location.protocol === "file:") {
-        return reject(new Error("Online oyun için sayfayı sunucudan açmalısın. README'deki tek komutu çalıştır."));
+      if (location.protocol === "file:" && !serverBase()) {
+        return reject(new Error("Sunucu adresi gir: online oyun için bir sunucuya bağlanmalısın."));
       }
       var socket;
       try {
@@ -562,10 +1030,25 @@
   /* durum uygulama                                                      */
   /* ------------------------------------------------------------------ */
 
+  function stateSignature(state) {
+    if (!state) return "";
+    return [
+      state.phase,
+      state.seq,
+      state.turn,
+      state.mode,
+      state.players.map(function (p) {
+        return [p.score, p.alive ? 1 : 0, p.connected ? 1 : 0, p.penalties || 0].join(":");
+      }).join("|"),
+      state.shared ? state.shared.score + ":" + state.shared.combo : ""
+    ].join("~");
+  }
+
   function applyState(state) {
     if (!state) return;
     app.state = state;
     app.pending = false;
+    if (app.online) app.onlineAt = performance.now();
 
     if (state.phase === "lobby") {
       if (app.screen !== "lobby") showScreen("lobby");
@@ -578,7 +1061,16 @@
       app.lastAnimated = -1;
     }
     if (app.lastAnimated > state.seq) app.lastAnimated = -1;
+    app.daily = false;
 
+    var signature = stateSignature(state);
+    if (signature === app.lastSignature && app.screen === "game") {
+      updateClock();
+      updateHint();
+      return;
+    }
+    app.lastSignature = signature;
+    app.recordedKey = null;
     renderGame();
     if (state.phase === "over") {
       checkResult();
@@ -593,7 +1085,49 @@
     var key = s.seq + "|" + s.players.map(function (p) { return p.score; }).join(",") + "|" + s.winner;
     if (app.shownResultKey === key) return;
     app.shownResultKey = key;
-    showResult();
+    var reward = null;
+    if (app.recordedKey !== key) {
+      app.recordedKey = key;
+      reward = awardResult(s);
+    }
+    app.lastReward = reward;
+    showResult(reward);
+  }
+
+  function resultPayload(s) {
+    if (s.mode === "coop") {
+      return {
+        mode: "coop",
+        score: s.shared ? s.shared.score : 0,
+        lines: s.shared ? s.shared.lines : 0,
+        blocks: (s.players[0].blocks || 0) + (s.players[1].blocks || 0),
+        combo: s.shared ? s.shared.combo : 0,
+        win: false, bot: false
+      };
+    }
+    var human = app.online ? app.me : 0;
+    var player = s.players[human] || s.players[0];
+    return {
+      mode: app.daily ? "daily" : (app.botLevel ? "bot" : "versus"),
+      score: player.score,
+      lines: player.lines,
+      blocks: player.blocks,
+      combo: player.combo,
+      win: s.winner === human,
+      bot: !!app.botLevel
+    };
+  }
+
+  function awardResult(s) {
+    if (!PROGRESS || !app.profile) return null;
+    var reward = PROGRESS.recordGame(app.profile, resultPayload(s));
+    renderHomeMeta();
+    if (FX && (reward.newRecord || reward.levelUp || reward.unlocked.length)) {
+      FX.confetti();
+      if (app.sound) sfxReward();
+      if (app.vibrate) FX.vibrate(30);
+    }
+    return reward;
   }
 
   /* ------------------------------------------------------------------ */
@@ -617,17 +1151,27 @@
     if (!player) return "";
     var active = s.phase === "playing" && s.turnBased && s.turn === index;
     var sub = player.lines + " satır · " + player.blocks + " blok";
+    if (player.penalties) sub += ' · <span class="penalty">' + player.penalties + " ceza</span>";
     var offline = app.online && !player.connected;
     var mini = s.mode === "versus" && (app.online ? index !== app.me : index !== s.turn) ? miniBoardHTML(player.board) : "";
+    var clock = s.timeMode === "turn" && !s.turnBased && s.phase === "playing"
+      ? '<span class="score-time" data-clock="' + index + '">' + fmtTime(clockValue(s, index)) + "</span>"
+      : "";
     return '' +
       '<div class="score-card p' + (index + 1) + (active ? " active" : "") + (mini ? " has-mini" : "") + '">' +
         '<div class="score-main">' +
-          '<span class="score-name"><span class="score-dot"></span>' + esc(player.name) + '</span>' +
+          '<span class="score-name"><span class="score-dot"></span>' + esc(player.name) + clock + '</span>' +
           '<span class="score-value">' + fmt(player.score) + '</span>' +
           '<span class="score-sub">' + (offline ? '<span class="conn-flag">bağlantı yok</span>' : sub) + '</span>' +
         '</div>' +
         mini +
       '</div>';
+  }
+
+  function timeHTML(s) {
+    if (!s.timeMode || s.timeMode === "none" || s.phase === "over") return "";
+    var label = fmtTime(clockValue(s));
+    return '<span class="tp-time" id="time-left">' + label + '</span>';
   }
 
   function turnPillHTML(s) {
@@ -646,11 +1190,15 @@
       top = "canlı";
       main = "ikisi de";
       cls = "live";
+    } else if (app.botLevel) {
+      top = s.turn === 1 ? "bot düşünüyor" : "sıra";
+      main = s.turn === 1 ? "Bot" : "Sen";
+      cls = s.turn === 1 ? "thinking" : "";
     } else {
       top = "sıra";
       main = s.players[s.turn] ? s.players[s.turn].name : "—";
     }
-    return '<div class="turn-pill ' + cls + '"><span class="tp-top">' + top + '</span><span class="tp-main">' + esc(main) + '</span></div>';
+    return '<div class="turn-pill ' + cls + '"><span class="tp-top">' + top + '</span><span class="tp-main">' + esc(main) + '</span>' + timeHTML(s) + '</div>';
   }
 
   function renderScoreboard() {
@@ -746,7 +1294,8 @@
         "board-" + activeIndex,
         "active",
         '<span class="score-dot" style="background:' + activeColor + '"></span>' +
-        esc(activePlayer.name) + ' <span class="you">sıra sende</span>'
+        esc(activePlayer.name) + ' <span class="you">' +
+          (app.botLevel && activeIndex === 1 ? "bot oynuyor" : "sıra sende") + '</span>'
       );
       html += '<div class="tray-wrap">';
       html += trayHTML(activePlayer ? activePlayer.tray : [], interactive);
@@ -769,7 +1318,9 @@
     bindGameEvents();
     updateHint();
     animateLastMove();
+    updateClock();
     updateRoomChrome();
+    scheduleBot();
   }
 
   function updateHint() {
@@ -784,6 +1335,14 @@
 
     if (s.phase === "over") {
       hint.textContent = s.reason || "Tur bitti.";
+      return;
+    }
+    if (app.daily) {
+      hint.textContent = app.botThinking ? "Günün botu oynuyor…" : "Günün tahtası · satırları patlat, süre kazan.";
+      return;
+    }
+    if (app.botThinking) {
+      hint.textContent = "Bot düşünüyor…";
       return;
     }
     if (s.mode === "coop") {
@@ -1130,15 +1689,48 @@
         }
       });
     }
+
     if (last.lines > 0) {
       sfxClear(last.lines);
-      if (navigator.vibrate) navigator.vibrate(last.lines > 1 ? [18, 35, 18] : 14);
+      if (app.vibrate && FX) FX.vibrate(last.lines > 1 ? [18, 35, 18] : 14);
+      if (FX && boardEl) {
+        var rect = boardEl.getBoundingClientRect();
+        var pitch = rect.width / SIZE;
+        var cells = last.cleared && last.cleared.length ? last.cleared : [];
+        if (cells.length > 18) cells = cells.slice(0, 18);
+        cells.forEach(function (cell) {
+          var cx = rect.left + (cell[1] + 0.5) * pitch;
+          var cy = rect.top + (cell[0] + 0.5) * pitch;
+          FX.burst(cx, cy, last.piece.color, 5, 0.7);
+          if (Math.random() < 0.3) FX.burst(cx, cy, "mustard", 2, 0.9);
+        });
+        FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.38,
+          "+" + last.points, "points");
+        if (last.timeBonus) {
+          FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.5,
+            "+" + last.timeBonus + " sn", "time");
+        }
+        if (last.lines >= 2) FX.shake(boardEl);
+        if (last.lines >= 3) FX.confetti();
+        if (last.combo > 1) {
+          FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.62,
+            "COMBO ×" + last.combo, "combo");
+        }
+      }
       if (last.lines > 1 || last.combo > 1) {
         toast("+" + last.points + " · " + last.lines + " satır" + (last.combo > 1 ? " · combo ×" + last.combo : ""));
       }
     } else {
       sfxPlace();
-      if (navigator.vibrate) navigator.vibrate(5);
+      if (app.vibrate && FX) FX.vibrate(5);
+      if (FX && boardEl) FX.pulse(boardEl);
+    }
+    if (last.garbage && FX) {
+      var rivalBoard = document.querySelector('[data-board="' + last.garbage.to + '"]');
+      if (rivalBoard) {
+        FX.shake(rivalBoard);
+        toast("Rakibe " + last.garbage.rows + " çöp satır!");
+      }
     }
   }
 
@@ -1157,6 +1749,12 @@
     $$("#lobby-mode button").forEach(function (button) {
       var mode = button.dataset.mode;
       button.setAttribute("aria-pressed", mode === s.mode ? "true" : "false");
+      button.disabled = !isHost;
+    });
+
+    $$("#lobby-timer button").forEach(function (button) {
+      var on = button.dataset.time === (s.timeMode || "shared");
+      button.setAttribute("aria-pressed", on ? "true" : "false");
       button.disabled = !isHost;
     });
 
@@ -1228,31 +1826,36 @@
       '<p class="sheet-sub">Her turda üç blok gelir. Blokları 8×8 tahtaya sürükle; satır ya da sütun tamamlanınca patlar. Üç blok bitmeden yenisi gelmez.</p>' +
       '<ul class="help-list">' +
         '<li><b>Ortak tahta</b><span>Tek tahta, tek skor. Sırayla oynarsınız; herkesin katkısı ayrı sayılır. Tahta tıkanınca tur biter.</span></li>' +
-        '<li><b>Rakip</b><span>Herkesin kendi tahtası, aynı blok sırası. Tahtası dolan oyuncu kaybeder.</span></li>' +
-        '<li><b>Combo</b><span>Üst üste satır patlatırsan puan çarpanı yükselir.</span></li>' +
+        '<li><b>Rakip</b><span>Herkesin kendi tahtası, aynı blok sırası. Tahtası dolan oyuncu kaybeder. İki satır birden patlatırsan rakibin tahtasına çöp satır itersin.</span></li>' +
+        '<li><b>Süre</b><span>Ortak sayaçta süre bitince yüksek skor kazanır. Sıra sayacında süre dolarsa −15 puan ceza alır ve sıra geçer. Satır patlatmak süre kazandırır.</span></li>' +
+        '<li><b>Combo</b><span>Üst üste satır patlatırsan puan çarpanı yükselir; üçlü patlatma daha çok süre verir.</span></li>' +
+        '<li><b>Günün tahtası</b><span>Her gün aynı blok dizisi. Bir tur oyna, seriyi sürdür, bonus coin kazan.</span></li>' +
         '<li><b>Uzaktan</b><span>Oda kur, 5 haneli kodu paylaş. İki oyuncu da aynı sunucuya bağlanır.</span></li>' +
       '</ul>' +
       '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Anladım</button></div>'
     );
   }
 
-  function showResult() {
+  function showResult(reward) {
     var s = app.state;
     if (!s) return;
     var coop = s.mode === "coop";
     var winner = s.winner;
+    var human = app.online ? app.me : 0;
+    var won = winner === human;
     var badge;
     var title;
     if (coop) {
       badge = "ortak tur";
       title = "Tur bitti";
     } else if (winner != null && s.players[winner]) {
-      badge = app.online ? (winner === app.me ? "kazandın" : "kaybettin") : "rakip modu";
+      badge = won ? "kazandın" : "kaybettin";
       title = s.players[winner].name + " kazandı";
     } else {
       badge = "tur bitti";
       title = "Berabere";
     }
+    if (app.daily) badge = "günün tahtası";
 
     var rows = s.players.map(function (player, index) {
       var isWinner = !coop && winner === index;
@@ -1267,30 +1870,60 @@
     if (coop) {
       meta += '<span>Ortak skor ' + fmt(s.shared.score) + '</span>';
       meta += '<span>' + s.shared.lines + ' satır</span>';
-      meta += '<span>' + (s.shared.moves || 0) + ' hamle</span>';
+      meta += '<span>' + s.shared.blocks + ' blok tahtada</span>';
       if (s.shared.combo > 1) meta += '<span>Son combo ×' + s.shared.combo + '</span>';
     } else {
       meta += '<span>' + s.players[0].lines + ' + ' + s.players[1].lines + ' satır</span>';
       meta += '<span>' + ((s.players[0].moves || 0) + (s.players[1].moves || 0)) + ' hamle</span>';
-      meta += '<span>Aynı blok dizisi</span>';
+      if (app.timeMode === "none") meta += '<span>Süresiz</span>';
+      else meta += '<span>Süre modu</span>';
+    }
+
+    var rewardHTML = "";
+    if (reward) {
+      rewardHTML += '<div class="reward-row">' +
+        '<span><b>+' + fmt(reward.xp) + '</b> XP</span>' +
+        '<span><b>+' + fmt(reward.coins) + '</b> coin</span>';
+      if (reward.newRecord) rewardHTML += '<span class="reward-badge">yeni rekor</span>';
+      if (reward.levelUp) rewardHTML += '<span class="reward-badge level">seviye ' + reward.levelAfter + '</span>';
+      rewardHTML += '</div>';
+      if (reward.daily && reward.daily.newDay) {
+        rewardHTML += '<p class="result-note daily-note">Günün tahtası tamam · ' +
+          reward.daily.streak + ' günlük seri' +
+          (reward.daily.bonus ? " · +" + reward.daily.bonus + " bonus coin" : "") + '</p>';
+      }
+      if (reward.unlocked && reward.unlocked.length) {
+        rewardHTML += '<div class="reward-unlock"><span class="tiny">Yeni başarım</span>' +
+          reward.unlocked.map(function (item) {
+            return '<span class="unlock-chip">' + item.title + '</span>';
+          }).join("") + '</div>';
+      }
     }
 
     var canRematch = !app.online || app.me === s.host;
     var action = canRematch
-      ? '<button class="btn btn-coral" type="button" data-rematch data-autofocus>Yeniden oyna</button>'
+      ? '<button class="btn btn-coral" type="button" data-rematch data-autofocus>' +
+        (app.daily ? "Yeniden oyna" : "Yeniden oyna") + '</button>'
       : '<p class="result-note">Yeniden başlatmayı oda sahibi yapar.</p>';
 
     var rejoinNote = app.online && s.players.some(function (p) { return !p.connected; })
       ? '<p class="result-note">Bir oyuncunun bağlantısı yok. Yeniden başlatmak için iki oyuncu da bağlı olmalı.</p>'
       : "";
 
+    var sub = coop
+      ? '<p class="sheet-sub">Birlikte ' + fmt(s.shared.score) + ' puana ulaştınız.</p>'
+      : (app.botLevel
+        ? '<p class="sheet-sub">' + (won ? "Botu geçtin." : "Bot bu turu aldı.") +
+          (app.daily ? " Günün tahtası sayıldı." : "") + '</p>'
+        : '<p class="sheet-sub">' + (won ? "Rakibinin tahtası doldu." : "Tahtan doldu.") + '</p>');
+
     openOverlay(
-      '<span class="result-badge' + (coop ? "" : (app.online && winner !== app.me ? " lost" : "")) + '">' + badge + '</span>' +
+      '<span class="result-badge' + (coop ? "" : (won ? "" : " lost")) + '">' + badge + '</span>' +
       '<h2>' + esc(title) + '</h2>' +
-      (coop ? '<p class="sheet-sub">Birlikte ' + fmt(s.shared.score) + ' puana ulaştınız.</p>' :
-        '<p class="sheet-sub">' + (app.online ? (winner === app.me ? "Rakibinin tahtası doldu." : "Tahtan doldu.") : "Tur sona erdi.") + '</p>') +
+      sub +
       '<div class="result-scores">' + rows + '</div>' +
       '<div class="result-meta">' + meta + '</div>' +
+      rewardHTML +
       (s.reason ? '<p class="result-note">' + esc(s.reason) + '</p>' : "") +
       rejoinNote +
       '<div class="sheet-actions">' +
@@ -1300,7 +1933,9 @@
       '</div>',
       true
     );
-    if (s.phase === "over") sfxLose();
+    if (s.phase === "over") {
+      if (won || coop) sfxWin(); else sfxLose();
+    }
   }
 
   function showMenu() {
@@ -1309,14 +1944,18 @@
     var online = app.online;
     var canRestart = s.phase === "over" ? (!online || app.me === s.host) : false;
     var restartLabel = online ? "Yeniden başlat" : "Yeni oyun";
+    var info = app.profile ? PROGRESS.levelInfo(app.profile.xp) : null;
     openOverlay(
       '<span class="result-badge">Duraklat</span>' +
       '<h2>Oyun menüsü</h2>' +
       '<p class="sheet-sub">' + (online ? 'Oda <b>' + esc(app.room || "") + '</b> · ' + modeName(s.mode) + ' · Online' : modeName(s.mode) + ' · Aynı cihaz') + '</p>' +
+      (info ? '<p class="result-note">Seviye ' + info.level + ' · ' + fmt(app.profile.coins) + ' coin · ' + fmt(app.profile.bestAny || 0) + ' rekor</p>' : '') +
       '<div class="sheet-actions">' +
         (canRestart ? '<button class="btn btn-coral" type="button" data-restart>' + restartLabel + '</button>' : '') +
         '<button class="btn btn-outline" type="button" data-help>Nasıl oynanır?</button>' +
         '<button class="btn btn-outline" type="button" data-sound>' + (app.sound ? "Sesi kapat" : "Sesi aç") + '</button>' +
+        '<button class="btn btn-outline" type="button" data-vibrate>' + (app.vibrate ? "Titreşimi kapat" : "Titreşimi aç") + '</button>' +
+        '<button class="btn btn-ghost" type="button" data-reset-progress>İlerlemeyi sıfırla</button>' +
         '<button class="btn btn-ghost" type="button" data-exit>Oyundan çık</button>' +
       '</div>' +
       '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Devam et</button></div>',
@@ -1384,6 +2023,18 @@
     return value;
   }
 
+  /* Sunucu yoksa kullanıcıyı doğrudan adres alanına götürür. */
+  function askServer(message) {
+    toast(message || "Sunucu adresi gir: online oyun için bir sunucuya bağlanmalısın.");
+    var details = $("#server-field");
+    var input = $("#server-url");
+    if (details && !details.open) details.open = true;
+    if (details && details.scrollIntoView) {
+      details.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    if (input) setTimeout(function () { input.focus({ preventScroll: true }); }, 350);
+  }
+
   function createRoom(mode) {
     if (app.busy) return;
     app.busy = true;
@@ -1393,7 +2044,9 @@
       setTimeout(function () { app.busy = false; }, 500);
     }).catch(function (error) {
       app.busy = false;
-      toast(error.message || "Sunucuya bağlanılamadı.");
+      var message = error.message || "Sunucuya bağlanılamadı.";
+      if (/sunucu/i.test(message)) askServer(message);
+      else toast(message);
     });
   }
 
@@ -1412,7 +2065,9 @@
       setTimeout(function () { app.busy = false; }, 500);
     }).catch(function (error) {
       app.busy = false;
-      toast(error.message || "Sunucuya bağlanılamadı.");
+      var message = error.message || "Sunucuya bağlanılamadı.";
+      if (/sunucu/i.test(message)) askServer(message);
+      else toast(message);
     });
   }
 
@@ -1467,7 +2122,7 @@
     $$("[data-local]").forEach(function (button) {
       button.addEventListener("click", function () {
         audio();
-        startLocal(button.dataset.local === "coop" ? "coop" : "versus");
+        startLocal(button.dataset.local === "coop" ? "coop" : "versus", { timeMode: app.timeMode });
       });
     });
 
@@ -1512,6 +2167,12 @@
       });
     });
 
+    $$("#lobby-timer button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        wsSend({ t: "timer", mode: button.dataset.time });
+      });
+    });
+
     $("#game-menu").addEventListener("click", showMenu);
 
     $("#game-restart").addEventListener("click", function () {
@@ -1544,6 +2205,25 @@
         save(LS_SOUND, app.sound ? "1" : "0");
         updateSoundButton();
         showMenu();
+        return;
+      }
+      if (target.hasAttribute("data-vibrate")) {
+        app.vibrate = !app.vibrate;
+        if (app.profile) { app.profile.vibrate = app.vibrate; PROGRESS.save(app.profile); }
+        if (app.vibrate && FX) FX.vibrate(25);
+        showMenu();
+        return;
+      }
+      if (target.hasAttribute("data-reset-progress")) {
+        closeOverlay();
+        showConfirm("İlerleme sıfırlansın mı?",
+          "Seviye, coin, başarımlar ve rekorlar silinir. Bu geri alınamaz.",
+          "Sıfırla", function () {
+            if (PROGRESS) app.profile = PROGRESS.reset();
+            app.timeMode = "shared";
+            renderHomeMeta();
+            toast("İlerleme sıfırlandı.");
+          });
         return;
       }
       if (target.hasAttribute("data-restart") || target.hasAttribute("data-rematch")) {
@@ -1592,7 +2272,12 @@
       wsSend({ t: "rematch" });
       return;
     }
-    startLocal(app.state.mode);
+    startLocal(app.state.mode, {
+      timeMode: app.timeMode,
+      bot: app.botLevel,
+      daily: app.daily,
+      seed: app.daily ? PROGRESS.dailySeed() : undefined
+    });
   }
 
   function copyText(text, message) {

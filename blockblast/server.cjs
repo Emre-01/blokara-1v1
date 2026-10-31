@@ -252,10 +252,13 @@ function makeRoom(mode) {
   const room = {
     code,
     mode: mode === "coop" ? "coop" : "versus",
+    timeMode: "shared",
     phase: "lobby",
     host: 0,
     players: [],
     game: null,
+    lastTick: Date.now(),
+    lastSentSecond: -1,
     createdAt: Date.now(),
     lastActive: Date.now()
   };
@@ -308,6 +311,11 @@ function lobbyState(room) {
     winner: null,
     reason: "",
     lastMove: null,
+    timeMode: room.timeMode,
+    timeLimit: GameCore.DEFAULT_TIME,
+    timeLeft: room.timeMode === "shared" ? GameCore.DEFAULT_TIME : null,
+    turnLimit: GameCore.DEFAULT_TURN,
+    turnLeft: null,
     players: room.players.map((slot) => ({
       name: slot.name,
       score: 0,
@@ -481,6 +489,14 @@ function handleMessage(conn, message) {
     return;
   }
 
+  if (t === "timer") {
+    if (room.phase !== "lobby") return;
+    if (room.host !== info.index) return conn.send({ t: "error", message: "Süre modunu oda sahibi seçer." });
+    room.timeMode = GameCore.TIME_MODES.indexOf(message.mode) >= 0 ? message.mode : "shared";
+    broadcast(room);
+    return;
+  }
+
   if (t === "start") {
     if (room.phase !== "lobby") return;
     if (room.host !== info.index) return conn.send({ t: "error", message: "Oyunu oda sahibi başlatır." });
@@ -490,9 +506,12 @@ function handleMessage(conn, message) {
       mode: room.mode,
       names: room.players.map((player) => player.name),
       seed: crypto.randomBytes(4).readUInt32BE(0),
-      turnBased: room.mode === "coop"
+      turnBased: room.mode === "coop",
+      timeMode: room.timeMode
     });
     room.phase = "playing";
+    room.lastTick = Date.now();
+    room.lastSentSecond = -1;
     broadcast(room);
     return;
   }
@@ -521,9 +540,12 @@ function handleMessage(conn, message) {
       mode: room.mode,
       names: room.players.map((player) => player.name),
       seed: crypto.randomBytes(4).readUInt32BE(0),
-      turnBased: room.mode === "coop"
+      turnBased: room.mode === "coop",
+      timeMode: room.timeMode
     });
     room.phase = "playing";
+    room.lastTick = Date.now();
+    room.lastSentSecond = -1;
     broadcast(room);
     return;
   }
@@ -577,6 +599,30 @@ setInterval(() => {
     });
   });
 }, 15000).unref();
+
+/* Oyun saatleri sunucuda ilerler (otoriter). İstemci yumuşak sayım için
+   saniyede bir yayın alır; tahta sadece gerçek değişimde yeniden çizilir. */
+setInterval(() => {
+  const now = Date.now();
+  rooms.forEach((room) => {
+    if (room.phase !== "playing" || !room.game || room.game.phase !== "playing") return;
+    const dt = Math.min(2, (now - (room.lastTick || now)) / 1000);
+    room.lastTick = now;
+    const result = room.game.tick(dt);
+    const over = room.game.phase === "over";
+    if (over) room.phase = "over";
+
+    let second = null;
+    if (room.game.timeMode === "shared") second = Math.ceil(room.game.timeLeft || 0);
+    else if (room.game.timeMode === "turn" && room.game.turnBased) second = Math.ceil(room.game.turnLeft || 0);
+    const changedSecond = second !== null && second !== room.lastSentSecond;
+
+    if (over || changedSecond || result.penalty != null) {
+      if (second !== null) room.lastSentSecond = second;
+      broadcast(room);
+    }
+  });
+}, 1000).unref();
 
 server.listen(PORT, HOST, () => {
   console.log("Blok İki hazır: http://localhost:" + PORT);

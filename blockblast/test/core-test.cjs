@@ -242,4 +242,84 @@ test("tam oyun: ortak modda tek skor ve tıkanma", () => {
   assert.ok(game.shared.score > 0);
 });
 
+test("ortak sayaç süre bitince yüksek puan kazanıyor", () => {
+  const game = new Core.Game({ mode: "versus", seed: 11, timeMode: "shared", timeLimit: 10 });
+  assert.strictEqual(game.timeMode, "shared");
+  assert.strictEqual(game.timeLeft, 10);
+  game.players[0].score = 50;
+  game.players[1].score = 20;
+  const result = game.tick(9);
+  assert.strictEqual(result.over, false);
+  assert.ok(game.timeLeft > 0);
+  const done = game.tick(2);
+  assert.strictEqual(done.over, true);
+  assert.strictEqual(game.phase, "over");
+  assert.strictEqual(game.winner, 0);
+  assert.ok(/Süre doldu/.test(game.reason));
+});
+
+test("satır patlatmak süre kazandırıyor (ödül)", () => {
+  const game = new Core.Game({ mode: "coop", seed: 21, timeMode: "shared", timeLimit: 30 });
+  const start = game.timeLeft;
+  fillRow(game.shared.board, 7, 0);
+  game.shared.tray[0] = { shape: 0, name: "nokta", cells: [[0, 0]], w: 1, h: 1, color: "coral" };
+  const result = game.move(0, 0, 7, 0);
+  assert.ok(result.ok, result.reason);
+  assert.strictEqual(result.lastMove.lines, 1);
+  assert.ok(result.lastMove.timeBonus >= 2);
+  assert.ok(game.timeLeft > start);
+});
+
+test("sıra sayacı dolunca ceza veriyor ve sıra geçiyor", () => {
+  const game = new Core.Game({ mode: "coop", seed: 31, timeMode: "turn", turnLimit: 5 });
+  assert.strictEqual(game.timeLeft, null);
+  assert.strictEqual(game.turnLeft, 5);
+  game.shared.score = 100;
+  game.players[0].score = 100;
+  const result = game.tick(5.5);
+  assert.strictEqual(result.penalty, 0);
+  assert.strictEqual(game.players[0].penalties, 1);
+  assert.strictEqual(game.players[0].score, 100 - Core.TURN_PENALTY);
+  assert.strictEqual(game.shared.score, 100 - Core.TURN_PENALTY);
+  assert.strictEqual(game.turn, 1);
+  assert.strictEqual(game.turnLeft, 5);
+  assert.strictEqual(game.phase, "playing");
+});
+
+test("çöp satır rakibin tahtasını aşağıdan itiyor", () => {
+  const board = Core.emptyBoard();
+  board[7][3] = "mint";
+  const rng = Core.mulberry32(7);
+  const overflow = Core.addGarbage(board, 2, rng);
+  assert.strictEqual(overflow, false);
+  assert.strictEqual(board[5][3], "mint", "eski alt satır iki kez yukarı kaymalı");
+  const bottomCells = Core.countCells(board);
+  assert.strictEqual(bottomCells, 13, "12 çöp hücresi + korunan blok");
+  assert.strictEqual(board[6].filter(Boolean).length, 6);
+  assert.strictEqual(board[7].filter(Boolean).length, 6);
+  // üst satır doluysa taşma bildirilir
+  const crowded = Core.emptyBoard();
+  crowded[0][0] = "mint";
+  assert.strictEqual(Core.addGarbage(crowded, 1, rng), true);
+});
+
+test("bot her zaman geçerli bir hamle buluyor", () => {
+  const game = new Core.Game({ mode: "versus", seed: 51 });
+  const move = Core.botMove(game.players[0].board, game.players[0].tray, "hard");
+  assert.ok(move, "boş tahtada hamle bulunmalı");
+  assert.ok(Core.canPlace(game.players[0].board, game.players[0].tray[move.piece], move.row, move.col));
+  const result = game.move(0, move.piece, move.row, move.col);
+  assert.ok(result.ok, result.reason);
+});
+
+test("süresiz modda sayaç işlemiyor", () => {
+  const game = new Core.Game({ mode: "versus", seed: 61, timeMode: "none", turnBased: false });
+  const snapshot = game.snapshot();
+  assert.strictEqual(snapshot.timeMode, "none");
+  const before = JSON.stringify(game.players.map((p) => p.score));
+  game.tick(999);
+  assert.strictEqual(JSON.stringify(game.players.map((p) => p.score)), before);
+  assert.strictEqual(game.phase, "playing");
+});
+
 console.log("Çekirdek testleri geçti (" + passed + " test).");

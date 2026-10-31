@@ -248,6 +248,63 @@ async function main() {
   d.close();
   await wait(200);
 
+  /* ---------- süre modu ve sunucu saati ---------- */
+  const f = await connect();
+  f.send({ t: "create", mode: "versus", name: "Süre" });
+  const welcomeF = await f.next(isWelcome);
+  assert.strictEqual(welcomeF.state.timeMode, "shared");
+  assert.strictEqual(welcomeF.state.timeLeft, 120);
+
+  const g = await connect();
+  g.send({ t: "join", code: welcomeF.code, name: "Sayaç" });
+  const welcomeG = await g.next(isWelcome);
+
+  // süre modunu sadece oda sahibi seçer
+  g.send({ t: "timer", mode: "turn" });
+  const timerDenied = await g.next((m) => m.t === "error" && /süre modunu/i.test(m.message));
+  assert.ok(/süre modunu/i.test(timerDenied.message), "oyuncu 2 süre modunu değiştirememeli");
+
+  f.send({ t: "timer", mode: "turn" });
+  const timerStateF = await f.next((m) => isState(m) && m.state.timeMode === "turn");
+  assert.strictEqual(timerStateF.state.timeMode, "turn");
+  await g.next((m) => isState(m) && m.state.timeMode === "turn");
+
+  f.send({ t: "start" });
+  const timed = await f.next((m) => isState(m) && m.state.phase === "playing");
+  assert.strictEqual(timed.state.timeMode, "turn");
+  assert.strictEqual(timed.state.timeLimit, 120);
+  assert.strictEqual(timed.state.turnLimit, 30);
+
+  f.close();
+  g.close();
+  await wait(200);
+
+  /* ---------- ortak sayaç sunucuda akıyor ---------- */
+  const h = await connect();
+  h.send({ t: "create", mode: "versus", name: "Akış" });
+  const welcomeH = await h.next(isWelcome);
+  const i = await connect();
+  i.send({ t: "join", code: welcomeH.code, name: "Sayaç" });
+  await i.next(isWelcome);
+
+  h.send({ t: "start" });
+  const sharedStart = await h.next((m) => isState(m) && m.state.phase === "playing");
+  assert.strictEqual(sharedStart.state.timeMode, "shared");
+  const ticked = await h.next(
+    (m) => isState(m) && m.state.phase === "playing" && m.state.timeLeft != null && m.state.timeLeft < 120,
+    4000
+  );
+  assert.ok(ticked.state.timeLeft < 120, "sunucu saati akmıyor");
+
+  // oyun sırasında süre modu değiştirilemez
+  h.send({ t: "timer", mode: "none" });
+  const late = await h.next((m) => isState(m) && m.state.timeMode === "none", 900).catch(() => null);
+  assert.strictEqual(late, null, "oyun sırasında süre modu değişmemeli");
+
+  h.close();
+  i.close();
+  await wait(200);
+
   console.log("\nTüm sunucu testleri geçti.");
 }
 

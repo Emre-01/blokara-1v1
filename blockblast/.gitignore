@@ -1,3 +1,8 @@
 node_modules/
 .env
 *.log
+
+# APK derleme çıktıları ve yerel imza anahtarı
+android/build/
+android/debug.keystore
+android/res/mipmap-*/

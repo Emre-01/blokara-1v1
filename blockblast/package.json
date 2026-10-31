@@ -1,13 +1,15 @@
 {
   "name": "blok-iki",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Blok İki — iki kişilik Block Blast ve oda kodlu online multiplayer",
   "main": "server.cjs",
   "scripts": {
     "start": "node server.cjs",
     "dev": "node server.cjs",
-    "test": "node test/socket-test.cjs"
+    "test": "node test/core-test.cjs && node test/socket-test.cjs && node test/check-html.cjs",
+    "test:ui": "node --experimental-websocket test/online-flow.cjs",
+    "apk": "powershell -ExecutionPolicy Bypass -File android/build-apk.ps1"
   },
   "engines": {
     "node": ">=18"

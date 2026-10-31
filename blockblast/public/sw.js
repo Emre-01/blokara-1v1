@@ -1,13 +1,15 @@
 /* Blok İki — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v3";
+const VERSION = "blok-iki-v4";
 const SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
   "/game-core.js",
+  "/progress.js",
+  "/fx.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png"

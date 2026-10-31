@@ -1,7 +1,7 @@
 # Blok İki
 
-Block Blast'ın iki kişilik, tarayıcı tabanlı yorumu. Tek kurulumla hem aynı cihazda
-hem de oda koduyla uzaktan oynanır. Telefona Android uygulaması gibi kurulabilir (PWA).
+Block Blast'ın iki kişilik yorumu. Aynı cihazda ya da oda koduyla uzaktan oynanır.
+Telefona Android uygulaması (APK) olarak kurulabilir, internetsiz de açılır.
 
 ## İki mod
 
@@ -9,7 +9,27 @@ hem de oda koduyla uzaktan oynanır. Telefona Android uygulaması gibi kurulabil
 Her oyuncunun katkısı ayrı sayılır. Tahta tıkanınca tur biter.
 
 **Rakip** — Her oyuncunun kendi tahtası vardır ama iki taraf da **aynı blok sırasını**
-alır. Tahtası dolan oyuncu kaybeder. Online modda iki oyuncu aynı anda oynar.
+alır. Tahtası dolan oyuncu kaybeder. İki satır birden patlatan oyuncu rakibinin
+tahtasına çöp satır iter (2 satır → 1 çöp, 3+ satır → 2 çöp).
+
+## Süre, ceza, ödül
+
+Üç süre modu var; ana sayfadaki **Süre** seçicisinden ya da odada oda sahibi tarafından
+seçilir.
+
+| Mod | Davranış |
+| --- | --- |
+| **Ortak süre** (2:00) | Tek sayaç iki oyuncu için de akar. Süre bitince yüksek skor kazanır; ortak modda tur biter. |
+| **Sıra süresi** (0:30) | Her oyuncunun sırası için ayrı sayaç. Süre dolarsa **−15 puan ceza** ve sıra geçer. Rakip modunda her oyuncunun kendi saati vardır. |
+| **Süresiz** | Sayaç yok, ceza yok. Sadece tahta tıkanınca biter. |
+
+**Ödül:** Patlayan her satır **+2 saniye**, combo her kademesi **+0,75 saniye** kazandırır.
+Sayaç, başlangıç süresinin en fazla 1,5 katına kadar dolabilir.
+
+**Kalıcı ilerleme (cihazda):** Her tur sonunda XP ve coin kazanılır; seviye atlanır,
+rekorlar tutulur. 12 başarım açılabilir, her biri coin ödüllü. **Günün tahtası** her gün
+aynı blok dizisini verir; günlük seriyi sürdürmek bonus coin kazandırır. Tüm bunlar
+`localStorage` üzerinde çalışır, yani APK çevrimdışıyken de kaydedilir.
 
 ## Çalıştırma
 
@@ -70,10 +90,11 @@ SSL_KEY=/etc/ssl/key.pem SSL_CERT=/etc/ssl/cert.pem node server.cjs
 
 ## Nasıl oynanır
 
-1. Ana sayfada **Aynı cihazda oyna** ile hemen başla.
+1. Ana sayfada **Bota karşı oyna** ile tek başına başla ya da bir mod kartından
+   **Aynı cihazda oyna** de.
 2. Uzaktan için adını yaz, modu seç, **Oda kur**. Çıkan 5 haneli kodu arkadaşına
    gönder. Arkadaşın aynı sayfada kodu girip **Odaya katıl** der.
-3. Oda sahibi **Oyunu başlat**'a basar.
+3. Oda sahibi süre modunu seçer ve **Oyunu başlat**'a basar.
 4. Blokları tahtaya sürükle. Kısa dokunuşla bloğu seçip tahtadaki bir kareye
    dokunarak da yerleştirebilirsin.
 5. Klavyeyle de oynanır: blok üzerinde **Enter** ile seç, **ok tuşlarıyla** gez,
@@ -83,25 +104,32 @@ SSL_KEY=/etc/ssl/key.pem SSL_CERT=/etc/ssl/cert.pem node server.cjs
 Puanlama: yerleşen her blok için 1 puan; patlayan her satır için `10 × satır × combo`.
 Combo, art arda patlayan hamlelerde büyür, patlamayan hamlede sıfırlanır.
 
-## Telefona kurma (Android)
+## Telefona kurma (Android APK)
 
-1. Oyunu HTTPS üzerinden aç (Render/tünel adresi ya da kendi alan adın).
-2. Chrome menüsü → **Uygulamayı yükle** / **Ana ekrana ekle**.
-3. Artık tam ekran, çevrimdışı açılabilen bir uygulama olarak çalışır.
-   Yerel oyunlar internet olmadan da oynanır; online mod sunucu ister.
+APK hazır olarak `android/build/blok-iki.apk` altında üretilir. Gradle gerekmez; yalnızca
+JDK + Android SDK build-tools kullanılır (aapt2 → javac → d8 → zipalign → apksigner).
 
-APK olarak paketlemek istersen Capacitor ile sarmalayabilirsin:
-
-```bash
-npm i -D @capacitor/cli @capacitor/core
-npx cap init "Blok İki" com.ornek.blokiki --web-dir=public
-npm i @capacitor/android
-npx cap add android
-npx cap sync android
+```powershell
+cd blockblast
+powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
+  -ServerUrl "https://senin-sunucun.onrender.com"
 ```
 
-Uygulama içinden online oynanacaksa `public/app.js` içindeki bağlantı adresini
-(`wsUrl`) kendi HTTPS sunucuna yönlendir veya WebView'a sunucu adresini yükle.
+`-ServerUrl` verilirse adres APK'nın içine gömülür (`assets/server.txt`), arkadaşın
+hiçbir ayar yapmadan uzaktan oynayabilir. Adres verilmezse uygulama içindeki
+**Sunucu adresi** alanı kullanılır (`http://10.0.2.2:8080` varsayılanı emülatör içindir).
+
+Kurulum:
+
+```powershell
+adb install -r android\build\blok-iki.apk
+```
+
+APK `file:///android_asset/www/index.html` adresini bir WebView'da açar; yerel oyunlar
+tamamen çevrimdışıdır, uzaktan oyun gömülü sunucu adresini kullanır.
+
+PWA olarak kurmak da mümkün: oyunu HTTPS üzerinden aç, Chrome menüsü →
+**Uygulamayı yükle**. Artık tam ekran ve çevrimdışı açılabilir.
 
 ## Dosyalar
 
@@ -111,24 +139,34 @@ blockblast/
   public/
     index.html
     styles.css
-    app.js                arayüz, sürükle-bırak, online oturum
-    game-core.js          tahta, bloklar, puanlama (tarayıcı + Node ortak)
+    app.js                arayüz, sürükle-bırak, online oturum, saat, bot
+    game-core.js          tahta, bloklar, puanlama, süre, çöp satır, bot
+    progress.js           XP/coin/seviye/başarım/günlük (localStorage)
+    fx.js                 parçacık, konfeti, sarsıntı, titreşim
     manifest.webmanifest  PWA
     sw.js                 çevrimdışı önbellek
     icons/
+  android/
+    build-apk.ps1         Gradle'sız APK derleme
+    java/.../MainActivity.java
+    drive.cjs             emülatördeki WebView'ı CDP ile sürme aracı
+  test/
   package.json
   render.yaml
+  DESIGN.md               tasarım kararları ve gerekçeleri
 ```
 
-Sunucu otoritedir: hamleleri doğrular, tahtaları ve blok sırasını kendi tutar.
-İstemci sadece `{t:"move", piece, row, col}` gönderir; skor sunucuda hesaplanır.
+Sunucu otoritedir: hamleleri doğrular, tahtaları, blok sırasını ve saatleri kendi tutar.
+İstemci sadece `{t:"move", piece, row, col}` gönderir; skor ve süre sunucuda hesaplanır.
 
 ## Testler
 
 ```bash
-npm test            # ikisini birlikte çalıştırır
-node test/core-test.cjs    # oyun kuralları ve puanlama (14 test)
-node test/socket-test.cjs  # oda/WebSocket akışı; kendi sunucusunu 8099'da açar
+npm test                     # hepsini çalıştırır
+node test/core-test.cjs      # oyun kuralları, süre, çöp satır, bot (20 test)
+node test/socket-test.cjs    # oda/WebSocket akışı + otoriter saat; sunucuyu 8099'da açar
+node --experimental-websocket test/online-flow.cjs   # iki sekmeli uçtan uca akış (17 kontrol)
+node test/check-html.cjs     # HTML/UTF-8/varlık sağlık kontrolü
 ```
 
 `test/inspect.cjs` geliştirme aracıdır: başsız Chrome ile mobil ekran görüntüsü
