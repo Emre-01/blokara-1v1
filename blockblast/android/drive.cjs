@@ -1,6 +1,8 @@
-/* Emülatördeki WebView'ı CDP ile sürer: online oyun akışını uçtan uca test eder.
+/* Cihazdaki WebView'ı CDP ile sürer: online oyun akışını uçtan uca test eder.
    node android/drive.cjs "ifade"      → ifadeyi çalıştırır, sonucu yazar
-   node android/drive.cjs --shot out.png */
+   node android/drive.cjs --shot out.png
+   SERIAL=R5CY34M4SGE node android/drive.cjs "1+1"   → gerçek telefonda çalışır
+   CDP_PORT=9444 ...                                 → port çakışmasını önler */
 "use strict";
 const { spawnSync } = require("child_process");
 const fs = require("fs");
@@ -17,10 +19,12 @@ if (typeof WebSocket === "undefined") {
 
 const SDK = process.env.ANDROID_HOME || path.join(process.env.LOCALAPPDATA, "Android", "Sdk");
 const ADB = path.join(SDK, "platform-tools", "adb.exe");
-const PORT = 9333;
+/* Cihaz seçimi: SERIAL=emulator-5554 | R5CY34M4SGE ...  Port: CDP_PORT */
+const SERIAL = process.env.SERIAL || "emulator-5554";
+const PORT = Number(process.env.CDP_PORT || 9333);
 
 function adb(args) {
-  const r = spawnSync(ADB, args, { encoding: "utf8" });
+  const r = spawnSync(ADB, ["-s", SERIAL].concat(args), { encoding: "utf8" });
   if (r.error) throw r.error;
   return (r.stdout || "") + (r.stderr || "");
 }

@@ -197,9 +197,10 @@ async function main() {
     document.querySelector('.cell[data-r="' + mv.row + '"][data-c="' + mv.col + '"]').click();
     await new Promise(r => setTimeout(r, 1200));
     const s = window.BlokDebug.snapshot();
-    return { sharedScore: s.shared.score, turn: s.turn, seq: s.seq, mv };
+    return { sharedScore: s.shared.score, turn: s.turn, seq: s.seq, mv,
+             filled: s.shared.board.flat().filter(Boolean).length };
   })()`);
-  ok("A hamlesi sunucuya gitti", moveA.sharedScore > 0 && moveA.turn === 1, moveA);
+  ok("A hamlesi sunucuya gitti", moveA.filled > 0 && moveA.turn === 1, moveA);
 
   const seenB = await b.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 600));
@@ -208,7 +209,7 @@ async function main() {
              hint: document.getElementById('game-hint').textContent,
              filled: s.shared.board.flat().filter(Boolean).length };
   })()`);
-  ok("B hamleyi gördü ve sıra onda", seenB.sharedScore === moveA.sharedScore && seenB.turn === 1, seenB);
+  ok("B hamleyi gördü ve sıra onda", seenB.filled === moveA.filled && seenB.turn === 1, seenB);
   ok("ortak tahtada taş var", seenB.filled > 0, seenB);
 
   /* ---- sahte hamle reddedilmeli: sırası olmayan oyuncu ---- */
@@ -236,14 +237,14 @@ async function main() {
     document.querySelector('.cell[data-r="' + mv.row + '"][data-c="' + mv.col + '"]').click();
     await new Promise(r => setTimeout(r, 1000));
     const s = window.BlokDebug.snapshot();
-    return { score: s.shared.score, turn: s.turn, mv };
+    return { turn: s.turn, mv, filled: s.shared.board.flat().filter(Boolean).length };
   })()`);
   const afterB = await a.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 600));
     const s = window.BlokDebug.snapshot();
-    return { score: s.shared.score, turn: s.turn };
+    return { turn: s.turn, filled: s.shared.board.flat().filter(Boolean).length };
   })()`);
-  ok("B hamlesi A'ya yansıdı ve sıra A'ya döndü", afterB.score === moveB.score && afterB.turn === 0, { moveB, afterB });
+  ok("B hamlesi A'ya yansıdı ve sıra A'ya döndü", afterB.filled > moveA.filled && afterB.turn === 0, { moveA, moveB, afterB });
 
   /* ---- süre cezası: iki tarafta da ceza sayısı artmalı ---- */
   const penaltySeen = await a.evaluate(`(async () => {

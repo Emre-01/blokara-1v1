@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -27,6 +28,8 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private String serverUrl = DEFAULT_SERVER;
+    private int insetBottom = 0;
+    private int insetTop = 0;
 
     /* assets/server.txt varsa oradaki adresi kullan; yoksa varsayılana dön. */
     private String readServerUrl() {
@@ -87,6 +90,27 @@ public class MainActivity extends Activity {
 
         web.addJavascriptInterface(new Bridge(), "BlokIkiServer");
 
+        /* Jest/gezinme çubuğunun yüksekliğini ölçüp CSS'e aktarırız. */
+        web.setOnApplyWindowInsetsListener(new android.view.View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(android.view.View view, WindowInsets insets) {
+                int top, bottom;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    android.graphics.Insets bars = insets.getInsets(
+                            WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                    top = bars.top;
+                    bottom = bars.bottom;
+                } else {
+                    top = insets.getSystemWindowInsetTop();
+                    bottom = insets.getSystemWindowInsetBottom();
+                }
+                float density = getResources().getDisplayMetrics().density;
+                insetTop = Math.max(0, Math.round(top / density));
+                insetBottom = Math.max(0, Math.round(bottom / density));
+                return insets;
+            }
+        });
+
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -127,6 +151,18 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String serverUrl() {
             return serverUrl;
+        }
+
+        /* Android 15+ kenardan kenara çizdiği için sistem çubuğu yüksekliğini
+           CSS'e bildiririz; alt butonlar jest çubuğunun altında kalmasın. */
+        @JavascriptInterface
+        public int bottomInset() {
+            return insetBottom;
+        }
+
+        @JavascriptInterface
+        public int topInset() {
+            return insetTop;
         }
 
         @JavascriptInterface

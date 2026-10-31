@@ -45,6 +45,17 @@ Block Blast tek kişilik. Bizim farkımız iki kişilik olması. Bu yüzden:
 Ödül: patlayan satır başına **+2 sn**, combo arttıkça satır başına ek **+0,75 sn**.
 Ceza: sıra sayacı biterse −15 puan + sıra kaybı; ortak sayaçta süre biterse tur biter.
 
+### 1b. Puanlama
+Blok yerleştirmek **puan vermez**. Puan yalnızca patlayan çizgilerden gelir:
+
+- Patlayan her satır veya sütun: **25 puan**.
+- Aynı hamlede hem satır hem sütun patlarsa ek olarak **haç bonusu**: +90 puan,
+  ayrıca kesişen her satır×sütun çifti için +35 puan.
+- Combo (üst üste patlatma) tüm puanı çarpar: 1. patlama ×1, 2. ×2, 3. ×3…
+
+Örnek: tek satır 25, iki satır 50, satır+sütun (haç) 175; combo ×2 ile haç 350.
+Katsayılar `game-core.js` içinde `LINE_POINTS`, `CROSS_BONUS`, `CROSS_POINTS` olarak durur.
+
 ### 2. Juice (oyun hissi)
 - Patlayan her hücre için parçacık (canvas, tek katman).
 - Patlama noktasında yüzen puan yazısı (`+24`, `+36`).

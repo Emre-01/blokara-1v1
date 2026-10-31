@@ -6,7 +6,11 @@ param(
   [string]$Configuration = "debug",
   [string]$OutFile = "",
   # Yayınlanan sunucu adresi; APK'ya gömülür (örn. https://blok-iki.onrender.com).
-  [string]$ServerUrl = ""
+  [string]$ServerUrl = "",
+  # Son kullanıcı sürümü: hata ayıklama kapalı, ayrı anahtarla imzalanır.
+  [switch]$Release,
+  [string]$VersionName = "1.1",
+  [int]$VersionCode = 2
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,12 +74,24 @@ $compiled = Join-Path $out "res-compiled"
 $assets   = Join-Path $out "assets"
 $manifest = Join-Path $android "AndroidManifest.xml"
 
+# Sürüm bilgisi ve hata ayıklama bayrağı: kaynak manifeste dokunmadan
+# derleme klasöründe bir kopya üzerinde değiştirilir.
+$manifestOut = Join-Path $out "AndroidManifest.xml"
+$manifestText = [System.IO.File]::ReadAllText($manifest)
+$manifestText = $manifestText -replace 'android:versionCode="[^"]*"', ('android:versionCode="' + $VersionCode + '"')
+$manifestText = $manifestText -replace 'android:versionName="[^"]*"', ('android:versionName="' + $VersionName + '"')
+if ($Release) {
+  $manifestText = $manifestText -replace 'android:debuggable="[^"]*"', 'android:debuggable="false"'
+}
+
 Write-Host "SDK    : $sdk"
 Write-Host "Tools  : $($buildTools.Name)"
 Write-Host "Hedef  : $($platform.Name)"
 
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Path $gen, $classes, $dexOut, $compiled, $assets | Out-Null
+[System.IO.File]::WriteAllText($manifestOut, $manifestText, (New-Object System.Text.UTF8Encoding($false)))
+$manifest = $manifestOut
 
 # 1) Web varlıklarını assets/www içine kopyala
 Write-Host "`n[1/6] Web varlıkları kopyalanıyor..."
@@ -139,8 +155,6 @@ $unsigned = Join-Path $out "unsigned.apk"
   --java $gen `
   --min-sdk-version 23 `
   --target-sdk-version 35 `
-  --version-code 1 `
-  --version-name "1.0" `
   (Get-ChildItem $compiled -Filter *.flat | ForEach-Object { $_.FullName })
 if ($LASTEXITCODE -ne 0) { throw "aapt2 link başarısız" }
 
@@ -194,20 +208,42 @@ $aligned = Join-Path $out "aligned.apk"
 & $zipalign -f 4 $unsigned $aligned
 if ($LASTEXITCODE -ne 0) { throw "zipalign başarısız" }
 
-$keystore = Join-Path $android "debug.keystore"
-if (-not (Test-Path $keystore)) {
-  $prevPref = $ErrorActionPreference
-  $ErrorActionPreference = "Continue"
-  & keytool -genkeypair -v -keystore $keystore -storepass android -keypass android `
-    -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 `
-    -dname "CN=Android Debug,O=Android,C=US" 2>&1 | Out-Null
-  $ErrorActionPreference = $prevPref
-  if (-not (Test-Path $keystore)) { throw "keytool hata verdi" }
+# Son kullanıcı sürümü kendi anahtarıyla imzalanır; hata ayıklama sürümü debug anahtarını kullanır.
+if ($Release) {
+  $keystore = Join-Path $android "release.keystore"
+  $storePass = "blokiki-release"
+  $alias = "blokiki"
+  if (-not (Test-Path $keystore)) {
+    $prevPref = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & keytool -genkeypair -v -keystore $keystore -storepass $storePass -keypass $storePass `
+      -alias $alias -keyalg RSA -keysize 2048 -validity 10000 `
+      -dname "CN=Blok Iki,O=Blok Iki,C=TR" 2>&1 | Out-Null
+    $ErrorActionPreference = $prevPref
+    if (-not (Test-Path $keystore)) { throw "release anahtarı oluşturulamadı" }
+    Write-Host "Yeni imza anahtarı: $keystore"
+  }
+} else {
+  $keystore = Join-Path $android "debug.keystore"
+  $storePass = "android"
+  $alias = "androiddebugkey"
+  if (-not (Test-Path $keystore)) {
+    $prevPref = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & keytool -genkeypair -v -keystore $keystore -storepass $storePass -keypass $storePass `
+      -alias $alias -keyalg RSA -keysize 2048 -validity 10000 `
+      -dname "CN=Android Debug,O=Android,C=US" 2>&1 | Out-Null
+    $ErrorActionPreference = $prevPref
+    if (-not (Test-Path $keystore)) { throw "keytool hata verdi" }
+  }
 }
 
-if (-not $OutFile) { $OutFile = Join-Path $android "build\blok-iki.apk" }
+if (-not $OutFile) {
+  $OutFile = if ($Release) { Join-Path $android "build\Blok-Iki-$VersionName.apk" }
+             else { Join-Path $android "build\blok-iki.apk" }
+}
 & $apksigner sign `
-  --ks $keystore --ks-pass pass:android --key-pass pass:android `
+  --ks $keystore --ks-pass "pass:$storePass" --key-pass "pass:$storePass" `
   --min-sdk-version 23 --out $OutFile $aligned
 if ($LASTEXITCODE -ne 0) { throw "apksigner başarısız" }
 

@@ -161,6 +161,22 @@
     return { rows: rows, cols: cols };
   }
 
+  /* Puanlama: yerleştirme puan vermez. Puan yalnızca patlayan çizgilerden gelir.
+     Satır ve sütun aynı hamlede patlarsa "haç" bonusu eklenir; combo hepsini çarpar. */
+  var LINE_POINTS = 25;    // patlayan her satır/sütun
+  var CROSS_BONUS = 90;    // satır + sütun birlikte patlarsa sabit bonus
+  var CROSS_POINTS = 35;   // kesişen her satır×sütun çifti
+
+  function linePoints(lines, combo) {
+    var rows = lines.rows.length;
+    var cols = lines.cols.length;
+    var total = rows + cols;
+    if (!total) return 0;
+    var base = total * LINE_POINTS;
+    if (rows > 0 && cols > 0) base += CROSS_BONUS + rows * cols * CROSS_POINTS;
+    return Math.round(base * Math.max(1, combo || 1));
+  }
+
   function hasAnyMove(board, tray) {
     if (!tray) return false;
     for (var p = 0; p < tray.length; p++) {
@@ -350,9 +366,7 @@
     }
 
     holder.combo = lineCount ? holder.combo + 1 : 0;
-    var blockPoints = piece.cells.length;
-    var clearPoints = lineCount ? lineCount * 10 * holder.combo : 0;
-    var points = blockPoints + clearPoints;
+    var points = linePoints(lines, holder.combo);
 
     holder.score += points;
     holder.blocks += piece.cells.length;
@@ -620,7 +634,8 @@
       });
     }
 
-    var score = cleared * 120 + piece.cells.length * 1.5;
+    var lineClear = linePoints(lines, 1) * 10;
+    var score = lineClear + piece.cells.length * 1.2;
 
     // Komşuluk: yerleşen taşların dolu komşusu olması iyi.
     var neighbours = 0;
@@ -714,6 +729,10 @@
     cloneBoard: cloneBoard,
     canPlace: canPlace,
     fullLines: fullLines,
+    linePoints: linePoints,
+    LINE_POINTS: LINE_POINTS,
+    CROSS_BONUS: CROSS_BONUS,
+    CROSS_POINTS: CROSS_POINTS,
     hasAnyMove: hasAnyMove,
     countCells: countCells,
     cleanName: cleanName,

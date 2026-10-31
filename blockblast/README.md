@@ -1,6 +1,6 @@
 # Blok İki
 
-Block Blast'ın iki kişilik yorumu. Aynı cihazda ya da oda koduyla uzaktan oynanır.
+İki kişilik blok oyunu. Aynı cihazda ya da oda koduyla uzaktan oynanır.
 Telefona Android uygulaması (APK) olarak kurulabilir, internetsiz de açılır.
 
 ## İki mod
@@ -183,5 +183,3 @@ node --experimental-websocket test/inspect.cjs http://127.0.0.1:8080/ 390 844 sh
 - Sunucu yeniden başlarsa odalar silinir.
 - Servis çalışanı varlıkları ağdan çeker, çevrimdışıyken önbellekten sunar; böylece
   güncellemeler takılı kalmaz.
-- Bu proje Block Blast ile bağlantılı değildir; ona saygıyla yapılmış iki kişilik
-  bir yorumdur.

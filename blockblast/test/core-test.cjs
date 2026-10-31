@@ -322,4 +322,42 @@ test("süresiz modda sayaç işlemiyor", () => {
   assert.strictEqual(game.phase, "playing");
 });
 
+test("yerleştirme puan vermiyor, puan yalnızca patlayan çizgiden geliyor", () => {
+  const game = new Core.Game({ mode: "versus", seed: 8, turnBased: false });
+  const board = game.players[0].board;
+  // patlamayan bir hamle: skor 0 kalmalı
+  const result = game.move(0, 0, 3, 3);
+  assert.ok(result.ok, result.reason);
+  assert.strictEqual(result.lastMove.lines, 0);
+  assert.strictEqual(game.players[0].score, 0, "kutu koymak puan getirmemeli");
+});
+
+test("satır + sütun birlikte patlarsa haç bonusu devreye giriyor", () => {
+  // tek çizgi
+  const single = Core.linePoints({ rows: [7], cols: [] }, 1);
+  const cross = Core.linePoints({ rows: [7], cols: [7] }, 1);
+  const twoRows = Core.linePoints({ rows: [6, 7], cols: [] }, 1);
+  assert.strictEqual(single, Core.LINE_POINTS);
+  assert.ok(cross > twoRows, "satır+sütun, iki satırdan daha değerli olmalı");
+  assert.ok(cross >= single * 4, "haç en az 4 katı puan getirmeli");
+  assert.strictEqual(cross, 2 * Core.LINE_POINTS + Core.CROSS_BONUS + Core.CROSS_POINTS);
+  // combo çarpar
+  assert.strictEqual(Core.linePoints({ rows: [7], cols: [7] }, 3), cross * 3);
+  assert.strictEqual(Core.linePoints({ rows: [], cols: [] }, 5), 0);
+});
+
+test("tek hamlede hem satır hem sütun patlayınca skor sıçrıyor", () => {
+  const game = new Core.Game({ mode: "coop", seed: 44 });
+  const board = game.shared.board;
+  fillRow(board, 7, 3);
+  for (let r = 0; r < Core.SIZE; r++) if (r !== 7) board[r][3] = "sky";
+  // (7,3) hem satırı hem sütunu tamamlıyor
+  game.shared.tray[0] = { shape: 0, name: "nokta", cells: [[0, 0]], w: 1, h: 1, color: "coral" };
+  const result = game.move(0, 0, 7, 3);
+  assert.ok(result.ok, result.reason);
+  assert.strictEqual(result.lastMove.lines, 2);
+  assert.strictEqual(result.lastMove.points, Core.linePoints({ rows: [7], cols: [3] }, 1));
+  assert.ok(game.shared.score >= 100, "haç vuruşu en az 100 puan getirmeli");
+});
+
 console.log("Çekirdek testleri geçti (" + passed + " test).");

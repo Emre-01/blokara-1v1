@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Blok İki — iki kişilik blok oyunu</title>
-  <meta name="description" content="Block Blast'ın iki kişilik hâli. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın. Aynı cihazda veya oda koduyla uzaktan.">
+  <meta name="description" content="İki kişilik blok oyunu. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın. Aynı cihazda veya oda koduyla uzaktan.">
   <meta name="theme-color" content="#F3EAD8">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -49,9 +49,8 @@
       <div class="home-copy">
         <p class="kicker">İki kişilik blok oyunu</p>
         <h1>Blokları <span class="marker">iki kişi</span><br> dizersiniz.</h1>
-        <p class="lead">Block Blast'ın iki kişilik hâli. Aynı tahtada omuz omuza
-          hayatta kalın ya da ayrı tahtalarda birbirinizi geçin.
-          Aynı telefonda veya oda koduyla uzaktan.</p>
+        <p class="lead">Aynı tahtada omuz omuza hayatta kalın ya da ayrı tahtalarda
+          birbirinizi geçin. Aynı telefonda veya oda koduyla uzaktan.</p>
         <div class="hero-facts" aria-label="Oyun bilgileri">
           <span><b>8×8</b> tahta</span>
           <span><b>2</b> oyuncu</span>
@@ -129,7 +128,6 @@
             Ne kadar dayanırsınız?</p>
           <div class="mode-actions">
             <button class="btn btn-ink" type="button" data-local="coop">Aynı cihazda oyna</button>
-            <button class="btn btn-outline" type="button" data-host="coop">Oda kur</button>
           </div>
         </div>
       </article>
@@ -156,7 +154,6 @@
             skor tablosu seni bekliyor.</p>
           <div class="mode-actions">
             <button class="btn btn-ink" type="button" data-local="versus">Aynı cihazda oyna</button>
-            <button class="btn btn-outline" type="button" data-host="versus">Oda kur</button>
           </div>
         </div>
       </article>
@@ -167,81 +164,57 @@
         <p class="kicker">Günün tahtası</p>
         <h2 id="daily-title">Herkes aynı blokları alır</h2>
         <p id="daily-desc">Bugünün tohumuyla bota karşı oyna. Her gün bir tur, seriyi bozma.</p>
+        <span class="tiny" id="daily-state">Bugün henüz oynanmadı</span>
       </div>
       <div class="daily-side">
         <div class="daily-streak"><b id="daily-streak">0</b><span>gün seri</span></div>
         <button class="btn btn-coral" type="button" id="play-daily">Bugünü oyna</button>
-        <span class="tiny" id="daily-state">Bugün henüz oynanmadı</span>
       </div>
     </section>
+
+    <details class="online-card" id="online-card">
+      <summary class="online-summary">
+        <span class="online-summary-title">Uzaktan oyna</span>
+        <span class="online-summary-sub">Kodla katıl</span>
+      </summary>
+      <div class="online-body">
+        <div class="online-copy">
+          <h2 id="online-title">Uzaktan oyna</h2>
+          <p>Arkadaşının oda kodunu gir ve katıl. Kendin oda kuruyorsan kodu ona gönder.</p>
+        </div>
+        <div class="online-form">
+          <div class="field">
+            <label for="player-name">Adın</label>
+            <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
+                   placeholder="Örn. Ada" enterkeyhint="next">
+          </div>
+          <form id="join-form" class="join-form" novalidate>
+            <div class="field">
+              <label for="join-code">Oda kodu</label>
+              <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
+                     autocapitalize="characters" autocomplete="off" spellcheck="false"
+                     inputmode="text" enterkeyhint="go">
+            </div>
+            <button class="btn btn-coral" type="submit" id="join-btn">Katıl</button>
+          </form>
+          <div class="online-create">
+            <span class="setup-label">Oda kur</span>
+            <div class="online-create-row">
+              <button class="btn btn-outline btn-sm" type="button" data-host="coop">Ortak tahta</button>
+              <button class="btn btn-outline btn-sm" type="button" data-host="versus">Rakip</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
 
     <details class="ach-card" id="ach-card">
       <summary>Başarımlar <span class="ach-count" id="ach-count">0 / 12</span></summary>
       <div class="ach-list" id="ach-list"></div>
     </details>
 
-    <section class="online-card" aria-labelledby="online-title">
-      <div class="online-copy">
-        <h2 id="online-title">Uzaktan oyna</h2>
-        <p>Bir oda kurup kodu paylaş. Arkadaşın aynı sayfayı açsın, kodu girsin.
-          Sunucu iki tahtayı da anlık eşitler.</p>
-        <ol class="online-steps">
-          <li>Adını yaz.</li>
-          <li>Modu seçip oda kur ya da kodu gir.</li>
-          <li>Oda kodunu paylaş, oyunu başlat.</li>
-        </ol>
-      </div>
-      <div class="online-form">
-        <div class="field">
-          <label for="player-name">Adın</label>
-          <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
-                 placeholder="Örn. Ada" enterkeyhint="next">
-        </div>
-        <form id="join-form" class="join-form" novalidate>
-          <div class="field">
-            <label for="join-code">Oda kodu</label>
-            <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
-                   autocapitalize="characters" autocomplete="off" spellcheck="false"
-                   inputmode="text" enterkeyhint="go">
-          </div>
-          <button class="btn btn-coral" type="submit" id="join-btn">Odaya katıl</button>
-        </form>
-        <p class="form-note">Oda kodunu arkadaşınla paylaş. Aynı ağdaysanız
-          <code>http://bilgisayar-ip:8080</code> adresini de kullanabilirsiniz.</p>
-
-        <details class="server-field" id="server-field">
-          <summary>Sunucu adresi</summary>
-          <div class="field">
-            <label for="server-url">Oyun sunucusu</label>
-            <input id="server-url" type="url" inputmode="url" autocomplete="off"
-                   spellcheck="false" placeholder="https://blok-iki.onrender.com">
-          </div>
-          <p class="tiny">Uygulama sürümünde uzaktan oyun için gerekli. Web sürümünde boş
-            bırakırsan aynı adres kullanılır.</p>
-        </details>
-      </div>
-    </section>
-
-    <details class="rules-card">
-      <summary>Nasıl oynanır?</summary>
-      <div class="rules-body">
-        <p>Her turda elinde üç blok olur. Blokları 8×8 tahtaya sürükle.
-          Bir satır veya sütunu tamamen doldurursan patlar ve yer açılır.
-          Yeni bloklar ancak üçü de kullanıldığında gelir.</p>
-        <ul>
-          <li><b>Ortak tahta:</b> Sırayla oynarsınız. Skor ortaktır; her oyuncunun katkısı ayrı görünür.</li>
-          <li><b>Rakip:</b> Ayrı tahtalar, aynı blok sırası. Tahtası dolan kaybeder.</li>
-          <li>Blokların hiçbiri sığmıyorsa tur biter.</li>
-          <li>Üst üste satır patlatmak combo çarpanını yükseltir.</li>
-        </ul>
-        <p class="tiny">İpucu: telefondaysan bloğu parmağınla sürükle. Kısa dokunuşla
-          bloğu seçip tahtadaki bir kareye de dokunabilirsin.</p>
-      </div>
-    </details>
-
     <footer class="site-foot">
       <p>Blok İki — arkadaşlar arası bir blok oyunu.</p>
-      <p class="tiny">Block Blast ile bağlantılı değildir; ona saygıyla yapılmış iki kişilik bir yorumdur.</p>
     </footer>
   </section>
 

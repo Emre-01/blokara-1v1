@@ -182,7 +182,41 @@
   /* yükleme                                                             */
   /* ------------------------------------------------------------------ */
 
+  /* Android 15+ uygulama kenardan kenara çizilir; sistem çubuğunun
+     yüksekliğini CSS'e taşı ki alttaki düğmeler çubuğun altında kalmasın. */
+  function applyNativeInsets() {
+    var bridge = window.BlokIkiServer;
+    if (!bridge) return;
+    var bottom = 0;
+    var top = 0;
+    try {
+      if (typeof bridge.bottomInset === "function") bottom = Number(bridge.bottomInset()) || 0;
+      if (typeof bridge.topInset === "function") top = Number(bridge.topInset()) || 0;
+    } catch (error) {
+      bottom = 0;
+      top = 0;
+    }
+    if (!bottom && !top) return;
+    var root = document.documentElement;
+    root.style.setProperty("--safe-b", bottom + "px");
+    root.style.setProperty("--safe-t", top + "px");
+    root.classList.add("native");
+  }
+
+  /* Pencereler yerleştikten sonra ölçüler değişebilir; birkaç kez tazele. */
+  function applyNativeInsetsSoon() {
+    applyNativeInsets();
+    [150, 500, 1200].forEach(function (delay) {
+      setTimeout(applyNativeInsets, delay);
+    });
+  }
+
   function init() {
+    /* Telefonda uygulama yeniden açıldığında eski kaydırma konumuna dönmesin. */
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+    applyNativeInsetsSoon();
+
     var savedName = read(LS_NAME);
     var nameInput = $("#player-name");
     if (savedName && nameInput) nameInput.value = savedName;
@@ -211,6 +245,10 @@
     prepareSharedLink();
     attemptSessionRejoin();
     exposeDebug();
+
+    var onlineCard = $("#online-card");
+    if (onlineCard && window.matchMedia("(min-width: 721px)").matches) onlineCard.open = true;
+    window.scrollTo(0, 0);
   }
 
   /* Yalnızca ?test=1 ile açılır; otomatik testler durumu sürebilsin diye. */
@@ -382,27 +420,9 @@
     }
   }
 
-  /* APK'da sayfa file:// üzerinden açılır; orada sunucu alanı hep görünür olmalı. */
+  /* APK'da sayfa file:// üzerinden açılır; sunucu adresi derlemeye gömülür. */
   function initServerField() {
-    var details = $("#server-field");
-    var input = $("#server-url");
-    if (!details || !input) return;
-    var base = serverBase();
-    if (base) input.value = base;
-    var fromFile = location.protocol === "file:";
-    if (fromFile || base) details.open = true;
-    var apply = function () {
-      var parsed = parseServer(input.value);
-      if (parsed) save(LS_SERVER, parsed.base);
-      else remove(LS_SERVER);
-      if (app.ws) {
-        try { app.ws.close(); } catch (error) { /* yoksay */ }
-        app.ws = null;
-      }
-      app.reconnectAttempts = 0;
-    };
-    input.addEventListener("change", apply);
-    input.addEventListener("blur", apply);
+    /* Sunucu adresi artık arayüzde sorulmuyor; ayar dosyasından/derlemeden gelir. */
   }
 
   function buildHeroBoard() {
@@ -671,6 +691,16 @@
     return s.turn;
   }
 
+  /* Yerel bot oyununda ekran hep oyuncunun tahtasında kalır; bot kendi
+     tahtasında oynar. İki insan aynı cihazda oynarken tahta sırayla döner. */
+  function displayIndex() {
+    var s = app.state;
+    if (!s) return 0;
+    if (app.online) return app.me;
+    if (s.mode === "versus" && app.botLevel) return 0;
+    return s.turn;
+  }
+
   function activePlayerIndex() {
     var s = app.state;
     if (!s) return 0;
@@ -678,12 +708,21 @@
     return s.turnBased ? s.turn : (app.online ? app.me : 0);
   }
 
+  /* Hamle yapılabilir mi? (bot hamlesi de bu kapıdan geçer) */
   function canAct() {
     var s = app.state;
     if (!s || s.phase !== "playing" || app.pending) return false;
     if (!app.online) return true;
     if (s.mode === "coop") return s.turn === app.me;
     return !!s.players[app.me] && s.players[app.me].alive;
+  }
+
+  /* Kullanıcı ekrana dokunabilir mi? Bot düşünürken eli tahtadan çekeriz. */
+  function canPlay() {
+    if (!canAct()) return false;
+    var s = app.state;
+    if (!app.online && app.botLevel && s.mode === "versus" && s.turn !== 0) return false;
+    return true;
   }
 
   function performMove(pieceIndex, row, col) {
@@ -1153,7 +1192,7 @@
     var sub = player.lines + " satır · " + player.blocks + " blok";
     if (player.penalties) sub += ' · <span class="penalty">' + player.penalties + " ceza</span>";
     var offline = app.online && !player.connected;
-    var mini = s.mode === "versus" && (app.online ? index !== app.me : index !== s.turn) ? miniBoardHTML(player.board) : "";
+    var mini = s.mode === "versus" ? miniBoardHTML(player.board) : "";
     var clock = s.timeMode === "turn" && !s.turnBased && s.phase === "playing"
       ? '<span class="score-time" data-clock="' + index + '">' + fmtTime(clockValue(s, index)) + "</span>"
       : "";
@@ -1229,13 +1268,14 @@
     return html + "</div></div>";
   }
 
-  function pieceHTML(piece, index, interactive) {
+  function pieceHTML(piece, index, interactive, dim) {
     if (!piece) {
       return '<div class="piece empty" aria-hidden="true"></div>';
     }
     var filled = {};
     piece.cells.forEach(function (cell) { filled[cell[0] + "-" + cell[1]] = true; });
-    var html = '<div class="piece' + (app.selected === index ? " selected" : "") + (interactive ? "" : " dead") +
+    var html = '<div class="piece' + (app.selected === index ? " selected" : "") +
+      (dim ? " dead" : "") + (interactive ? "" : " locked") +
       '" data-piece="' + index + '" role="button" tabindex="' + (interactive ? "0" : "-1") +
       '" aria-label="Blok ' + (index + 1) + '" style="grid-template-columns:repeat(' + piece.w + ', var(--tile))">';
     for (var r = 0; r < piece.h; r++) {
@@ -1248,10 +1288,10 @@
     return html + "</div>";
   }
 
-  function trayHTML(tray, interactive) {
+  function trayHTML(tray, interactive, dim) {
     var html = '<div class="tray" id="tray" aria-label="Blok seçimi">';
     for (var i = 0; i < tray.length; i++) {
-      html += pieceHTML(tray[i], i, interactive);
+      html += pieceHTML(tray[i], i, interactive, dim);
     }
     return html + "</div>";
   }
@@ -1265,11 +1305,11 @@
       app.cursor = null;
     }
     cancelDrag();
-    clearPreview();
+    hidePreview();
     renderScoreboard();
 
     var table = $("#table-area");
-    var interactive = canAct();
+    var interactive = canPlay();
     var html = "";
 
     if (s.mode === "coop") {
@@ -1285,9 +1325,10 @@
       html += trayHTML(shared.tray, interactive);
       html += '</div>';
     } else if (!app.online) {
-      var activeIndex = s.turn;
+      var activeIndex = displayIndex();
       var activePlayer = s.players[activeIndex];
       var activeColor = activeIndex === 0 ? "var(--coral)" : "var(--cobalt)";
+      var waitingBot = app.botLevel && s.turn !== activeIndex;
       html += '<div class="vs-local">';
       html += boardHTML(
         activePlayer.board,
@@ -1295,7 +1336,7 @@
         "active",
         '<span class="score-dot" style="background:' + activeColor + '"></span>' +
         esc(activePlayer.name) + ' <span class="you">' +
-          (app.botLevel && activeIndex === 1 ? "bot oynuyor" : "sıra sende") + '</span>'
+          (waitingBot ? "bot oynuyor" : "sıra sende") + '</span>'
       );
       html += '<div class="tray-wrap">';
       html += trayHTML(activePlayer ? activePlayer.tray : [], interactive);
@@ -1372,7 +1413,7 @@
     $$(".board").forEach(function (boardEl) {
       boardEl.addEventListener("pointermove", onBoardPointerMove);
       boardEl.addEventListener("pointerleave", function () {
-        if (!app.drag) clearPreview();
+        if (!app.drag) hidePreview();
       });
       boardEl.addEventListener("click", onBoardClick);
     });
@@ -1382,7 +1423,7 @@
     if (event.key !== "Enter" && event.key !== " ") return;
     var pieceEl = event.target.closest(".piece");
     if (!pieceEl || pieceEl.classList.contains("empty") || pieceEl.classList.contains("dead")) return;
-    if (!canAct()) return;
+    if (!canPlay()) return;
     event.preventDefault();
     var index = Number(pieceEl.dataset.piece);
     app.selected = app.selected === index ? null : index;
@@ -1398,8 +1439,8 @@
   function findCursorFor(pieceIndex) {
     var s = app.state;
     if (!s) return null;
-    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : s.turn].tray;
-    var board = s.mode === "coop" ? s.shared.board : s.players[app.online ? app.me : s.turn].board;
+    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : displayIndex()].tray;
+    var board = s.mode === "coop" ? s.shared.board : s.players[app.online ? app.me : displayIndex()].board;
     var piece = tray[pieceIndex];
     if (!piece) return null;
     for (var r = 0; r < SIZE; r++) {
@@ -1417,18 +1458,23 @@
     var s = app.state;
     var boardEl = activeBoardEl();
     if (!s || !boardEl) return;
-    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : s.turn].tray;
-    var board = s.mode === "coop" ? s.shared.board : s.players[app.online ? app.me : s.turn].board;
+    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : displayIndex()].tray;
+    var board = s.mode === "coop" ? s.shared.board : s.players[app.online ? app.me : displayIndex()].board;
     var piece = tray[app.selected];
     if (!piece) return;
-    paintPreview(boardEl, piece, cursor.row, cursor.col);
+    var geo = boardGeometry(boardEl);
+    if (!geo) return;
+    var valid = CORE.canPlace(board, piece, cursor.row, cursor.col);
+    showPreview(piece, cursor.row, cursor.col, geo, valid);
+    if (valid) markLineHint(boardEl, board, piece, cursor.row, cursor.col);
+    else clearLineHint();
     var el = boardEl.children[cursor.row * SIZE + cursor.col];
     if (el) el.classList.add("cursor");
   }
 
   function onBoardKeyDown(event) {
     var s = app.state;
-    if (!s || app.screen !== "game" || app.selected == null || !canAct()) return;
+    if (!s || app.screen !== "game" || app.selected == null || !canPlay()) return;
     var moves = {
       ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]
     };
@@ -1448,14 +1494,14 @@
   }
 
   function onTrayPointerDown(event) {
-    if (!canAct()) return;
+    if (!canPlay()) return;
     var pieceEl = event.target.closest(".piece");
     if (!pieceEl || pieceEl.classList.contains("empty") || pieceEl.classList.contains("dead")) return;
     event.preventDefault();
 
     var index = Number(pieceEl.dataset.piece);
     var s = app.state;
-    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : s.turn].tray;
+    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : displayIndex()].tray;
     var piece = tray[index];
     if (!piece) return;
 
@@ -1469,6 +1515,8 @@
 
     var boardEl = activeBoardEl();
     if (!boardEl) return;
+    var geo = boardGeometry(boardEl);
+    if (!geo) return;
 
     app.selected = index;
     app.cursor = null;
@@ -1484,58 +1532,87 @@
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
-      lift: event.pointerType === "mouse" ? 0 : 46,
+      lift: event.pointerType === "mouse" ? 0 : 44,
       boardEl: boardEl,
-      ghost: null,
+      geo: geo,
+      bounds: boardEl.getBoundingClientRect(),
+      ghost: buildGhost(piece, geo),
       target: null,
-      pointerId: event.pointerId
+      pointerId: event.pointerId,
+      queued: null,
+      frame: 0
     };
-    buildGhost();
     moveGhost(event.clientX, event.clientY);
     window.addEventListener("pointermove", onDragMove, { passive: false });
     window.addEventListener("pointerup", onDragEnd);
     window.addEventListener("pointercancel", onDragEnd);
   }
 
-  function buildGhost() {
-    var drag = app.drag;
-    if (!drag) return;
-    var rect = drag.boardEl.getBoundingClientRect();
-    var pitch = rect.width / SIZE;
-    var tile = pitch * 0.86;
+  /* Çizim için gereken ölçüler: sürükleme başında bir kez okunur. */
+  function boardGeometry(boardEl) {
+    var cells = boardEl.children;
+    if (!cells || cells.length < SIZE + 1) return null;
+    var a = cells[0].getBoundingClientRect();
+    var b = cells[1].getBoundingClientRect();
+    var c = cells[SIZE].getBoundingClientRect();
+    return {
+      x: a.left,
+      y: a.top,
+      w: a.width,
+      h: a.height,
+      stepX: b.left - a.left,
+      stepY: c.top - a.top
+    };
+  }
+
+  function buildGhost(piece, geo) {
     var ghost = document.createElement("div");
     ghost.className = "drag-ghost";
-    ghost.style.setProperty("--tile", tile + "px");
-    ghost.style.gridTemplateColumns = "repeat(" + drag.piece.w + ", " + tile + "px)";
-    ghost.style.gap = (pitch - tile) + "px";
     var filled = {};
-    drag.piece.cells.forEach(function (cell) { filled[cell[0] + "-" + cell[1]] = true; });
-    for (var r = 0; r < drag.piece.h; r++) {
-      for (var c = 0; c < drag.piece.w; c++) {
-        var el = document.createElement("span");
-        el.className = "pcell" + (filled[r + "-" + c] ? " on " + colorClass(drag.piece.color) : "");
-        ghost.appendChild(el);
+    piece.cells.forEach(function (cell) { filled[cell[0] + "-" + cell[1]] = true; });
+    for (var r = 0; r < piece.h; r++) {
+      for (var c = 0; c < piece.w; c++) {
+        if (!filled[r + "-" + c]) continue;
+        var span = document.createElement("span");
+        span.className = "pcell on " + colorClass(piece.color);
+        span.style.width = geo.w + "px";
+        span.style.height = geo.h + "px";
+        span.style.transform = "translate3d(" + (c * geo.stepX) + "px," + (r * geo.stepY) + "px,0)";
+        ghost.appendChild(span);
       }
     }
     document.body.appendChild(ghost);
-    drag.ghost = ghost;
+    return ghost;
   }
 
   function moveGhost(x, y) {
     var drag = app.drag;
     if (!drag || !drag.ghost) return;
-    var rect = drag.boardEl.getBoundingClientRect();
-    var pitch = rect.width / SIZE;
-    var left = x - (drag.grabC + 0.5) * pitch;
-    var top = y - drag.lift - (drag.grabR + 0.5) * pitch;
-    drag.ghost.style.left = left + "px";
-    drag.ghost.style.top = top + "px";
+    var left = x - (drag.grabC + 0.5) * drag.geo.stepX;
+    var top = y - drag.lift - (drag.grabR + 0.5) * drag.geo.stepY;
+    drag.ghost.style.transform = "translate3d(" + left + "px," + top + "px,0)";
   }
 
+  /* pointermove saniyede yüzlerce kez gelir; kare başına bir kez işleriz. */
   function onDragMove(event) {
     var drag = app.drag;
     if (!drag) return;
     event.preventDefault();
+    drag.queued = event;
+    if (drag.frame) return;
+    drag.frame = requestAnimationFrame(function () {
+      var current = app.drag;
+      if (!current) return;
+      current.frame = 0;
+      var queued = current.queued;
+      current.queued = null;
+      if (queued) updateDrag(queued);
+    });
+  }
+
+  function updateDrag(event) {
+    var drag = app.drag;
+    if (!drag) return;
     if (app.cursor) {
       app.cursor = null;
       $$(".cell.cursor").forEach(function (cell) { cell.classList.remove("cursor"); });
@@ -1544,19 +1621,31 @@
       drag.moved = true;
     }
     moveGhost(event.clientX, event.clientY);
-    var rect = drag.boardEl.getBoundingClientRect();
-    var pitch = rect.width / SIZE;
-    var col = Math.round((event.clientX - rect.left - (drag.grabC + 0.5) * pitch) / pitch);
-    var row = Math.round((event.clientY - drag.lift - rect.top - (drag.grabR + 0.5) * pitch) / pitch);
-    var inside = event.clientX >= rect.left - pitch && event.clientX <= rect.right + pitch &&
-      event.clientY >= rect.top - pitch && event.clientY <= rect.bottom + pitch;
+
+    var geo = drag.geo;
+    var bounds = drag.bounds;
+    var col = Math.round((event.clientX - (drag.grabC + 0.5) * geo.stepX - geo.x) / geo.stepX);
+    var row = Math.round((event.clientY - drag.lift - (drag.grabR + 0.5) * geo.stepY - geo.y) / geo.stepY);
+    var inside = event.clientX >= bounds.left - geo.stepX && event.clientX <= bounds.right + geo.stepX &&
+      event.clientY >= bounds.top - geo.stepY - drag.lift && event.clientY <= bounds.bottom + geo.stepY;
     if (!inside) {
-      clearPreview();
+      hidePreview();
       drag.target = null;
+      if (drag.ghost) drag.ghost.style.opacity = "";
       return;
     }
-    var valid = paintPreview(drag.boardEl, drag.piece, row, col);
-    drag.target = { row: row, col: col, valid: valid };
+
+    var board = activeBoard();
+    if (!board) return;
+    var valid = CORE.canPlace(board, drag.piece, row, col);
+    var key = row + ":" + col + ":" + (valid ? 1 : 0);
+    if (drag.target && drag.target.key === key) return;  // hedef değişmedi: boşuna çizme
+    drag.target = { row: row, col: col, valid: valid, key: key };
+    showPreview(drag.piece, row, col, geo, valid);
+    /* Tahtanın üstündeyken parmağın altındaki kopya gizlenir; hedef önizlemesi yeterli. */
+    if (drag.ghost) drag.ghost.style.opacity = "0";
+    if (valid) markLineHint(drag.boardEl, board, drag.piece, row, col);
+    else clearLineHint();
   }
 
   function onDragEnd() {
@@ -1565,8 +1654,17 @@
     window.removeEventListener("pointerup", onDragEnd);
     window.removeEventListener("pointercancel", onDragEnd);
     if (!drag) return;
+    if (drag.frame) {
+      cancelAnimationFrame(drag.frame);
+      drag.frame = 0;
+    }
+    if (drag.queued) {
+      var queued = drag.queued;
+      drag.queued = null;
+      updateDrag(queued);
+    }
     if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
-    clearPreview();
+    hidePreview();
     var target = drag.target;
     app.drag = null;
     if (drag.moved && target && target.valid) {
@@ -1585,78 +1683,116 @@
     window.removeEventListener("pointermove", onDragMove);
     window.removeEventListener("pointerup", onDragEnd);
     window.removeEventListener("pointercancel", onDragEnd);
+    if (app.drag.frame) cancelAnimationFrame(app.drag.frame);
     if (app.drag.ghost && app.drag.ghost.parentNode) app.drag.ghost.parentNode.removeChild(app.drag.ghost);
     app.drag = null;
+    hidePreview();
   }
 
   function activeBoardEl() {
     var s = app.state;
     if (!s) return null;
     if (s.mode === "coop") return $("#board-shared");
-    if (!app.online) return $("#board-" + s.turn);
+    if (!app.online) return $("#board-" + displayIndex());
     return $("#board-me");
   }
 
-  function paintPreview(boardEl, piece, row, col) {
-    clearPreview();
-    var valid = true;
+  function activeBoard() {
     var s = app.state;
-    var board = s.mode === "coop" ? s.shared.board : s.players[app.online ? app.me : s.turn].board;
-    if (!CORE.canPlace(board, piece, row, col)) valid = false;
-
-    for (var i = 0; i < piece.cells.length; i++) {
-      var r = row + piece.cells[i][0];
-      var c = col + piece.cells[i][1];
-      if (r < 0 || c < 0 || r >= SIZE || c >= SIZE) { valid = false; continue; }
-      var cell = boardEl.children[r * SIZE + c];
-      if (!cell) continue;
-      cell.classList.add(valid ? "ghost" : "bad", colorClass(piece.color));
-    }
-
-    if (valid) {
-      var test = board.map(function (line) { return line.slice(); });
-      piece.cells.forEach(function (cell) {
-        test[row + cell[0]][col + cell[1]] = "preview";
-      });
-      var full = CORE.fullLines(test);
-      full.rows.forEach(function (r) {
-        for (var c = 0; c < SIZE; c++) {
-          var el = boardEl.children[r * SIZE + c];
-          if (el) el.classList.add("clear-hint");
-        }
-      });
-      full.cols.forEach(function (c) {
-        for (var r = 0; r < SIZE; r++) {
-          var el = boardEl.children[r * SIZE + c];
-          if (el) el.classList.add("clear-hint");
-        }
-      });
-    }
-    return valid;
+    if (!s) return null;
+    if (s.mode === "coop") return s.shared.board;
+    return s.players[app.online ? app.me : displayIndex()].board;
   }
 
-  function clearPreview() {
-    $$(".cell.ghost, .cell.bad").forEach(function (cell) {
-      cell.classList.remove("ghost", "bad", "c-coral", "c-cobalt", "c-mustard", "c-mint", "c-grape", "c-sky");
+  /* ---------- hedef önizlemesi: tahtada tek katman, renkli ve okunur ---------- */
+
+  function showPreview(piece, row, col, geo, valid) {
+    var el = app.preview;
+    if (!el || app.previewPiece !== piece) {
+      hidePreview();
+      el = document.createElement("div");
+      el.className = "drop-preview";
+      var filled = {};
+      piece.cells.forEach(function (cell) { filled[cell[0] + "-" + cell[1]] = true; });
+      for (var r = 0; r < piece.h; r++) {
+        for (var c = 0; c < piece.w; c++) {
+          if (!filled[r + "-" + c]) continue;
+          var span = document.createElement("span");
+          span.className = "dp on " + colorClass(piece.color);
+          span.style.width = geo.w + "px";
+          span.style.height = geo.h + "px";
+          span.style.transform = "translate3d(" + (c * geo.stepX) + "px," + (r * geo.stepY) + "px,0)";
+          el.appendChild(span);
+        }
+      }
+      document.body.appendChild(el);
+      app.preview = el;
+      app.previewPiece = piece;
+    }
+    el.style.transform = "translate3d(" + (geo.x + col * geo.stepX) + "px," + (geo.y + row * geo.stepY) + "px,0)";
+    el.classList.toggle("bad", !valid);
+  }
+
+  function hidePreview() {
+    if (app.preview && app.preview.parentNode) app.preview.parentNode.removeChild(app.preview);
+    app.preview = null;
+    app.previewPiece = null;
+    clearLineHint();
+  }
+
+  function clearLineHint() {
+    if (!app.hintCells) return;
+    app.hintCells.forEach(function (cell) { cell.classList.remove("clear-hint"); });
+    app.hintCells = null;
+  }
+
+  /* Patlayacak satır/sütunları önceden işaretler (yalnızca hedef değişince çağrılır). */
+  function markLineHint(boardEl, board, piece, row, col) {
+    clearLineHint();
+    var test = board.map(function (line) { return line.slice(); });
+    piece.cells.forEach(function (cell) { test[row + cell[0]][col + cell[1]] = "preview"; });
+    var full = CORE.fullLines(test);
+    if (!full.rows.length && !full.cols.length) return;
+    var els = [];
+    full.rows.forEach(function (r) {
+      for (var c = 0; c < SIZE; c++) {
+        var el = boardEl.children[r * SIZE + c];
+        if (el) els.push(el);
+      }
     });
-    $$(".cell.clear-hint").forEach(function (cell) {
-      cell.classList.remove("clear-hint");
+    full.cols.forEach(function (c) {
+      for (var r = 0; r < SIZE; r++) {
+        var el = boardEl.children[r * SIZE + c];
+        if (el) els.push(el);
+      }
     });
+    els.forEach(function (el) { el.classList.add("clear-hint"); });
+    app.hintCells = els;
   }
 
   function onBoardPointerMove(event) {
-    if (app.drag || app.selected == null || event.pointerType !== "mouse" || !canAct()) return;
+    if (app.drag || app.selected == null || event.pointerType !== "mouse" || !canPlay()) return;
     var cell = event.target.closest(".cell");
     if (!cell || !app.state) return;
+    var boardEl = activeBoardEl();
+    var board = activeBoard();
+    if (!boardEl || !board) return;
     var s = app.state;
-    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : s.turn].tray;
+    var tray = s.mode === "coop" ? s.shared.tray : s.players[app.online ? app.me : displayIndex()].tray;
     var piece = tray[app.selected];
     if (!piece) return;
-    paintPreview(activeBoardEl(), piece, Number(cell.dataset.r), Number(cell.dataset.c));
+    var geo = boardGeometry(boardEl);
+    if (!geo) return;
+    var row = Number(cell.dataset.r);
+    var col = Number(cell.dataset.c);
+    var valid = CORE.canPlace(board, piece, row, col);
+    showPreview(piece, row, col, geo, valid);
+    if (valid) markLineHint(boardEl, board, piece, row, col);
+    else clearLineHint();
   }
 
   function onBoardClick(event) {
-    if (app.selected == null || !canAct()) return;
+    if (app.selected == null || !canPlay()) return;
     var cell = event.target.closest(".cell");
     if (!cell) return;
     app.cursor = null;
@@ -1671,6 +1807,8 @@
     var last = s.lastMove;
     var owner = s.mode === "coop" ? "shared" : (app.online ? String(last.by) : "active");
     var boardEl = document.querySelector('[data-board="' + owner + '"]');
+    /* Botun hamlesi oyuncunun tahtasında oynatılmasın. */
+    if (boardEl && s.mode === "versus" && !app.online && last.by !== displayIndex()) boardEl = null;
     if (boardEl) {
       last.placed.forEach(function (cell) {
         var el = boardEl.children[cell[0] * SIZE + cell[1]];
@@ -2030,14 +2168,9 @@
 
   /* Sunucu yoksa kullanıcıyı doğrudan adres alanına götürür. */
   function askServer(message) {
-    toast(message || "Sunucu adresi gir: online oyun için bir sunucuya bağlanmalısın.");
-    var details = $("#server-field");
-    var input = $("#server-url");
-    if (details && !details.open) details.open = true;
-    if (details && details.scrollIntoView) {
-      details.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-    if (input) setTimeout(function () { input.focus({ preventScroll: true }); }, 350);
+    toast(message || "Uzaktan oyun için sunucu ayarlı değil.");
+    var online = $("#online-card");
+    if (online && !online.open) online.open = true;
   }
 
   function createRoom(mode) {
@@ -2255,7 +2388,7 @@
       if (event.key === "Escape" && app.selected != null) {
         app.selected = null;
         app.cursor = null;
-        clearPreview();
+        hidePreview();
         $$(".piece").forEach(function (el) { el.classList.remove("selected"); });
       }
     });

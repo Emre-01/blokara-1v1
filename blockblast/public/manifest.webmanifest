@@ -1,7 +1,7 @@
 {
   "name": "Blok İki — iki kişilik blok oyunu",
   "short_name": "Blok İki",
-  "description": "Block Blast'ın iki kişilik hâli. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın.",
+  "description": "İki kişilik blok oyunu. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın.",
   "lang": "tr",
   "dir": "ltr",
   "start_url": "/",

@@ -111,9 +111,9 @@ async function main() {
           const msg = await a.next((m) => (m.t === "state" && m.state.phase === "playing") || m.t === "error", 700);
           if (msg.t === "state") {
             placed = true;
-            assert.ok(msg.state.players[0].score > 0);
+            assert.ok(msg.state.players[0].blocks > 0);
             const seen = await b.next((m) => m.t === "state" && m.state.phase === "playing");
-            assert.strictEqual(seen.state.players[0].score, msg.state.players[0].score);
+            assert.strictEqual(seen.state.players[0].blocks, msg.state.players[0].blocks);
           }
         } catch (error) { /* sığmadı, devam */ }
       }
@@ -129,7 +129,7 @@ async function main() {
       for (let c = 0; c < 8 && !placedB; c++) {
         b.send({ t: "move", piece: p, row: r, col: c });
         try {
-          const msg = await b.next((m) => (m.t === "state" && m.state.players[1].score > 0) || m.t === "error", 600);
+          const msg = await b.next((m) => (m.t === "state" && m.state.players[1].blocks > 0) || m.t === "error", 600);
           if (msg.t === "state") {
             placedB = true;
             assert.ok(msg.state.players[1].blocks > 0);
@@ -230,7 +230,7 @@ async function main() {
           moved = true;
           assert.strictEqual(msg.state.turn, 1);
           const shared = msg.state.shared;
-          assert.ok(shared.score > 0);
+          assert.ok(shared.blocks > 0);
           const flat = shared.board.flat().filter(Boolean).length;
           assert.ok(flat > 0, "ortak tahtada blok yok");
         }
