@@ -101,8 +101,9 @@ SSL_KEY=/etc/ssl/key.pem SSL_CERT=/etc/ssl/cert.pem node server.cjs
    **Enter** ile bırak, **Esc** ile vazgeç.
 6. Tamamlanan her satır/sütun patlar. Üst üste patlatmak combo çarpanını yükseltir.
 
-Puanlama: yerleşen her blok için 1 puan; patlayan her satır için `10 × satır × combo`.
-Combo, art arda patlayan hamlelerde büyür, patlamayan hamlede sıfırlanır.
+Puanlama: yerleştirme puan vermez. Yalnızca patlayan çizgiler puan kazandırır —
+her satır/sütun 25 puan, aynı hamlede satır + sütun patlarsa ekstra haç bonusu
+(90 + 35 × kesişim) gelir ve combo hepsini çarpar.
 
 ## Telefona kurma (Android APK)
 
@@ -116,8 +117,19 @@ powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
 ```
 
 `-ServerUrl` verilirse adres APK'nın içine gömülür (`assets/server.txt`), arkadaşın
-hiçbir ayar yapmadan uzaktan oynayabilir. Adres verilmezse uygulama içindeki
-**Sunucu adresi** alanı kullanılır (`http://10.0.2.2:8080` varsayılanı emülatör içindir).
+hiçbir ayar yapmadan uzaktan oynayabilir. Adres verilmezse oyun yalnızca tek cihazda
+(aynı telefonda iki kişi) oynanır.
+
+Yayın sürümü (kendi imza anahtarınla, mağazaya/telefona kurulabilir):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
+  -ServerUrl "https://senin-sunucun.onrender.com" `
+  -Release -VersionName "1.1" -VersionCode 2
+```
+
+Çıktı: `android/build/Blok-Iki-1.1.apk`. İmza anahtarı `android/release.keystore`
+(yalnızca **bir kez** üretilir; güncelleme yayınlarken aynı dosyayı kullan).
 
 Kurulum:
 
