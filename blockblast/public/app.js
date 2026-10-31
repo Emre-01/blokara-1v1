@@ -1230,8 +1230,8 @@
       main = "ikisi de";
       cls = "live";
     } else if (app.botLevel) {
-      top = s.turn === 1 ? "bot düşünüyor" : "sıra";
-      main = s.turn === 1 ? "Bot" : "Sen";
+      top = s.turn === 1 ? "bot" : "sıra";
+      main = s.turn === 1 ? "düşünüyor" : "Sen";
       cls = s.turn === 1 ? "thinking" : "";
     } else {
       top = "sıra";

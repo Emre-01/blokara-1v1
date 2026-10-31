@@ -29,9 +29,9 @@ function adb(args) {
   return (r.stdout || "") + (r.stderr || "");
 }
 
-function getJson(pathname) {
+function getJsonOn(port, pathname) {
   return new Promise((resolve, reject) => {
-    http.get({ host: "127.0.0.1", port: PORT, path: pathname }, (res) => {
+    http.get({ host: "127.0.0.1", port, path: pathname }, (res) => {
       let body = "";
       res.on("data", (c) => (body += c));
       res.on("end", () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
@@ -39,22 +39,41 @@ function getJson(pathname) {
   });
 }
 
-async function waitForDevtools() {
+function getJson(pathname) {
+  return getJsonOn(PORT, pathname);
+}
+
+async function waitForDevtools(port) {
   for (let i = 0; i < 60; i++) {
-    try { return await getJson("/json/list"); } catch (e) { await new Promise((r) => setTimeout(r, 300)); }
+    try { return await getJsonOn(port, "/json/list"); } catch (e) { await new Promise((r) => setTimeout(r, 300)); }
   }
   throw new Error("DevTools köprüsü açılmadı");
 }
 
 async function main() {
-  const sockets = adb(["shell", "cat /proc/net/unix"]).split("\n").filter((l) => l.includes("webview_devtools_remote_"));
-  if (!sockets.length) throw new Error("WebView hata ayıklama soketi yok. Uygulama açık mı?");
-  const name = sockets[sockets.length - 1].trim().split("@")[1];
-  adb(["forward", "tcp:" + PORT, "localabstract:" + name]);
+  /* Başka uygulamaların WebView'ları da soket açar; sayfamızı barındıranı seçeriz. */
+  const pkg = process.env.PKG || "tr.blokiki.app";
+  const all = adb(["shell", "cat /proc/net/unix"]).split("\n").filter((l) => l.includes("webview_devtools_remote_"));
+  if (!all.length) throw new Error("WebView hata ayıklama soketi yok. Uygulama açık mı?");
 
-  const targets = await waitForDevtools();
-  const page = targets.find((t) => t.type === "page") || targets[0];
-  if (!page) throw new Error("Sayfa hedefi bulunamadı");
+  /* Birden çok WebView olabilir (emülatörde başka uygulamalar da soket açar).
+     Her soketi ayrı porta yönlendirip bizim sayfamızı barındıranı seçeriz. */
+  let chosen = null;
+  for (let i = 0; i < all.length; i++) {
+    const socketName = all[i].trim().split("@")[1];
+    if (!socketName) continue;
+    adb(["forward", "tcp:" + (PORT + i), "localabstract:" + socketName]);
+    let list = [];
+    try { list = await getJsonOn(PORT + i, "/json/list"); } catch (e) { continue; }
+    const page = list.find((t) => t.type === "page" && /android_asset\/(www|index)/.test(t.url || ""))
+      || (process.env.PKG ? list.find((t) => t.type === "page" && /blok/i.test(t.title || "")) : null);
+    if (page) { chosen = { socketName, port: PORT + i, page }; break; }
+  }
+  if (!chosen) throw new Error(pkg + " WebView'ı bulunamadı. Uygulama açık mı?");
+  adb(["forward", "tcp:" + PORT, "localabstract:" + chosen.socketName]);
+
+  await waitForDevtools(PORT);
+  const page = chosen.page;
 
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {

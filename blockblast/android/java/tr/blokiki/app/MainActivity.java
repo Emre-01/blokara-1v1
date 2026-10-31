@@ -107,11 +107,17 @@ public class MainActivity extends Activity {
                 float density = getResources().getDisplayMetrics().density;
                 insetTop = Math.max(0, Math.round(top / density));
                 insetBottom = Math.max(0, Math.round(bottom / density));
+                pushInsets();
                 return insets;
             }
         });
 
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pushInsets();
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return handleUrl(request.getUrl().toString());
@@ -133,6 +139,12 @@ public class MainActivity extends Activity {
         }
     }
 
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) pushInsets();
+    }
+
     /* Uygulama içi linkler WebView'da kalır, dış linkler tarayıcıda açılır. */
     private boolean handleUrl(String url) {
         if (url == null) return false;
@@ -145,6 +157,16 @@ public class MainActivity extends Activity {
             /* açacak uygulama yok */
         }
         return true;
+    }
+
+    /* Ölçülen güvenli alanları CSS değişkenlerine yazar. */
+    private void pushInsets() {
+        if (web == null) return;
+        String js = "(function(){var r=document.documentElement;" +
+                "r.style.setProperty('--safe-t','" + insetTop + "px');" +
+                "r.style.setProperty('--safe-b','" + insetBottom + "px');" +
+                "r.classList.add('native');})()";
+        web.evaluateJavascript(js, null);
     }
 
     public class Bridge {
