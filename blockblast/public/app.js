@@ -1836,6 +1836,12 @@
     );
   }
 
+  function timeModeLabel(mode) {
+    if (mode === "none") return "Süresiz";
+    if (mode === "turn") return "Sıra süresi";
+    return "Ortak süre";
+  }
+
   function showResult(reward) {
     var s = app.state;
     if (!s) return;
@@ -1875,8 +1881,7 @@
     } else {
       meta += '<span>' + s.players[0].lines + ' + ' + s.players[1].lines + ' satır</span>';
       meta += '<span>' + ((s.players[0].moves || 0) + (s.players[1].moves || 0)) + ' hamle</span>';
-      if (app.timeMode === "none") meta += '<span>Süresiz</span>';
-      else meta += '<span>Süre modu</span>';
+      meta += '<span>' + timeModeLabel(s.timeMode || app.timeMode) + '</span>';
     }
 
     var rewardHTML = "";

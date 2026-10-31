@@ -208,8 +208,9 @@
     }
 
     reward.win = win;
-    reward.xp = Math.round(score / 8) + lines * 3 + (win ? 25 : 0) + (reward.daily && reward.daily.newDay ? 30 : 0);
-    reward.coins = Math.round(score / 40) + lines * 2 + (win ? 10 : 0) + (reward.daily ? reward.daily.bonus : 0);
+    /* Turu bitirmek de bir şey kazandırır: en az 5 XP / 2 coin. */
+    reward.xp = 5 + Math.round(score / 8) + lines * 3 + (win ? 25 : 0) + (reward.daily && reward.daily.newDay ? 30 : 0);
+    reward.coins = 2 + Math.round(score / 40) + lines * 2 + (win ? 10 : 0) + (reward.daily ? reward.daily.bonus : 0);
     profile.xp += reward.xp;
     profile.coins += reward.coins;
 
