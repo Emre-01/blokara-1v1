@@ -93,18 +93,11 @@ New-Item -ItemType Directory -Path $gen, $classes, $dexOut, $compiled, $assets |
 [System.IO.File]::WriteAllText($manifestOut, $manifestText, (New-Object System.Text.UTF8Encoding($false)))
 $manifest = $manifestOut
 
-# 1) Web varlıklarını assets/www içine kopyala
+# 1) Web varlıklarını assets/www içine kopyala (public/ altındaki her şey)
 Write-Host "`n[1/6] Web varlıkları kopyalanıyor..."
 $www = Join-Path $assets "www"
 New-Item -ItemType Directory -Path $www -Force | Out-Null
-Copy-Item (Join-Path $root "public\index.html")          $www -Force
-Copy-Item (Join-Path $root "public\styles.css")          $www -Force
-Copy-Item (Join-Path $root "public\app.js")              $www -Force
-Copy-Item (Join-Path $root "public\game-core.js")        $www -Force
-Copy-Item (Join-Path $root "public\progress.js")         $www -Force
-Copy-Item (Join-Path $root "public\fx.js")               $www -Force
-Copy-Item (Join-Path $root "public\manifest.webmanifest") $www -Force
-Copy-Item (Join-Path $root "public\icons")               $www -Recurse -Force
+Copy-Item (Join-Path $root "public\*") $www -Recurse -Force
 # APK'da servis çalışanı gerekmez (varlıklar zaten yerel).
 Remove-Item (Join-Path $www "sw.js") -Force -ErrorAction SilentlyContinue
 

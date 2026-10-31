@@ -1,7 +1,7 @@
 /* Blok İki — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v7";
+const VERSION = "blok-iki-v8";
 const SHELL = [
   "/",
   "/index.html",
@@ -12,7 +12,11 @@ const SHELL = [
   "/fx.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
-  "/icons/icon-512.png"
+  "/icons/icon-512.png",
+  "/fonts/bricolage-latin.woff2",
+  "/fonts/bricolage-latin-ext.woff2",
+  "/fonts/figtree-latin.woff2",
+  "/fonts/figtree-latin-ext.woff2"
 ];
 
 self.addEventListener("install", (event) => {

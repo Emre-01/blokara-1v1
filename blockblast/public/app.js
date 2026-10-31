@@ -825,18 +825,24 @@
       }
       app.ws = socket;
       var settled = false;
+      /* Ücretsiz sunucular boşta uykuya geçer; ilk bağlantı 40-60 sn sürebilir. */
+      var slowToast = setTimeout(function () {
+        if (!settled) toast("Sunucu uyanıyor, birkaç saniye sürer…");
+      }, 4000);
       var timer = setTimeout(function () {
         if (!settled) {
           settled = true;
+          clearTimeout(slowToast);
           try { socket.close(); } catch (error) { /* yoksay */ }
           reject(new Error("Sunucu yanıt vermedi."));
         }
-      }, 8000);
+      }, 45000);
 
       socket.addEventListener("open", function () {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        clearTimeout(slowToast);
         app.reconnectAttempts = 0;
         resolve(socket);
       });
@@ -845,6 +851,7 @@
 
       socket.addEventListener("close", function () {
         clearTimeout(timer);
+        clearTimeout(slowToast);
         if (app.ws !== socket) return;
         app.ws = null;
         if (!settled) {
@@ -859,6 +866,7 @@
         if (!settled) {
           settled = true;
           clearTimeout(timer);
+          clearTimeout(slowToast);
           reject(new Error("Sunucuya bağlanılamadı."));
         }
       });

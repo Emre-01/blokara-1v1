@@ -1,10 +1,18 @@
+# Render.com'da tek tıkla yayın.
+# Render panelinde: New → Blueprint → bu depoyu seç. Ücretsiz plan kullanılır.
 services:
   - type: web
     name: blok-iki
     runtime: node
     plan: free
-    buildCommand: ""
-    startCommand: node server.cjs
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /healthz
+    buildCommand: "echo 'bagimlilik yok'"
+    startCommand: "node server.cjs"
     envVars:
       - key: NODE_VERSION
-        value: 20
+        value: "20"
+      - key: HOST
+        value: "0.0.0.0"
