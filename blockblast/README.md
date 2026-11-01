@@ -125,10 +125,10 @@ Yayın sürümü (kendi imza anahtarınla, mağazaya/telefona kurulabilir):
 ```powershell
 powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
   -ServerUrl "https://senin-sunucun.onrender.com" `
-  -Release -VersionName "1.1" -VersionCode 2
+  -Release -VersionName "1.4" -VersionCode 5
 ```
 
-Çıktı: `android/build/Blok-Iki-1.1.apk`. İmza anahtarı `android/release.keystore`
+Çıktı: `android/build/Blok-Iki-1.4.apk`. İmza anahtarı `android/release.keystore`
 (yalnızca **bir kez** üretilir; güncelleme yayınlarken aynı dosyayı kullan).
 
 Kurulum:
@@ -175,7 +175,7 @@ Sunucu otoritedir: hamleleri doğrular, tahtaları, blok sırasını ve saatleri
 
 ```bash
 npm test                     # hepsini çalıştırır
-node test/core-test.cjs      # oyun kuralları, süre, çöp satır, bot (20 test)
+node test/core-test.cjs      # oyun kuralları, süre, çöp satır, bot (23 test)
 node test/socket-test.cjs    # oda/WebSocket akışı + otoriter saat; sunucuyu 8099'da açar
 node --experimental-websocket test/online-flow.cjs   # iki sekmeli uçtan uca akış (17 kontrol)
 node test/check-html.cjs     # HTML/UTF-8/varlık sağlık kontrolü
@@ -195,3 +195,12 @@ node --experimental-websocket test/inspect.cjs http://127.0.0.1:8080/ 390 844 sh
 - Sunucu yeniden başlarsa odalar silinir.
 - Servis çalışanı varlıkları ağdan çeker, çevrimdışıyken önbellekten sunar; böylece
   güncellemeler takılı kalmaz.
+- Android uygulamasında geri tuşu önce açık kartı kapatır, oyunda duraklatma menüsünü
+  açar; yalnızca ana sayfadayken uygulamadan çıkar.
+- Yerel oyunda (bot/aynı cihaz) süre, menü açıkken ve uygulama arkadayken durur.
+  Çevrimiçi oyunda süre sunucuda işlediği için durmaz.
+- Oyun ekranında ekranın kararması engellenir; uygulama öne döndüğünde kopmuş
+  çevrimiçi bağlantı kendiliğinden tazelenir.
+- Sürüklerken blok parmağın ~36px üstünde durur; parmak bloğu kapatmaz. Dolu ya da
+  taşan bir hedefte tahtada önizleme binmez, blok kırmızı çerçeveyle uyarır ve
+  bırakınca yerleşmez.

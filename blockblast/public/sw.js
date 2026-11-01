@@ -1,7 +1,7 @@
 /* Blok İki — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v8";
+const VERSION = "blok-iki-v10";
 const SHELL = [
   "/",
   "/index.html",

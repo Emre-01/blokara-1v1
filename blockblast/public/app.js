@@ -53,7 +53,9 @@
     lastReward: null,
     lastClockWhole: -1,
     soundOn: true,
-    vibrate: true
+    vibrate: true,
+    lastServerAt: 0,
+    backgrounded: false
   };
 
   /* ------------------------------------------------------------------ */
@@ -240,6 +242,7 @@
     initHomeControls();
     buildHeroBoard();
     bindStaticEvents();
+    bindLifecycle();
     renderHomeMeta();
     registerServiceWorker();
     prepareSharedLink();
@@ -262,6 +265,54 @@
         return !!app.ws;
       },
       snapshot: function () { return app.state; },
+      /* Yalnızca testlerde: tahtaya dikdörtgen doldurup yeniden çizer. */
+      fillRegion: function (row, col, height, width, color) {
+        var s = app.state;
+        var g = app.game;
+        if (!s || !g) return null;
+        var board = s.mode === "coop" ? g.shared.board : g.players[0].board;
+        for (var r = row; r < row + height; r++) {
+          for (var c = col; c < col + width; c++) {
+            if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) board[r][c] = color || "mint";
+          }
+        }
+        app.state = g.snapshot();
+        renderGame();
+        return app.state;
+      },
+      fillRow: function (row, color) {
+        return this.fillRegion(row, 0, 1, SIZE, color);
+      },
+      drag: function () {
+        var d = app.drag;
+        if (!d) return null;
+        return {
+          lift: d.lift, grabR: d.grabR, grabC: d.grabC,
+          h: d.piece ? d.piece.h : null, w: d.piece ? d.piece.w : null,
+          size: d.piece ? d.piece.cells.length : null,
+          stepY: d.geo ? d.geo.stepY : null, cellH: d.geo ? d.geo.h : null,
+          stepX: d.geo ? d.geo.stepX : null, cellW: d.geo ? d.geo.w : null,
+          geoX: d.geo ? d.geo.x : null, geoY: d.geo ? d.geo.y : null,
+          target: d.target, moved: d.moved,
+          ghostTop: d.ghost ? d.ghost.style.transform : null,
+          ghostMoves: d.ghostMoves || 0, ghostAt: d.ghostAt || null,
+          hasGhost: !!d.ghost, ghostInDom: !!(d.ghost && d.ghost.parentNode),
+          queued: !!d.queued, frame: !!d.frame
+        };
+      },
+      status: function () {
+        return {
+          online: app.online,
+          room: app.room,
+          me: app.me,
+          ws: app.ws ? app.ws.readyState : null,
+          screen: app.screen,
+          phase: app.state ? app.state.phase : null,
+          players: app.state ? app.state.players.map(function (p) {
+            return p.name + ":" + (p.connected ? "on" : "off");
+          }) : []
+        };
+      },
       finish: function (winner, reason) {
         if (!app.game) return null;
         app.game.finish(winner, reason || "Test bitişi.");
@@ -422,7 +473,25 @@
 
   /* APK'da sayfa file:// üzerinden açılır; sunucu adresi derlemeye gömülür. */
   function initServerField() {
-    /* Sunucu adresi artık arayüzde sorulmuyor; ayar dosyasından/derlemeden gelir. */
+    /* Sunucu adresi artık arayüzde sorulmuyor; ayar dosyasından/derlemeden gelir.
+       Adres gömülü değilse uzaktan oyun bölümünü kapatıp nedenini yazarız. */
+    if (location.protocol !== "file:" || serverBase()) return;
+    var card = $("#online-card");
+    if (!card) return;
+    card.classList.add("offline-only");
+    var sub = $(".online-summary-sub", card);
+    if (sub) sub.textContent = "Bu sürümde kapalı";
+    $$("button, input", card).forEach(function (el) {
+      el.disabled = true;
+    });
+    var body = $(".online-body", card);
+    if (body) {
+      var note = document.createElement("p");
+      note.className = "online-note";
+      note.textContent = "Bu kurulumda çevrimiçi sunucu adresi tanımlı değil. " +
+        "Aynı cihazda ve bota karşı oynamak sorunsuz çalışır.";
+      body.insertBefore(note, body.firstChild);
+    }
   }
 
   function buildHeroBoard() {
@@ -452,6 +521,13 @@
   /* ekran yönetimi                                                      */
   /* ------------------------------------------------------------------ */
 
+  /* Oyun sırasında ekran kararmasın (Android köprüsü varsa). */
+  function setKeepAwake(on) {
+    var bridge = window.BlokIkiServer;
+    if (!bridge || typeof bridge.keepAwake !== "function") return;
+    try { bridge.keepAwake(!!on); } catch (error) { /* yoksay */ }
+  }
+
   function showScreen(name) {
     app.screen = name;
     ["home", "lobby", "game"].forEach(function (screen) {
@@ -463,6 +539,7 @@
     var badge = $("#room-badge");
     badge.hidden = !inRoom;
     if (inRoom && app.room) badge.textContent = "ODA " + app.room;
+    setKeepAwake(name === "game");
     if (name === "game") {
       app.lastAnimated = -1;
       startClock();
@@ -539,6 +616,9 @@
     var dt = (now - app.lastClockAt) / 1000;
     app.lastClockAt = now;
     if (!app.state || app.screen !== "game" || app.state.phase !== "playing") return;
+    /* Yerel oyunda menü açıkken ya da uygulama arkadayken sayaç işlemez.
+       Çevrimiçi oyunda süre sunucuda işlediği için durdurulmaz. */
+    if (localPaused()) return;
 
     if (!app.online && app.game) {
       var result = app.game.tick(dt);
@@ -671,6 +751,7 @@
     var s = app.state;
     app.botThinking = false;
     if (!s || app.online || s.phase !== "playing" || !app.botLevel || s.turn !== 1) return;
+    if (localPaused()) return;
     var player = s.players[1];
     if (!player) return;
     var move = CORE.botMove(player.board, player.tray, app.botLevel, Math.random);
@@ -811,11 +892,15 @@
     return "";
   }
 
-  function ensureSocket() {
+  function ensureSocket(options) {
+    var quiet = !!(options && options.quiet);
     return new Promise(function (resolve, reject) {
       if (app.ws && app.ws.readyState === WebSocket.OPEN) return resolve(app.ws);
+      if (navigator.onLine === false) {
+        return reject(new Error("İnternet bağlantısı yok. Bağlanınca tekrar dene."));
+      }
       if (location.protocol === "file:" && !serverBase()) {
-        return reject(new Error("Sunucu adresi gir: online oyun için bir sunucuya bağlanmalısın."));
+        return reject(new Error("Bu sürümde çevrimiçi sunucu tanımlı değil."));
       }
       var socket;
       try {
@@ -827,7 +912,7 @@
       var settled = false;
       /* Ücretsiz sunucular boşta uykuya geçer; ilk bağlantı 40-60 sn sürebilir. */
       var slowToast = setTimeout(function () {
-        if (!settled) toast("Sunucu uyanıyor, birkaç saniye sürer…");
+        if (!settled && !quiet) toast("Sunucu uyanıyor, birkaç saniye sürer…");
       }, 4000);
       var timer = setTimeout(function () {
         if (!settled) {
@@ -883,6 +968,7 @@
   }
 
   function handleSocketMessage(event) {
+    app.lastServerAt = Date.now();
     var message;
     try { message = JSON.parse(event.data); } catch (error) { return; }
     if (!message || !message.t) return;
@@ -924,9 +1010,16 @@
 
   function startHeartbeat() {
     if (app.heartbeat) clearInterval(app.heartbeat);
+    app.lastServerAt = Date.now();
     app.heartbeat = setInterval(function () {
-      if (app.ws && app.ws.readyState === WebSocket.OPEN) wsSend({ t: "ping" });
-    }, 25000);
+      if (!app.ws || app.ws.readyState !== WebSocket.OPEN) return;
+      /* Sessizce ölmüş bağlantı (tünel/uyku) fark edilmeden kalmasın. */
+      if (Date.now() - app.lastServerAt > 30000) {
+        try { app.ws.close(); } catch (error) { /* yoksay */ }
+        return;
+      }
+      wsSend({ t: "ping" });
+    }, 10000);
   }
 
   function handleSocketClose() {
@@ -1015,9 +1108,18 @@
     if (new URLSearchParams(location.search).get("oda")) return;
     var session = readSession();
     if (!session) return;
-    ensureSocket().then(function () {
+    /* Uygulama yeniden açıldığında sadece taze oturumu kendiliğinden dene;
+       eski oda kayıtları arka planda sessizce temizlenir. */
+    if (Date.now() - (session.at || 0) > 3 * 60 * 1000) {
+      clearSession(session.code);
+      return;
+    }
+    ensureSocket({ quiet: true }).then(function () {
       wsSend({ t: "rejoin", code: session.code, token: session.token });
-    }).catch(function () { clearSession(session.code); });
+    }).catch(function () {
+      /* Çevrimdışıysak oturumu silme; internet gelince tekrar denenebilir. */
+      if (navigator.onLine !== false) clearSession(session.code);
+    });
   }
 
   function cleanupOnline(keepSession) {
@@ -1230,8 +1332,11 @@
       main = fmt(s.shared ? s.shared.score : 0);
       cls = s.phase === "over" ? "over" : "";
     } else if (s.phase === "over") {
-      top = "kazanan";
-      main = s.winner != null && s.players[s.winner] ? s.players[s.winner].name : "bitti";
+      var tied = s.winner == null || !s.players[s.winner];
+      top = tied ? "berabere" : "kazanan";
+      main = tied
+        ? s.players.map(function (p) { return p.score; }).join(" - ")
+        : s.players[s.winner].name;
       cls = "over";
     } else if (app.online) {
       top = "canlı";
@@ -1344,7 +1449,7 @@
         "active",
         '<span class="score-dot" style="background:' + activeColor + '"></span>' +
         esc(activePlayer.name) + ' <span class="you">' +
-          (waitingBot ? "bot oynuyor" : "sıra sende") + '</span>'
+          (s.phase === "over" ? "tur bitti" : (waitingBot ? "bot oynuyor" : "sıra sende")) + '</span>'
       );
       html += '<div class="tray-wrap">';
       html += trayHTML(activePlayer ? activePlayer.tray : [], interactive);
@@ -1525,6 +1630,11 @@
     if (!boardEl) return;
     var geo = boardGeometry(boardEl);
     if (!geo) return;
+    /* Bloğun alt kenarı parmağın hep biraz üstünde kalır: parmak bloğu
+       kapatmaz. Yükseklik, tutulan hücreye göre hesaplanır. */
+    var clearance = event.pointerType === "mouse" ? 0 : Math.max(24, Math.round(geo.stepY * 0.75));
+    var lift = event.pointerType === "mouse" ? 0
+      : Math.round((piece.h - grabR - 0.5) * geo.stepY + clearance);
 
     app.selected = index;
     app.cursor = null;
@@ -1540,7 +1650,9 @@
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
-      lift: event.pointerType === "mouse" ? 0 : 44,
+      /* Parmakla sürüklerken blok parmağın biraz üstünde durur; parmak
+         bloğu kapatmaz. Fare için kaldırma gerekmez. */
+      lift: lift,
       boardEl: boardEl,
       geo: geo,
       bounds: boardEl.getBoundingClientRect(),
@@ -1599,23 +1711,21 @@
     var left = x - (drag.grabC + 0.5) * drag.geo.stepX;
     var top = y - drag.lift - (drag.grabR + 0.5) * drag.geo.stepY;
     drag.ghost.style.transform = "translate3d(" + left + "px," + top + "px,0)";
+    drag.ghostAt = { x: x, y: y, left: left, top: top };
+    drag.ghostMoves = (drag.ghostMoves || 0) + 1;
   }
 
-  /* pointermove saniyede yüzlerce kez gelir; kare başına bir kez işleriz. */
+  /* Sürükleme sırasında her harekette hemen güncelle. rAF bazı WebView'larda
+     gecikip blok parmağın gerisinde kalıyordu; iş hafif, hedef değişmediyse
+     yalnızca bir transform yazılır. */
   function onDragMove(event) {
     var drag = app.drag;
     if (!drag) return;
-    event.preventDefault();
-    drag.queued = event;
-    if (drag.frame) return;
-    drag.frame = requestAnimationFrame(function () {
-      var current = app.drag;
-      if (!current) return;
-      current.frame = 0;
-      var queued = current.queued;
-      current.queued = null;
-      if (queued) updateDrag(queued);
-    });
+    if (event.cancelable) event.preventDefault();
+    if (drag.moved && drag.lastX === event.clientX && drag.lastY === event.clientY) return;
+    drag.lastX = event.clientX;
+    drag.lastY = event.clientY;
+    updateDrag(event);
   }
 
   function updateDrag(event) {
@@ -1632,28 +1742,42 @@
 
     var geo = drag.geo;
     var bounds = drag.bounds;
-    var col = Math.round((event.clientX - (drag.grabC + 0.5) * geo.stepX - geo.x) / geo.stepX);
-    var row = Math.round((event.clientY - drag.lift - (drag.grabR + 0.5) * geo.stepY - geo.y) / geo.stepY);
-    var inside = event.clientX >= bounds.left - geo.stepX && event.clientX <= bounds.right + geo.stepX &&
-      event.clientY >= bounds.top - geo.stepY - drag.lift && event.clientY <= bounds.bottom + geo.stepY;
+    var piece = drag.piece;
+    var maxRow = SIZE - piece.h;
+    var maxCol = SIZE - piece.w;
+    var rawCol = Math.round((event.clientX - (drag.grabC + 0.5) * geo.stepX - geo.x) / geo.stepX);
+    var rawRow = Math.round((event.clientY - drag.lift - (drag.grabR + 0.5) * geo.stepY - geo.y) / geo.stepY);
+    var inside = event.clientX >= bounds.left - geo.stepX * 1.5 &&
+      event.clientX <= bounds.right + geo.stepX * 1.5 &&
+      event.clientY >= bounds.top - geo.stepY * 1.5 - drag.lift &&
+      event.clientY <= bounds.bottom + geo.stepY * 2;
     if (!inside) {
-      hidePreview();
+      hidePreviewVisual();
       drag.target = null;
-      if (drag.ghost) drag.ghost.style.opacity = "";
+      if (drag.ghost) drag.ghost.classList.remove("bad");
       return;
     }
 
+    /* Önizleme tahtanın dışına taşmasın: hedefi tahta sınırına yasla. */
+    var row = Math.max(0, Math.min(maxRow, rawRow));
+    var col = Math.max(0, Math.min(maxCol, rawCol));
+
     var board = activeBoard();
     if (!board) return;
-    var valid = CORE.canPlace(board, drag.piece, row, col);
+    var valid = CORE.canPlace(board, piece, row, col);
     var key = row + ":" + col + ":" + (valid ? 1 : 0);
     if (drag.target && drag.target.key === key) return;  // hedef değişmedi: boşuna çizme
     drag.target = { row: row, col: col, valid: valid, key: key };
-    showPreview(drag.piece, row, col, geo, valid);
-    /* Tahtanın üstündeyken parmağın altındaki kopya gizlenir; hedef önizlemesi yeterli. */
-    if (drag.ghost) drag.ghost.style.opacity = "0";
-    if (valid) markLineHint(drag.boardEl, board, drag.piece, row, col);
-    else clearLineHint();
+    if (drag.ghost) drag.ghost.classList.toggle("bad", !valid);
+    if (valid) {
+      showPreview(piece, row, col, geo);
+      markLineHint(drag.boardEl, board, piece, row, col);
+    } else {
+      /* Dolu ya da taşan yere hedef gösterme: blok yalnızca parmağın
+         üstünde kalır, tahtadaki dolu karelerin üzerine binmez. */
+      hidePreviewVisual();
+      clearLineHint();
+    }
   }
 
   function onDragEnd() {
@@ -1662,15 +1786,6 @@
     window.removeEventListener("pointerup", onDragEnd);
     window.removeEventListener("pointercancel", onDragEnd);
     if (!drag) return;
-    if (drag.frame) {
-      cancelAnimationFrame(drag.frame);
-      drag.frame = 0;
-    }
-    if (drag.queued) {
-      var queued = drag.queued;
-      drag.queued = null;
-      updateDrag(queued);
-    }
     if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
     hidePreview();
     var target = drag.target;
@@ -1714,10 +1829,10 @@
 
   /* ---------- hedef önizlemesi: tahtada tek katman, renkli ve okunur ---------- */
 
-  function showPreview(piece, row, col, geo, valid) {
+  function showPreview(piece, row, col, geo) {
     var el = app.preview;
     if (!el || app.previewPiece !== piece) {
-      hidePreview();
+      if (el) hidePreview();
       el = document.createElement("div");
       el.className = "drop-preview";
       var filled = {};
@@ -1737,8 +1852,14 @@
       app.preview = el;
       app.previewPiece = piece;
     }
+    el.classList.remove("is-hidden");
     el.style.transform = "translate3d(" + (geo.x + col * geo.stepX) + "px," + (geo.y + row * geo.stepY) + "px,0)";
-    el.classList.toggle("bad", !valid);
+  }
+
+  /* Geçersiz hedefte önizlemeyi silmeden gizleriz; böylece sürüklerken
+     her karede DOM kurulmaz ve blok takılmaz. */
+  function hidePreviewVisual() {
+    if (app.preview) app.preview.classList.add("is-hidden");
   }
 
   function hidePreview() {
@@ -1963,6 +2084,7 @@
     overlay.hidden = true;
     $(".sheet", overlay).innerHTML = "";
     document.body.style.overflow = "";
+    resumeLocal();
   }
 
   function showHelp() {
@@ -2061,12 +2183,13 @@
       ? '<p class="result-note">Bir oyuncunun bağlantısı yok. Yeniden başlatmak için iki oyuncu da bağlı olmalı.</p>'
       : "";
 
+    var tie = !coop && (winner == null || !s.players[winner]);
     var sub = coop
       ? '<p class="sheet-sub">Birlikte ' + fmt(s.shared.score) + ' puana ulaştınız.</p>'
       : (app.botLevel
-        ? '<p class="sheet-sub">' + (won ? "Botu geçtin." : "Bot bu turu aldı.") +
+        ? '<p class="sheet-sub">' + (tie ? "Skorlar eşit; tur berabere bitti." : (won ? "Botu geçtin." : "Bot bu turu aldı.")) +
           (app.daily ? " Günün tahtası sayıldı." : "") + '</p>'
-        : '<p class="sheet-sub">' + (won ? "Rakibinin tahtası doldu." : "Tahtan doldu.") + '</p>');
+        : '<p class="sheet-sub">' + (tie ? "Skorlar eşit; tur berabere bitti." : (won ? "Rakibinin tahtası doldu." : "Tahtan doldu.")) + '</p>');
 
     openOverlay(
       '<span class="result-badge' + (coop ? "" : (won ? "" : " lost")) + '">' + badge + '</span>' +
@@ -2101,6 +2224,9 @@
       '<h2>Oyun menüsü</h2>' +
       '<p class="sheet-sub">' + (online ? 'Oda <b>' + esc(app.room || "") + '</b> · ' + modeName(s.mode) + ' · Online' : modeName(s.mode) + ' · Aynı cihaz') + '</p>' +
       (info ? '<p class="result-note">Seviye ' + info.level + ' · ' + fmt(app.profile.coins) + ' coin · ' + fmt(app.profile.bestAny || 0) + ' rekor</p>' : '') +
+      (online && s.timeMode && s.timeMode !== "none"
+        ? '<p class="result-note">Çevrimiçi oyunda süre menü açıkken de işler.</p>'
+        : '') +
       '<div class="sheet-actions">' +
         (canRestart ? '<button class="btn btn-coral" type="button" data-restart>' + restartLabel + '</button>' : '') +
         '<button class="btn btn-outline" type="button" data-help>Nasıl oynanır?</button>' +
@@ -2174,7 +2300,7 @@
     return value;
   }
 
-  /* Sunucu yoksa kullanıcıyı doğrudan adres alanına götürür. */
+  /* Sunucu sorununda uzaktan oyun bölümünü açar (adres alanı yok; adres gömülü). */
   function askServer(message) {
     toast(message || "Uzaktan oyun için sunucu ayarlı değil.");
     var online = $("#online-card");
@@ -2462,6 +2588,79 @@
     } else {
       copyText(url, "Oda bağlantısı kopyalandı.");
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* yaşam döngüsü / geri tuşu                                           */
+  /* ------------------------------------------------------------------ */
+
+  /* Yerel oyun, menü açıkken ya da uygulama arkadayken duraklar. */
+  function localPaused() {
+    if (app.online) return false;
+    return !!app.backgrounded || !$("#overlay").hidden;
+  }
+
+  function resumeLocal() {
+    if (!app.state || app.screen !== "game") return;
+    app.lastClockAt = performance.now();
+    if (localPaused()) return;
+    if (app.state.phase === "playing") {
+      scheduleBot();
+      updateClock();
+    }
+  }
+
+  function setBackgrounded(value) {
+    value = !!value;
+    if (app.backgrounded === value) return;
+    app.backgrounded = value;
+    if (value) return;
+    resumeLocal();
+    resumeOnline();
+  }
+
+  /* Uygulama öne döndüğünde kopmuş çevrimiçi bağlantıyı tazele. */
+  function resumeOnline() {
+    if (!app.online) {
+      /* Oyun ortasında uygulamadan çıkıldıysa öne dönünce oturumu geri al. */
+      if (!app.reconnectTimer) attemptSessionRejoin();
+      return;
+    }
+    if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
+      if (!app.reconnectTimer) scheduleReconnect();
+      return;
+    }
+    wsSend({ t: "ping" });
+  }
+
+  /* Android köprüsü uygulama öne/arkaya geçtiğinde çağırır. */
+  window.BlokLifecycle = function (state) {
+    setBackgrounded(state === "pause");
+  };
+
+  /* Android geri tuşu: true dönerse uygulama kapanmaz. */
+  window.BlokBack = function () {
+    if (!$("#overlay").hidden) {
+      if (app.overlayClosable) closeOverlay();
+      return true;
+    }
+    if (app.screen === "game") {
+      showMenu();
+      return true;
+    }
+    if (app.screen === "lobby") {
+      leaveToHome(false);
+      return true;
+    }
+    return false;
+  };
+
+  function bindLifecycle() {
+    document.addEventListener("visibilitychange", function () {
+      setBackgrounded(!!document.hidden);
+    });
+    window.addEventListener("pagehide", function () { setBackgrounded(true); });
+    window.addEventListener("pageshow", function () { setBackgrounded(false); });
   }
 
   /* ------------------------------------------------------------------ */

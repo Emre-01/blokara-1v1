@@ -9,8 +9,8 @@ param(
   [string]$ServerUrl = "",
   # Son kullanıcı sürümü: hata ayıklama kapalı, ayrı anahtarla imzalanır.
   [switch]$Release,
-  [string]$VersionName = "1.1",
-  [int]$VersionCode = 2
+  [string]$VersionName = "1.4",
+  [int]$VersionCode = 5
 )
 
 $ErrorActionPreference = "Stop"
@@ -103,8 +103,15 @@ Remove-Item (Join-Path $www "sw.js") -Force -ErrorAction SilentlyContinue
 
 # Sunucu adresi: verilmişse APK'ya gömülür, verilmemişse uygulama varsayılanı kullanır.
 if ($ServerUrl) {
-  $normalized = $ServerUrl.Trim()
-  if ($normalized -notmatch '^[a-zA-Z][a-zA-Z0-9+.-]*://') { $normalized = "http://" + $normalized }
+  $normalized = $ServerUrl.Trim().TrimEnd('/')
+  if ($normalized -notmatch '^[a-zA-Z][a-zA-Z0-9+.-]*://') {
+    # Şemasız adres: yerel adresler http, internete açık adresler https.
+    if ($normalized -match '^(localhost|127\.|10\.|192\.168\.)') {
+      $normalized = "http://" + $normalized
+    } else {
+      $normalized = "https://" + $normalized
+    }
+  }
   [System.IO.File]::WriteAllText((Join-Path $assets "server.txt"), $normalized, (New-Object System.Text.UTF8Encoding($false)))
   Write-Host "Sunucu : $normalized"
 }

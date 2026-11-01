@@ -35,6 +35,14 @@
   return (async function () {
     var dbg = window.BlokDebug;
     if (!dbg) return "BlokDebug yok";
+    /* Önceki testten kalan sonuç kartı varsa kapat. */
+    var ov = document.getElementById("overlay");
+    if (ov && !ov.hidden) {
+      var closer = ov.querySelector("[data-close]");
+      if (closer) closer.click();
+      else ov.hidden = true;
+    }
+    await wait(150);
     dbg.start("versus", { bot: "easy", timeMode: "none" });
     await wait(500);
 

@@ -564,6 +564,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .online-card {
   display: block;
+  margin-top: 22px;
   background: var(--ink);
   color: var(--paper);
   border: 2px solid var(--ink);
@@ -867,6 +868,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   box-shadow: 0 2px 0 rgba(28, 27, 46, 0.3);
 }
 .mode-switch button:disabled { opacity: 0.6; }
+
+/* Lobby'deki süre seçicisinde üç seçenek var; iki sütunlu ızgarada taşıyordu. */
+.mode-switch.lobby-timer { grid-template-columns: repeat(3, 1fr); }
+.mode-switch.lobby-timer button { padding: 9px 6px; font-size: 12.5px; white-space: nowrap; }
 
 .slots {
   list-style: none;
@@ -1277,6 +1282,17 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   opacity: 0.6;
 }
 
+/* Geçersiz hedef: önizleme gizlenir, blok parmağın üstünde kalır. */
+.drop-preview.is-hidden {
+  opacity: 0;
+}
+
+/* Bırakılamayacak konumda tutulan blok kırmızı çerçeveyle uyarır. */
+.drag-ghost.bad .pcell.on {
+  box-shadow: inset 0 0 0 2px rgba(242, 85, 61, 0.95),
+    inset 0 3px 0 rgba(255, 255, 255, 0.24), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
+}
+
 .game-foot {
   display: flex;
   align-items: center;
@@ -1293,7 +1309,14 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   flex: 1;
   min-width: 120px;
 }
-.game-foot .btn-ghost { order: -1; }
+/* Oyun alt çubuğu: menü butonu solda ve tıklanabilir görünür olmalı. */
+.game-foot #game-menu {
+  order: -1;
+  box-shadow: 2px 2px 0 var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+}
 
 /* rakip (aynı cihaz) */
 .vs-local {
@@ -1927,6 +1950,19 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   line-height: 1;
 }
 .online-card[open] .online-summary-sub::after { content: "–"; }
+
+/* Sunucu adresi gömülü olmayan derlemelerde uzaktan oyun kapalı. */
+.online-card.offline-only .online-body { opacity: 0.6; }
+.online-card.offline-only .online-summary-sub::after { display: none; }
+.online-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 2px dashed rgba(243, 234, 216, 0.45);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--paper);
+}
 
 @media (max-width: 720px) {
   /* Ana sayfa: sıkı, tek ekran */

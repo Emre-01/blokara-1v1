@@ -8,7 +8,7 @@
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#F3EAD8",
   "theme_color": "#F3EAD8",
   "categories": ["games", "entertainment"],

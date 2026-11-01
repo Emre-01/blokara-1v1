@@ -81,6 +81,43 @@
       </div>
     </section>
 
+    <!-- Uzaktan oyun: temel mekanik, ana sayfanın üst kısmında -->
+    <details class="online-card" id="online-card">
+      <summary class="online-summary">
+        <span class="online-summary-title">Uzaktan oyna</span>
+        <span class="online-summary-sub">Kodla katıl</span>
+      </summary>
+      <div class="online-body">
+        <div class="online-copy">
+          <h2 id="online-title">Uzaktan oyna</h2>
+          <p>Arkadaşının oda kodunu gir ve katıl. Kendin oda kuruyorsan kodu ona gönder.</p>
+        </div>
+        <div class="online-form">
+          <div class="field">
+            <label for="player-name">Adın</label>
+            <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
+                   placeholder="Örn. Ada" enterkeyhint="next">
+          </div>
+          <form id="join-form" class="join-form" novalidate>
+            <div class="field">
+              <label for="join-code">Oda kodu</label>
+              <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
+                     autocapitalize="characters" autocomplete="off" spellcheck="false"
+                     inputmode="text" enterkeyhint="go">
+            </div>
+            <button class="btn btn-coral" type="submit" id="join-btn">Katıl</button>
+          </form>
+          <div class="online-create">
+            <span class="setup-label">Oda kur</span>
+            <div class="online-create-row">
+              <button class="btn btn-outline btn-sm" type="button" data-host="coop">Ortak tahta</button>
+              <button class="btn btn-outline btn-sm" type="button" data-host="versus">Rakip</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
     <section class="quick-card" aria-labelledby="quick-title">
       <div class="quick-head">
         <h2 id="quick-title">Hızlı başla</h2>
@@ -171,42 +208,6 @@
       </div>
     </section>
 
-    <details class="online-card" id="online-card">
-      <summary class="online-summary">
-        <span class="online-summary-title">Uzaktan oyna</span>
-        <span class="online-summary-sub">Kodla katıl</span>
-      </summary>
-      <div class="online-body">
-        <div class="online-copy">
-          <h2 id="online-title">Uzaktan oyna</h2>
-          <p>Arkadaşının oda kodunu gir ve katıl. Kendin oda kuruyorsan kodu ona gönder.</p>
-        </div>
-        <div class="online-form">
-          <div class="field">
-            <label for="player-name">Adın</label>
-            <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
-                   placeholder="Örn. Ada" enterkeyhint="next">
-          </div>
-          <form id="join-form" class="join-form" novalidate>
-            <div class="field">
-              <label for="join-code">Oda kodu</label>
-              <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
-                     autocapitalize="characters" autocomplete="off" spellcheck="false"
-                     inputmode="text" enterkeyhint="go">
-            </div>
-            <button class="btn btn-coral" type="submit" id="join-btn">Katıl</button>
-          </form>
-          <div class="online-create">
-            <span class="setup-label">Oda kur</span>
-            <div class="online-create-row">
-              <button class="btn btn-outline btn-sm" type="button" data-host="coop">Ortak tahta</button>
-              <button class="btn btn-outline btn-sm" type="button" data-host="versus">Rakip</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </details>
-
     <details class="ach-card" id="ach-card">
       <summary>Başarımlar <span class="ach-count" id="ach-count">0 / 12</span></summary>
       <div class="ach-list" id="ach-list"></div>
@@ -262,7 +263,7 @@
     <div class="timer-track" id="timer-track" hidden aria-hidden="true"><i id="timer-fill"></i></div>
     <div class="table-area" id="table-area"></div>
     <div class="game-foot">
-      <button class="btn btn-ghost btn-sm" id="game-menu" type="button">Menü</button>
+      <button class="btn btn-outline btn-sm" id="game-menu" type="button" aria-label="Oyun menüsü">☰ Menü</button>
       <span class="game-hint" id="game-hint">Bloğu tahtaya sürükle</span>
       <button class="btn btn-coral btn-sm" id="game-restart" type="button" hidden>Yeniden</button>
     </div>

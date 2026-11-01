@@ -12,6 +12,7 @@ import android.os.Vibrator;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -192,6 +193,17 @@ public class MainActivity extends Activity {
             return "android";
         }
 
+        /* Oyunda ekranın kararmasını engeller. */
+        @JavascriptInterface
+        public void keepAwake(final boolean on) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (web != null) web.setKeepScreenOn(on);
+                }
+            });
+        }
+
         @JavascriptInterface
         public void vibrate(int milliseconds) {
             try {
@@ -209,13 +221,47 @@ public class MainActivity extends Activity {
         }
     }
 
+    /* Geri tuşu önce uygulama içinde çalışır (menü/açık kart/kapı). BlokBack
+       true dönerse uygulama kapanmaz; false dönerse ana ekrandayız demektir. */
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) {
-            web.goBack();
+        if (web == null) {
+            super.onBackPressed();
             return;
         }
-        super.onBackPressed();
+        web.evaluateJavascript(
+                "(function(){try{return window.BlokBack?window.BlokBack():false}catch(e){return false}})()",
+                new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        /* evaluateJavascript sonucu JSON olarak gelir: true / "true" / 1 */
+                        boolean handled = value != null &&
+                                (value.equals("true") || value.equals("\"true\"") || value.equals("1"));
+                        if (!handled) finish();
+                    }
+                });
+    }
+
+    /* JS'e uygulama öne/arkaya geçtiğini bildirir; yerel oyun sayacı duraklar. */
+    @Override
+    protected void onPause() {
+        super.onPause();
+        evalJs("window.BlokLifecycle&&window.BlokLifecycle('pause')");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        evalJs("window.BlokLifecycle&&window.BlokLifecycle('resume')");
+    }
+
+    private void evalJs(String js) {
+        if (web == null) return;
+        try {
+            web.evaluateJavascript("try{" + js + "}catch(e){}", null);
+        } catch (Exception ignored) {
+            /* yoksay */
+        }
     }
 
     @Override
