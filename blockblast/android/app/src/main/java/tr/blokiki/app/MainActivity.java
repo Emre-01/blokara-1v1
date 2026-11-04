@@ -663,6 +663,31 @@ public class MainActivity extends Activity {
             return serverUrl;
         }
 
+        /* "Paylaş" düğmesi: Android'in kendi paylaşım menüsünü açar
+           (WhatsApp, Telegram, mesajlar…). Kopyalama ayrı düğmede kalır. */
+        @JavascriptInterface
+        public boolean share(final String text, final String subject) {
+            try {
+                final Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("text/plain");
+                if (text != null) send.putExtra(Intent.EXTRA_TEXT, text);
+                if (subject != null) send.putExtra(Intent.EXTRA_SUBJECT, subject);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            startActivity(Intent.createChooser(send, subject == null ? "" : subject));
+                        } catch (Exception ignored) {
+                            /* paylaşım uygulaması yok */
+                        }
+                    }
+                });
+                return true;
+            } catch (Exception error) {
+                return false;
+            }
+        }
+
         /* Android 15+ kenardan kenara çizdiği için sistem çubuğu yüksekliğini
            CSS'e bildiririz; alt butonlar jest çubuğunun altında kalmasın. */
         @JavascriptInterface

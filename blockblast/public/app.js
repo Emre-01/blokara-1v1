@@ -1673,10 +1673,13 @@
     var offline = app.online && !player.connected;
     var mini = "";
     if (s.mode === "versus") {
-      /* Rakip tahtası skor kartında canlı ve küçük görünür. */
-      mini = app.online && index !== app.me
-        ? miniBoardHTML(player.board, "board-rival", String(index))
-        : miniBoardHTML(player.board);
+      /* Çevrimiçi rakipte yalnızca karşı tarafın tahtası küçük görünür;
+         kendi tahtası zaten ekranın ortasında. */
+      if (app.online) {
+        if (index !== app.me) mini = miniBoardHTML(player.board, "board-rival", String(index));
+      } else {
+        mini = miniBoardHTML(player.board);
+      }
     }
     var clock = s.timeMode === "turn" && !s.turnBased && s.phase === "playing"
       ? '<span class="score-time" data-clock="' + index + '">' + fmtTime(clockValue(s, index)) + "</span>"
@@ -1816,6 +1819,21 @@
     }
   }
 
+  /* Skor kartındaki mini tahtayı boyar (hücre sınıfları sade kalmalı). */
+  function paintMiniBoard(boardEl, board) {
+    if (!boardEl || !board) return;
+    var cells = boardEl.children;
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        var cell = cells[r * SIZE + c];
+        if (!cell) continue;
+        var color = board[r][c];
+        var want = color ? "on " + colorClass(color) : "";
+        if (cell.className !== want) cell.className = want;
+      }
+    }
+  }
+
   /* Aynı düzen korunurken yalnızca değişenleri tazeler. */
   function syncGameLayout(s, layout, interactive) {
     if (s.mode === "coop") {
@@ -1834,7 +1852,7 @@
       var me = s.players[app.me];
       var rival = s.players[1 - app.me];
       paintBoard($("#board-me"), me.board);
-      if (rival) paintBoard($("#board-rival"), rival.board);
+      if (rival) paintMiniBoard($("#board-rival"), rival.board);
       var onlineNote = $("#turn-note");
       if (onlineNote) {
         onlineNote.innerHTML = s.phase === "over" ? '<span class="dot"></span>Tur bitti'
@@ -2394,16 +2412,16 @@
 
   function receivePeerDrag(message) {
     var s = app.state;
-    if (!s || !app.online || app.screen !== "game") return;
+    if (!s || !app.online) return;
     if (message.by === app.me) return;
     if (message.on === false) {
       clearPeerDrag();
       return;
     }
-    var boardEl = peerBoardEl();
+    /* Tahta henüz çizilmemiş olabilir (ekran geçişi); veriyi sakla,
+       bir sonraki çizimde hayalet yerine oturur. */
     var piece = peerTrayPiece(Number(message.piece));
-    var geo = boardEl ? boardGeometry(boardEl) : null;
-    if (!boardEl || !piece || !geo) {
+    if (!piece) {
       clearPeerDrag();
       return;
     }
@@ -2420,7 +2438,7 @@
       seq: s.seq,
       at: Date.now()
     };
-    drawPeerGhost(app.peerDrag, geo);
+    refreshPeerGhost();
     /* Haber kesilirse (bağlantı koptu, oyun bitti) hayaleti kendiliğinden kaldır. */
     if (app.peerDragTimer) clearTimeout(app.peerDragTimer);
     app.peerDragTimer = setTimeout(function () {
@@ -2470,16 +2488,14 @@
   function refreshPeerGhost() {
     var d = app.peerDrag;
     if (!d) return;
-    if (Date.now() - d.at > 2200) {
+    if (Date.now() - d.at > 2200 || app.screen !== "game") {
       clearPeerDrag();
       return;
     }
     var boardEl = peerBoardEl();
     var geo = boardEl ? boardGeometry(boardEl) : null;
-    if (!geo) {
-      clearPeerDrag();
-      return;
-    }
+    /* Tahta henüz çizilmediyse veriyi koru: sonraki çizimde yerleşir. */
+    if (!geo) return;
     drawPeerGhost(d, geo);
   }
 
@@ -3041,7 +3057,7 @@
       rewardHTML +
       (s.reason ? '<p class="result-note">' + esc(s.reason) + '</p>' : "") +
       rejoinNote +
-      '<div class="sheet-actions result-actions">' +
+      '<div class="sheet-actions result-actions' + (doubleCoins ? " has-double" : "") + '">' +
         doubleCoins +
         action +
         '<button class="btn btn-outline" type="button" data-close>Tahtaya bak</button>' +
@@ -4510,18 +4526,36 @@
     document.body.removeChild(area);
   }
 
+  /* "Paylaş": işletim sisteminin paylaşım menüsünü açar (WhatsApp, Telegram,
+     mesajlar…). "Kopyala" düğmesi ise yalnızca kodu panoya yazar; ikisi aynı
+     işi yapmaz. Paylaşım yolu yoksa son çare olarak bağlantı kopyalanır. */
   function shareRoom() {
-    var code = $("#lobby-code").textContent;
-    var url = location.origin + location.pathname + "?oda=" + encodeURIComponent(code);
-    if (navigator.share) {
-      navigator.share({
-        title: "Blokara 1v1",
-        text: "Blokara 1v1 oynayalım mı? Oda kodu: " + code,
-        url: url
-      }).catch(function () { /* kullanıcı iptal etti */ });
-    } else {
-      copyText(url, "Oda bağlantısı kopyalandı.");
+    var code = $("#lobby-code").textContent.trim();
+    if (!code || code === "-----") {
+      toast("Önce bir oda kur.");
+      return;
     }
+    var url = location.origin + location.pathname + "?oda=" + encodeURIComponent(code);
+    var text = "Blokara 1v1 oynayalım mı? Oda kodu: " + code + "\n" + url;
+    var title = "Blokara 1v1 · Oda " + code;
+
+    /* Android uygulamasında yerel paylaşım menüsü. */
+    var bridge = window.BlokIkiServer;
+    if (bridge && typeof bridge.share === "function") {
+      var opened = false;
+      try { opened = !!bridge.share(text, title); } catch (error) { opened = false; }
+      if (opened) return;
+    }
+
+    if (navigator.share) {
+      navigator.share({ title: title, text: text, url: url }).catch(function (error) {
+        if (error && error.name === "AbortError") return;
+        copyText(url, "Paylaşım açılamadı; bağlantı kopyalandı.");
+      });
+      return;
+    }
+
+    copyText(url, "Bu cihazda paylaşım menüsü yok; bağlantı kopyalandı.");
   }
 
   /* ------------------------------------------------------------------ */

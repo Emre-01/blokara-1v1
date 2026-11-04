@@ -350,6 +350,17 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   border-radius: 999px;
   background: var(--mustard);
   white-space: nowrap;
+  max-width: 42vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 344px) {
+  .room-badge { font-size: 10.5px; padding: 3px 7px; letter-spacing: 0.03em; max-width: 38vw; }
+}
+
+/* Oda kodu görünürken dar ekranda marka yazısı kısalır; üst bar taşmaz. */
+@media (max-width: 420px) {
+  .topbar:has(.room-badge:not([hidden])) .brand-word { display: none; }
 }
 
 /* ---------------------------- ekranlar ---------------------------- */
@@ -1177,10 +1188,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .scoreboard {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px minmax(0, 1fr);
+  /* Orta sütun dar ekranda küçülür; iki skor kartı her zaman sığar. */
+  grid-template-columns: minmax(0, 1fr) clamp(60px, 21vw, 86px) minmax(0, 1fr);
   align-items: stretch;
   gap: 8px;
   padding: 6px 0 10px;
+  max-width: 100%;
 }
 
 .score-card {
@@ -1202,11 +1215,19 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   box-shadow: 3px 3px 0 var(--coral);
   transform: translateY(-1px);
 }
-.score-main { min-width: 0; flex: 1; display: grid; gap: 0; }
+.score-main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  /* Tek sütun, kalan genişliğe sığar: uzun ad/skor taşmaz, kısalır. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
 .score-name {
   font-size: 11.5px;
   font-weight: 700;
   color: var(--ink-soft);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1230,8 +1251,19 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   line-height: 1.05;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.score-sub { font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; }
+.score-sub {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .score-mini {
   flex: none;
   width: 38px;
@@ -1249,9 +1281,16 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 /* Rakip skor kartındaki canlı mini tahta (canlı sürükleme için). */
 .score-mini > div { border-radius: 1px; background: var(--cell); }
 .score-mini > div.on { background: var(--c); }
-
+.score-mini-live {
+  width: clamp(40px, 11vw, 50px);
+  gap: 1px;
+  padding: 3px;
+  border-color: var(--cobalt);
+  box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.16);
+  grid-template-rows: repeat(8, 1fr);
+}
 /* Tek kişilik: tek skor kartı + tur pill'i. */
-.scoreboard.solo { grid-template-columns: minmax(0, 1fr) 86px; }
+.scoreboard.solo { grid-template-columns: minmax(0, 1fr) clamp(60px, 21vw, 86px); }
 .scoreboard.solo .score-card { min-height: 66px; }
 .scoreboard.solo .score-value { font-size: clamp(24px, 4vw, 32px); }
 
@@ -1877,6 +1916,21 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   font-size: 12.5px;
 }
 
+/* Kısa yatay ekranlar (ör. 740×360): kaplama boşluğunu daralt ve son
+   sonuç sıkıştırmasını biraz daha sıkı yap ki kaydırma hiç oluşmasın. */
+@media (max-height: 520px) {
+  .overlay { padding: 10px; }
+  .sheet { max-height: calc(100svh - 20px); }
+  .sheet.result.tight { padding: 10px; }
+  .sheet.result.tight .result-badge { margin-bottom: 5px; }
+  .sheet.result.tight h2 { font-size: 19px; margin-bottom: 2px; }
+  .sheet.result.tight .sheet-sub { margin-bottom: 5px; }
+  .sheet.result.tight .result-scores { margin: 5px 0 1px; }
+  .sheet.result.tight .result-row { padding: 3px 8px; }
+  .sheet.result.tight .sheet-actions { margin-top: 6px; }
+  .sheet.result.tight .sheet-actions > .btn { min-height: 30px; padding: 4px 8px; }
+}
+
 .help-list { display: grid; gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
 .help-list li { display: grid; gap: 2px; }
 .help-list b { font-family: var(--font-display); font-size: 17px; letter-spacing: -0.02em; }
@@ -1969,6 +2023,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .scoreboard { gap: 5px; }
   .score-card { padding: 6px 8px; gap: 5px; }
   .score-mini { width: 32px; }
+  .score-mini-live { width: 40px; padding: 2px; }
   .turn-pill { min-width: 64px; padding: 5px 7px; }
   .turn-pill .tp-main { font-size: 11px; }
   .game-hint { display: none; }
