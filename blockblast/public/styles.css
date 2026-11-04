@@ -3412,11 +3412,15 @@ body {
   .screen.home .ach-card summary { padding: 6px 12px; font-size: 12.5px; border-radius: 10px; }
 }
 
-/* Lobi: kart ekran yüksekliğine sığar, alt düğmeler hiç kesilmez. */
-@media (max-width: 720px) {
-  .screen.lobby { padding: 0 10px 4px; }
+/* Lobi: kart içeriği kadar yer kaplar, ekranın ortasında durur. Kenar
+   gölgesi için altta boşluk bırakılır; çerçeve hiçbir zaman kesilmez. */
+@media (max-width: 900px) {
+  .screen.lobby { padding: 0 10px 12px; }
   .lobby {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     min-height: 0;
     height: 100%;
     padding-top: 0;
@@ -3424,9 +3428,13 @@ body {
   .lobby-card {
     width: 100%;
     max-width: 560px;
-    height: 100%;
+    height: auto;
+    max-height: calc(100% - 8px);
     min-height: 0;
     margin: 0 auto;
+    /* Çok kısa ekranlarda içerik taşarsa kartın kendi içi kayar,
+       düğmeler yine de görünür kalır. */
+    overflow-y: auto;
     padding: clamp(10px, 2vh, 18px) clamp(10px, 3.4vw, 18px);
     gap: clamp(4px, 1.1vh, 10px);
     border-radius: 20px;
@@ -3455,6 +3463,36 @@ body {
   .lobby-actions { gap: 5px; }
   .lobby-actions .btn { min-height: 34px; padding: 6px 10px; font-size: 13px; }
   .lobby-card > .tiny { font-size: 10px; line-height: 1.3; }
+}
+
+/* Yatay ve kısa ekranlar (ör. 568×320): lobi tek ekrana sığsın diye
+   ikincil satırlar kısalır, kart içi kaydırma gerekmez. */
+@media (max-height: 400px) and (orientation: landscape) {
+  .screen.lobby { padding: 0 10px 10px; }
+  .lobby-card {
+    padding: 7px 12px;
+    gap: 3px;
+    max-height: calc(100% - 4px);
+  }
+  .lobby-card .kicker { font-size: 9px; padding: 1px 6px; }
+  .lobby-card h1 { font-size: 15px; }
+  .code-row { padding: 3px 8px; gap: 6px; }
+  .code-label { display: none; }
+  .code-box strong { font-size: 16px; }
+  .code-actions .btn-sm { font-size: 10px; padding: 3px 6px; }
+  .mode-switch { padding: 2px; gap: 2px; }
+  .mode-switch button { padding: 3px; font-size: 10px; }
+  .mode-switch.lobby-timer button { font-size: 9.5px; }
+  .slot { min-height: 28px; padding: 2px 8px; gap: 6px; }
+  .slot .avatar { width: 20px; height: 20px; font-size: 9.5px; }
+  .slot-name { font-size: 11px; }
+  .slot-status { font-size: 9px; }
+  /* Kısa yatay ekranda oyuncular ve düğmeler yan yana: iki satır yerine bir. */
+  .slots { grid-template-columns: 1fr 1fr; gap: 4px; }
+  .lobby-hint,
+  .lobby-card > .tiny { display: none; }
+  .lobby-actions { gap: 4px; grid-template-columns: 1fr 1fr; }
+  .lobby-actions .btn { min-height: 26px; padding: 3px 8px; font-size: 11.5px; }
 }
 
 /* Kurallar penceresi: mobilde daha kompakt yazı, tek ekrana yakın. */

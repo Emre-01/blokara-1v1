@@ -104,6 +104,42 @@ async function attach(port, w, h) {
       return true;
     })()`);
 
+    const lobbyOnly = process.argv.indexOf("--lobby") > 0;
+    if (lobbyOnly) {
+      const lobbyMeasure = `(() => {
+        const card = document.querySelector('.lobby-card');
+        const cr = card.getBoundingClientRect();
+        const r = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const b = el.getBoundingClientRect();
+          return { top: Math.round(b.top), bottom: Math.round(b.bottom), h: Math.round(b.height) };
+        };
+        return {
+          vw: innerWidth, vh: innerHeight,
+          hScroll: document.documentElement.scrollWidth > innerWidth,
+          card: { top: Math.round(cr.top), bottom: Math.round(cr.bottom), h: Math.round(cr.height) },
+          cardOverflowY: card.scrollHeight > card.clientHeight + 1,
+          shadowBottom: Math.round(cr.bottom) + 4,
+          fits: Math.round(cr.bottom) + 4 <= innerHeight,
+          slots: document.querySelectorAll('#lobby-slots .slot').length,
+          actions: r('.lobby-actions'),
+          tiny: r('.lobby-card > .tiny')
+        };
+      })()`;
+      const la = await a.evaluate(lobbyMeasure);
+      const lb = await b.evaluate(lobbyMeasure);
+      console.log(JSON.stringify({ code, host: la, guest: lb }, null, 2));
+      if (shotPath) {
+        const shot = await a.send("Page.captureScreenshot", { format: "png" });
+        fs.writeFileSync(shotPath, Buffer.from(shot.data, "base64"));
+        console.log("shot:", shotPath);
+      }
+      a.ws.close(); b.ws.close();
+      host.kill(); guest.kill();
+      process.exit(0);
+    }
+
     await a.evaluate(`(async () => {
       document.getElementById('start-btn').click();
       await new Promise(r => setTimeout(r, 1800));
