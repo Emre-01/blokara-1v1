@@ -1283,6 +1283,11 @@
       return;
     }
 
+    if (message.t === "drag") {
+      receivePeerDrag(message);
+      return;
+    }
+
     if (message.t === "state") {
       app.pending = false;
       app.matching = false;
@@ -1452,6 +1457,8 @@
     app.me = 0;
     app.pending = false;
     app.matching = false;
+    stopPeerDrag();
+    clearPeerDrag();
     updateMatchButton();
     if (app.reconnectTimer) {
       clearTimeout(app.reconnectTimer);
@@ -1548,6 +1555,9 @@
     }
     if (app.lastAnimated > state.seq) app.lastAnimated = -1;
 
+    /* Yeni hamle geldiyse karşı taraf bloğu bırakmıştır: hayaleti kaldır. */
+    if (app.peerDrag && app.peerDrag.seq !== state.seq) clearPeerDrag();
+
     var signature = stateSignature(state);
     if (signature === app.lastSignature && app.screen === "game") {
       updateClock();
@@ -1637,13 +1647,18 @@
   /* render: skor tablosu                                                */
   /* ------------------------------------------------------------------ */
 
-  function miniBoardHTML(board) {
+  function miniBoardHTML(board, id, owner) {
     if (!board) return "";
-    var html = '<div class="score-mini" aria-hidden="true">';
+    var live = !!id;
+    var html = '<div class="score-mini' + (live ? " score-mini-live" : "") + '"' +
+      (live ? ' id="' + id + '" data-board="' + owner + '"' : "") + ' aria-hidden="true">';
     for (var r = 0; r < SIZE; r++) {
       for (var c = 0; c < SIZE; c++) {
         var color = board[r][c];
-        html += '<i class="' + (color ? "on " + colorClass(color) : "") + '"></i>';
+        var cls = color ? "on " + colorClass(color) : "";
+        html += live
+          ? '<div class="' + cls + '"></div>'
+          : '<i class="' + cls + '"></i>';
       }
     }
     return html + "</div>";
@@ -1656,7 +1671,13 @@
     var sub = player.lines + " satır · " + player.blocks + " blok";
     if (player.penalties) sub += ' · <span class="penalty">' + player.penalties + " ceza</span>";
     var offline = app.online && !player.connected;
-    var mini = s.mode === "versus" ? miniBoardHTML(player.board) : "";
+    var mini = "";
+    if (s.mode === "versus") {
+      /* Rakip tahtası skor kartında canlı ve küçük görünür. */
+      mini = app.online && index !== app.me
+        ? miniBoardHTML(player.board, "board-rival", String(index))
+        : miniBoardHTML(player.board);
+    }
     var clock = s.timeMode === "turn" && !s.turnBased && s.phase === "playing"
       ? '<span class="score-time" data-clock="' + index + '">' + fmtTime(clockValue(s, index)) + "</span>"
       : "";
@@ -1821,10 +1842,6 @@
             (me.combo > 1 ? ' · combo ×' + me.combo : "");
       }
       syncTray($("#tray"), me.tray, interactive);
-      var peerStats = $(".peer-stats");
-      if (peerStats && rival) {
-        peerStats.innerHTML = '<b>' + fmt(rival.score) + '</b> puan<span>' + rival.lines + ' satır</span>';
-      }
       return;
     }
     var activeIndex = displayIndex();
@@ -1888,10 +1905,6 @@
       html += '</div>';
     } else {
       var me = s.players[app.me];
-      var rivalIndex = 1 - app.me;
-      var rival = s.players[rivalIndex];
-      html += '<div class="online-versus">';
-      html += '<div class="versus-main">';
       html += boardHTML(me.board, "board-me", String(app.me), 'Senin tahtan <span class="you">sen</span>');
       html += '<div class="tray-wrap">';
       html += '<div class="turn-note" id="turn-note">' +
@@ -1900,16 +1913,6 @@
           (me.combo > 1 ? ' · combo ×' + me.combo : "")) +
         '</div>';
       html += trayHTML(me.tray, interactive);
-      html += '</div>';
-      html += '</div>';
-      if (rival) {
-        html += '<aside class="peer-panel" aria-label="Rakip tahtası">';
-        html += '<div class="peer-head"><span class="score-dot"></span><span>' + esc(rival.name) + '</span></div>';
-        html += boardHTML(rival.board, "board-rival", String(rivalIndex), "", "peer readonly");
-        html += '<div class="peer-stats"><b>' + fmt(rival.score) + '</b> puan<span>' +
-          rival.lines + ' satır</span></div>';
-        html += '</aside>';
-      }
       html += '</div>';
     }
 
@@ -1924,6 +1927,7 @@
     animateLastMove();
     updateClock();
     updateRoomChrome();
+    refreshPeerGhost();
   }
 
   /* Oyun sonu açıklamasını, kazanan sensen ikinci kişiye çevirir:
@@ -2128,6 +2132,7 @@
       frame: 0
     };
     moveGhost(event.clientX, event.clientY);
+    sendPeerDrag(true);
     window.addEventListener("pointermove", onDragMove, { passive: false });
     window.addEventListener("pointerup", onDragEnd);
     window.addEventListener("pointercancel", onDragEnd);
@@ -2177,6 +2182,7 @@
     var top = y - drag.lift - (drag.grabR + 0.5) * drag.geo.stepY;
     drag.ghost.style.transform = "translate3d(" + left + "px," + top + "px,0)";
     drag.ghostAt = { x: x, y: y, left: left, top: top };
+    drag.lastPointer = { x: x, y: y };
     drag.ghostMoves = (drag.ghostMoves || 0) + 1;
   }
 
@@ -2221,6 +2227,7 @@
       hidePreviewVisual();
       drag.target = null;
       if (drag.ghost) drag.ghost.classList.remove("bad");
+      sendPeerDrag(false);
       return;
     }
 
@@ -2232,7 +2239,11 @@
     if (!board) return;
     var valid = CORE.canPlace(board, piece, row, col);
     var key = row + ":" + col + ":" + (valid ? 1 : 0);
-    if (drag.target && drag.target.key === key) return;  // hedef değişmedi: boşuna çizme
+    /* Hedef değişmese de parmak kayıyor: karşı tarafa canlı konum gitsin. */
+    if (drag.target && drag.target.key === key) {
+      sendPeerDrag(false);
+      return;
+    }
     drag.target = { row: row, col: col, valid: valid, key: key };
     if (drag.ghost) drag.ghost.classList.toggle("bad", !valid);
     if (valid) {
@@ -2244,6 +2255,7 @@
       hidePreviewVisual();
       clearLineHint();
     }
+    sendPeerDrag(false);
   }
 
   function onDragEnd(event) {
@@ -2253,6 +2265,7 @@
     window.removeEventListener("pointerup", onDragEnd);
     window.removeEventListener("pointercancel", onDragEnd);
     if (!drag) return;
+    stopPeerDrag();
     if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
     hidePreview();
     var target = drag.target;
@@ -2280,6 +2293,7 @@
 
   function cancelDrag() {
     if (!app.drag) return;
+    stopPeerDrag();
     window.removeEventListener("pointermove", onDragMove);
     window.removeEventListener("pointerup", onDragEnd);
     window.removeEventListener("pointercancel", onDragEnd);
@@ -2288,6 +2302,185 @@
     app.drag = null;
     hidePreview();
     flushDirty();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* arkadaşın canlı sürüklemesi (ortak tahta / rakip tahtası)            */
+  /* ------------------------------------------------------------------ */
+
+  /* Kendi sürüklememizi karşı tarafa bildirir; bırakınca "kapandı" yollar. */
+  function stopPeerDrag() {
+    if (app.dragSendTimer) {
+      clearTimeout(app.dragSendTimer);
+      app.dragSendTimer = null;
+    }
+    app.lastDragSent = 0;
+    if (!app.online || !app.ws || app.ws.readyState !== WebSocket.OPEN) return;
+    app.ws.send(JSON.stringify({ t: "drag", on: false }));
+  }
+
+  /* Sürüklenen bloğun konumunu, tahta hücresi biriminde (kesirli) yollar.
+     Karşı taraf kendi ekran ölçüsüyle çizer; ekran boyutu fark etmez. */
+  function sendPeerDrag(force) {
+    if (!app.online) return;
+    var drag = app.drag;
+    if (!drag || !app.state || app.state.phase !== "playing") return;
+    if (!app.ws || app.ws.readyState !== WebSocket.OPEN) return;
+    var geo = drag.geo;
+    var at = drag.lastPointer;
+    if (!geo || !geo.stepX || !geo.stepY || !at) return;
+    var now = Date.now();
+    if (!force && now - (app.lastDragSent || 0) < 55) {
+      /* Ara kareleri biriktir: son konum her zaman gider. */
+      if (!app.dragSendTimer) {
+        app.dragSendTimer = setTimeout(function () {
+          app.dragSendTimer = null;
+          sendPeerDrag(true);
+        }, 55);
+      }
+      return;
+    }
+    if (app.dragSendTimer) {
+      clearTimeout(app.dragSendTimer);
+      app.dragSendTimer = null;
+    }
+    app.lastDragSent = now;
+    var target = drag.target;
+    app.ws.send(JSON.stringify({
+      t: "drag",
+      on: true,
+      piece: drag.index,
+      grabR: drag.grabR,
+      grabC: drag.grabC,
+      px: (at.x - geo.x) / geo.stepX,
+      py: (at.y - geo.y) / geo.stepY,
+      lift: drag.lift / geo.stepY,
+      row: target ? target.row : null,
+      col: target ? target.col : null,
+      valid: !!(target && target.valid)
+    }));
+  }
+
+  /* Arkadaşın sürüklemesi hangi tahtada gösterilecek? */
+  function peerBoardEl() {
+    var s = app.state;
+    if (!s || !app.online || s.phase === "over") return null;
+    if (s.mode === "coop") return $("#board-shared");
+    if (s.mode === "versus") return $("#board-rival");
+    return null;
+  }
+
+  function peerTrayPiece(index) {
+    var s = app.state;
+    if (!s) return null;
+    var tray;
+    if (s.mode === "coop") tray = s.shared && s.shared.tray;
+    else tray = s.players[1 - app.me] && s.players[1 - app.me].tray;
+    return tray ? tray[index] : null;
+  }
+
+  function clearPeerDrag() {
+    if (app.peerDragTimer) {
+      clearTimeout(app.peerDragTimer);
+      app.peerDragTimer = null;
+    }
+    if (app.peerGhost && app.peerGhost.parentNode) {
+      app.peerGhost.parentNode.removeChild(app.peerGhost);
+    }
+    app.peerGhost = null;
+    app.peerGhostKey = null;
+    app.peerDrag = null;
+  }
+
+  function receivePeerDrag(message) {
+    var s = app.state;
+    if (!s || !app.online || app.screen !== "game") return;
+    if (message.by === app.me) return;
+    if (message.on === false) {
+      clearPeerDrag();
+      return;
+    }
+    var boardEl = peerBoardEl();
+    var piece = peerTrayPiece(Number(message.piece));
+    var geo = boardEl ? boardGeometry(boardEl) : null;
+    if (!boardEl || !piece || !geo) {
+      clearPeerDrag();
+      return;
+    }
+    app.peerDrag = {
+      by: Number(message.by) || 0,
+      name: s.players[message.by] ? s.players[message.by].name : "Arkadaşın",
+      piece: piece,
+      grabR: Number(message.grabR) || 0,
+      grabC: Number(message.grabC) || 0,
+      px: Number(message.px),
+      py: Number(message.py),
+      lift: Number(message.lift) || 0,
+      valid: !!message.valid,
+      seq: s.seq,
+      at: Date.now()
+    };
+    drawPeerGhost(app.peerDrag, geo);
+    /* Haber kesilirse (bağlantı koptu, oyun bitti) hayaleti kendiliğinden kaldır. */
+    if (app.peerDragTimer) clearTimeout(app.peerDragTimer);
+    app.peerDragTimer = setTimeout(function () {
+      app.peerDragTimer = null;
+      refreshPeerGhost();
+    }, 2200);
+  }
+
+  /* Arkadaşın bloğu: kendi sürükleme hayaletimizin soluk, adlı sürümü. */
+  function drawPeerGhost(d, geo) {
+    if (!d || !geo) return;
+    var key = [d.name, d.piece.color, d.piece.w, d.piece.h,
+      geo.w, geo.h, geo.stepX, geo.stepY].join("|");
+    var el = app.peerGhost;
+    if (!el || app.peerGhostKey !== key) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      el = document.createElement("div");
+      el.className = "peer-ghost";
+      var filled = {};
+      d.piece.cells.forEach(function (cell) { filled[cell[0] + "-" + cell[1]] = true; });
+      for (var r = 0; r < d.piece.h; r++) {
+        for (var c = 0; c < d.piece.w; c++) {
+          if (!filled[r + "-" + c]) continue;
+          var span = document.createElement("span");
+          span.className = "pcell on " + colorClass(d.piece.color);
+          span.style.width = geo.w + "px";
+          span.style.height = geo.h + "px";
+          span.style.transform = "translate3d(" + (c * geo.stepX) + "px," + (r * geo.stepY) + "px,0)";
+          el.appendChild(span);
+        }
+      }
+      var tag = document.createElement("span");
+      tag.className = "peer-ghost-name";
+      tag.textContent = d.name;
+      el.appendChild(tag);
+      document.body.appendChild(el);
+      app.peerGhost = el;
+      app.peerGhostKey = key;
+    }
+    el.classList.toggle("bad", !d.valid);
+    var left = geo.x + (d.px - (d.grabC + 0.5)) * geo.stepX;
+    var top = geo.y + (d.py - d.lift - (d.grabR + 0.5)) * geo.stepY;
+    el.style.transform = "translate3d(" + left + "px," + top + "px,0)";
+  }
+
+  /* Tahta yeniden çizildiğinde (her saniye gelen durum) hayaleti tazele. */
+  function refreshPeerGhost() {
+    var d = app.peerDrag;
+    if (!d) return;
+    if (Date.now() - d.at > 2200) {
+      clearPeerDrag();
+      return;
+    }
+    var boardEl = peerBoardEl();
+    var geo = boardEl ? boardGeometry(boardEl) : null;
+    if (!geo) {
+      clearPeerDrag();
+      return;
+    }
+    drawPeerGhost(d, geo);
   }
 
   function activeBoardEl() {
@@ -2593,6 +2786,7 @@
   function openOverlay(innerHTML, closable, variant) {
     var overlay = $("#overlay");
     var sheet = $(".sheet", overlay);
+    overlay.className = "overlay" + (variant ? " is-" + variant : "");
     sheet.className = "sheet" + (variant ? " " + variant : "");
     sheet.innerHTML = innerHTML;
     /* iletişim kutusu başlığı aria-labelledby ile eşleşsin */
@@ -2617,6 +2811,7 @@
   function closeOverlay() {
     var overlay = $("#overlay");
     overlay.hidden = true;
+    overlay.className = "overlay";
     $(".sheet", overlay).innerHTML = "";
     document.body.style.overflow = "";
     /* Pencereyi açan öğeye odağı geri ver: klavye kullanıcısı kaybolmasın. */
@@ -2628,6 +2823,24 @@
     resumeLocal();
     flushPendingInterstitial();
     syncBannerVisibility();
+  }
+
+  /* Sonuç penceresini tek ekrana sığdırır. Önce normal ölçüler denenir;
+     içerik taşarsa compact, sonra tight sınıfı eklenir. Böylece kaydırma
+     çubuğu görünmeden bütün düğmeler ekranda kalır. */
+  function fitResultSheet() {
+    var overlay = $("#overlay");
+    if (!overlay || overlay.hidden) return;
+    var sheet = $(".sheet", overlay);
+    if (!sheet || !sheet.classList.contains("result")) return;
+    var overflows = function () {
+      return sheet.scrollHeight > sheet.clientHeight + 1;
+    };
+    sheet.classList.remove("compact", "tight");
+    if (!overflows()) return;
+    sheet.classList.add("compact");
+    if (!overflows()) return;
+    sheet.classList.add("tight");
   }
 
   function showHelp() {
@@ -2784,7 +2997,7 @@
 
     var canRematch = !app.online || app.me === s.host;
     var action = canRematch
-      ? '<button class="btn btn-coral" type="button" data-rematch data-autofocus>Yeniden oyna</button>'
+      ? '<button class="btn btn-coral" type="button" data-rematch data-primary data-autofocus>Yeniden oyna</button>'
       : '<p class="result-note">Yeniden başlatmayı oda sahibi yapar.</p>';
     var doubleCoins = "";
     if (ads.rewarded && reward && reward.coins > 0) {
@@ -2820,7 +3033,6 @@
     var variant = isWin ? "win" : (isLose ? "lose" : "");
 
     openOverlay(
-      (isWin ? '<span class="result-rays" aria-hidden="true"></span>' : "") +
       '<span class="result-badge' + ((coop || solo || localVersus) ? "" : (won ? "" : " lost")) + '">' + badge + '</span>' +
       '<h2>' + esc(title) + '</h2>' +
       sub +
@@ -2829,7 +3041,7 @@
       rewardHTML +
       (s.reason ? '<p class="result-note">' + esc(s.reason) + '</p>' : "") +
       rejoinNote +
-      '<div class="sheet-actions">' +
+      '<div class="sheet-actions result-actions">' +
         doubleCoins +
         action +
         '<button class="btn btn-outline" type="button" data-close>Tahtaya bak</button>' +
@@ -2838,6 +3050,11 @@
       true,
       variant
     );
+    var resultSheet = $(".sheet", $("#overlay"));
+    if (resultSheet) {
+      resultSheet.classList.add("result");
+      fitResultSheet();
+    }
     app.interstitialPending = true;
     if (s.phase === "over") {
       if (isWin) {
@@ -4375,6 +4592,10 @@
     });
     window.addEventListener("pagehide", function () { setBackgrounded(true); });
     window.addEventListener("pageshow", function () { setBackgrounded(false); });
+    window.addEventListener("resize", fitResultSheet);
+    window.addEventListener("orientationchange", function () {
+      setTimeout(fitResultSheet, 160);
+    });
   }
 
   /* ------------------------------------------------------------------ */

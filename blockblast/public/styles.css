@@ -168,18 +168,20 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: calc(10px + var(--safe-top)) clamp(14px, 3vw, 28px) 10px;
+  gap: clamp(6px, 1.6vw, 12px);
+  padding: calc(10px + var(--safe-top)) clamp(8px, 3vw, 28px) 10px;
   background: rgba(243, 234, 216, 0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 2px solid rgba(28, 27, 46, 0.12);
+  max-width: 100%;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   background: none;
   border: 0;
   padding: 4px;
@@ -282,6 +284,11 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   font-size: 20px;
   letter-spacing: -0.04em;
   line-height: 1;
+  /* Dar ekranlarda üst bar taşmasın: yazı gerekirse kısalır. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .brand-word em {
   font-style: normal;
@@ -290,7 +297,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   letter-spacing: -0.02em;
 }
 
-.top-actions { display: flex; align-items: center; gap: 6px; }
+.top-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 
 .icon-btn {
   width: 38px;
@@ -1239,6 +1246,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 .score-mini i { border-radius: 1px; background: var(--cell); }
 .score-mini i.on { background: var(--c); }
+/* Rakip skor kartındaki canlı mini tahta (canlı sürükleme için). */
+.score-mini > div { border-radius: 1px; background: var(--cell); }
+.score-mini > div.on { background: var(--c); }
 
 /* Tek kişilik: tek skor kartı + tur pill'i. */
 .scoreboard.solo { grid-template-columns: minmax(0, 1fr) 86px; }
@@ -1287,6 +1297,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .table-area {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1322,7 +1334,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 
 .board {
-  --board-w: min(92vw, 520px, calc(100svh - 320px - var(--ad-b)));
+  --board-w: min(92vw, 100%, 520px, calc(100svh - 320px - var(--ad-b)));
   width: var(--board-w);
   aspect-ratio: 1;
   display: grid;
@@ -1479,6 +1491,54 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.32), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
 }
 
+/* Arkadaşın canlı sürüklediği blok: soluk, adlı, tıklamayı geçirir. */
+.peer-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.72;
+  transform-origin: top left;
+  will-change: transform;
+  transition: transform 60ms linear;
+  filter: drop-shadow(0 6px 10px rgba(28, 27, 46, 0.28));
+}
+.peer-ghost .pcell {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: clamp(3px, 0.8vw, 6px);
+  will-change: transform;
+}
+.peer-ghost .pcell.on {
+  background: var(--c);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.34), inset 0 -3px 0 rgba(0, 0, 0, 0.16),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+.peer-ghost.bad .pcell.on {
+  box-shadow: inset 0 0 0 2px rgba(242, 85, 61, 0.95),
+    inset 0 3px 0 rgba(255, 255, 255, 0.24), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
+}
+.peer-ghost-name {
+  position: absolute;
+  left: 0;
+  top: -22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(28, 27, 46, 0.82);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Tahtadaki hedef önizlemesi: tek katman, dolu blok gibi görünür. */
 .drop-preview {
   position: fixed;
@@ -1553,76 +1613,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   gap: 10px;
 }
 
-/* Çevrimiçi rakip: kendi tahtası büyük, rakip tahtası yanda küçük. */
-.online-versus {
-  width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, 190px);
-  align-items: start;
-  justify-content: center;
-  gap: clamp(8px, 1.8vw, 18px);
-}
-.versus-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-.online-versus .versus-main .board {
-  --board-w: min(60vw, 460px, calc(100svh - 340px));
-}
-.peer-panel {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  padding: 8px;
-  background: var(--card);
-  border: 2px solid var(--ink);
-  border-radius: 14px;
-  box-shadow: 3px 3px 0 rgba(28, 27, 46, 0.16);
-}
-.peer-head {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 100%;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--ink-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.peer-head .score-dot { background: var(--cobalt); }
-.peer-panel .board.peer {
-  --board-w: 100%;
-  width: 100%;
-  border-width: 2px;
-  border-radius: 10px;
-  gap: 2px;
-  padding: 4px;
-  box-shadow: 2px 2px 0 var(--ink);
-  pointer-events: none;
-}
-.peer-stats {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 1px 6px;
-  font-size: 10.5px;
-  color: var(--ink-soft);
-}
-.peer-stats b {
-  font-family: var(--font-display);
-  font-size: 15px;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.peer-stats span { white-space: nowrap; }
+/* Çevrimiçi rakip: kendi tahtası ekranın ortasında; rakip tahtası
+   skor kartındaki küçük önizlemede görünür. */
 
 .turn-note {
   font-size: 12.5px;
@@ -1654,10 +1646,33 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   display: grid;
   place-items: center;
   padding: 18px;
+  overflow: hidden;
   background: rgba(23, 27, 49, 0.58);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: fade-in 0.18s ease both;
+}
+.overlay > .sheet { position: relative; z-index: 1; }
+
+/* Zafer ışınları kaplamanın arkasında durur; sonuç penceresinin
+   kaydırma alanına girmediği için sayfa/modal kaymaz. */
+.overlay.is-win::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220vmax;
+  height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(from 0deg,
+    rgba(232, 181, 58, 0.22) 0 6deg, transparent 6deg 26deg,
+    rgba(242, 85, 61, 0.16) 26deg 32deg, transparent 32deg 52deg,
+    rgba(79, 174, 139, 0.16) 52deg 58deg, transparent 58deg 78deg,
+    rgba(232, 181, 58, 0.22) 78deg 84deg, transparent 84deg 104deg);
+  animation: rays-spin 9s linear infinite;
+  opacity: 0.9;
 }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1724,24 +1739,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .sheet.lose { box-shadow: 8px 8px 0 var(--ink), 0 0 0 3px rgba(242, 85, 61, 0.22); }
 .sheet.lose .result-badge { background: var(--coral); color: #fff; }
 .sheet.lose h2 { color: #8d2f2a; animation: sheet-nudge 0.5s ease both; }
-.result-rays {
-  position: absolute;
-  left: 50%;
-  top: -40%;
-  width: 220vmax;
-  height: 220vmax;
-  margin-left: -110vmax;
-  z-index: 0;
-  pointer-events: none;
-  background: conic-gradient(from 0deg,
-    rgba(232, 181, 58, 0.22) 0 6deg, transparent 6deg 26deg,
-    rgba(242, 85, 61, 0.16) 26deg 32deg, transparent 32deg 52deg,
-    rgba(79, 174, 139, 0.16) 52deg 58deg, transparent 58deg 78deg,
-    rgba(232, 181, 58, 0.22) 78deg 84deg, transparent 84deg 104deg);
-  animation: rays-spin 9s linear infinite;
-  opacity: 0.9;
-}
-.sheet > :not(.result-rays) { position: relative; z-index: 1; }
 @keyframes rays-spin { to { transform: rotate(360deg); } }
 @keyframes badge-pop {
   0% { transform: scale(0.4) rotate(-8deg); opacity: 0; }
@@ -1808,6 +1805,76 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   border: 1.5px solid var(--ink);
   border-radius: 999px;
   background: var(--paper);
+}
+
+/* Sonuç penceresi her ekrana tek parça sığar; iç kaydırma çubuğu yok.
+   Sığmayan içerik JS'in eklediği compact / tight sınıflarıyla sıkışır. */
+.sheet.result {
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.sheet.result::-webkit-scrollbar { width: 0; height: 0; }
+
+.sheet.result .sheet-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.sheet.result .sheet-actions > .btn { padding: 10px 12px; font-size: 14px; }
+.sheet.result .sheet-actions > .btn[data-primary],
+.sheet.result .sheet-actions > .btn[data-double-coins],
+.sheet.result .sheet-actions > .result-note { grid-column: 1 / -1; }
+
+.sheet.result.compact { padding: clamp(14px, 3.4vw, 20px); }
+.sheet.result.compact .result-badge {
+  margin-bottom: 8px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+}
+.sheet.result.compact h2 {
+  font-size: clamp(22px, 6vw, 28px);
+  margin-bottom: 4px;
+}
+.sheet.result.compact .sheet-sub { margin-bottom: 10px; font-size: 14px; }
+.sheet.result.compact .result-scores { margin: 10px 0 2px; gap: 6px; }
+.sheet.result.compact .result-row { padding: 6px 10px; border-radius: 10px; }
+.sheet.result.compact .result-row .rname { font-size: 14px; }
+.sheet.result.compact .result-row .rscore { font-size: 19px; }
+.sheet.result.compact .result-meta { margin-top: 6px; gap: 5px; }
+.sheet.result.compact .result-meta span { font-size: 11px; padding: 2px 7px; }
+.sheet.result.compact .result-note { margin-top: 8px; font-size: 12px; line-height: 1.4; }
+.sheet.result.compact .reward-row { margin: 8px 0 2px; gap: 6px; }
+.sheet.result.compact .reward-row > span { font-size: 11px; padding: 3px 8px; }
+.sheet.result.compact .reward-row b { font-size: 13px; }
+.sheet.result.compact .reward-unlock { margin-top: 6px; gap: 4px; }
+.sheet.result.compact .sheet-actions { margin-top: 12px; gap: 6px; }
+.sheet.result.compact .sheet-actions > .btn {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+}
+
+.sheet.result.tight { padding: 12px; }
+.sheet.result.tight h2 { font-size: 21px; }
+.sheet.result.tight .sheet-sub { margin-bottom: 7px; font-size: 12.5px; }
+.sheet.result.tight .result-scores { margin: 7px 0 1px; gap: 4px; }
+.sheet.result.tight .result-row { padding: 4px 8px; }
+.sheet.result.tight .result-row .rname { font-size: 13px; }
+.sheet.result.tight .result-row .rscore { font-size: 17px; }
+.sheet.result.tight .result-meta { margin-top: 4px; gap: 4px; }
+.sheet.result.tight .result-meta span { font-size: 10px; padding: 1px 6px; }
+.sheet.result.tight .result-note { margin-top: 5px; font-size: 11px; }
+.sheet.result.tight .reward-row { margin: 5px 0 1px; gap: 4px; }
+.sheet.result.tight .reward-row > span { font-size: 10px; padding: 2px 6px; }
+.sheet.result.tight .reward-row b { font-size: 12px; }
+.sheet.result.tight .reward-unlock { margin-top: 4px; }
+.sheet.result.tight .unlock-chip { font-size: 10px; padding: 2px 7px; }
+.sheet.result.tight .sheet-actions { margin-top: 8px; gap: 4px; }
+.sheet.result.tight .sheet-actions > .btn {
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 12.5px;
 }
 
 .help-list { display: grid; gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
@@ -2739,7 +2806,12 @@ html.screen-shake { animation: screen-shake 0.46s cubic-bezier(0.36, 0.07, 0.19,
 /* Uygulama kabuğu — ana ekranda ve diğer ekranlarda sayfa kaymaz.      */
 /* ==================================================================== */
 
-html { height: 100%; }
+html {
+  height: 100%;
+  /* Yatay kaydırma hiçbir ekranda oluşmasın (dar cihaz / büyük yazı). */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
 
 body {
   height: 100%;
@@ -2766,6 +2838,7 @@ body {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  overflow-x: hidden;
   padding-bottom: 10px;
 }
 
@@ -3115,10 +3188,23 @@ body {
 [dir="rtl"] .lang-pick { text-align: right; }
 
 @media (max-width: 420px) {
+  .topbar { gap: 6px; padding-inline: 10px; }
   .top-actions { gap: 4px; }
   .icon-btn { width: 34px; height: 34px; }
   .icon-btn svg { width: 19px; height: 19px; }
   .brand-word { font-size: 18px; }
+}
+
+/* Çok dar / büyük görüntü ölçekli cihazlar (ör. 320 dp, ekran zoomu):
+   üst bar ekranı yana doğru genişletmesin. */
+@media (max-width: 344px) {
+  .topbar { padding-inline: 8px; gap: 4px; }
+  .brand { gap: 5px; padding: 2px; margin: -2px; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 8px; }
+  .brand-word { font-size: 15px; }
+  .top-actions { gap: 3px; }
+  .icon-btn { width: 29px; height: 29px; border-width: 1.5px; box-shadow: 1.5px 1.5px 0 var(--ink); }
+  .icon-btn svg { width: 16px; height: 16px; }
 }
 
 /* Kısa ekranlar (ör. 360×640): her şey tek ekrana sığsın diye sıkıştır. */

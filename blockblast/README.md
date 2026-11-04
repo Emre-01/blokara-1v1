@@ -13,6 +13,11 @@ oynayıp rekorunu yükseltirsin.
 **Ortak tahta** — Tek 8×8 tahta, tek ortak skor. Oyuncular sırayla blok yerleştirir.
 Her oyuncunun katkısı ayrı sayılır. Tahta tıkanınca tur biter.
 
+**Ortak tahtada canlı takip** — Çevrimiçi oynarken arkadaşının bloğu tutup
+sürüklemesi anlık olarak görünür: bloğun soluk hâli ve oyuncunun adı, parmağın
+gittiği yeri canlı izler. "Rakip" modunda aynı hayalet arkadaşın yan tahtasında
+görünür.
+
 **Rakip** — Her oyuncunun kendi tahtası vardır ama iki taraf da **aynı blok sırasını**
 alır. Tahtası dolan oyuncu kaybeder. Çevrimiçi rakip oyununda arkadaşının tahtası
 seninkiyle aynı anda, yanda daha küçük olarak görünür. İki satır birden patlatan

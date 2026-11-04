@@ -536,17 +536,23 @@ async function main() {
 
   const peerView = await b.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 400));
-    const board = document.querySelector('.peer-panel .board.peer');
-    const mine = document.querySelector('.versus-main .board');
+    const mine = document.querySelector('#board-me');
+    const rival = document.getElementById('board-rival');
+    const area = document.getElementById('table-area');
+    if (!mine || !area) return { exists: false };
+    const mr = mine.getBoundingClientRect();
+    const ar = area.getBoundingClientRect();
     return {
-      exists: !!board,
-      readonly: board ? board.classList.contains('readonly') : false,
-      cells: board ? board.querySelectorAll('.cell.on').length : 0,
-      smaller: board && mine ? board.getBoundingClientRect().width < mine.getBoundingClientRect().width : false
+      exists: true,
+      centered: Math.abs((mr.left - ar.left) - (ar.right - mr.right)) <= 2,
+      rival: !!rival,
+      rivalCells: rival ? rival.querySelectorAll('.on').length : -1,
+      smaller: rival ? rival.getBoundingClientRect().width < mr.width : false
     };
   })()`);
-  ok("rakip tahtası yanda ve daha küçük görünüyor",
-    peerView.exists && peerView.readonly && peerView.smaller && peerView.cells === rivalView.rivalCells, peerView);
+  ok("kendi tahtası ekranın ortasında, rakip tahtası skor kartında küçük görünüyor",
+    peerView.exists && peerView.centered && peerView.rival &&
+    peerView.rivalCells === rivalView.rivalCells && peerView.smaller, peerView);
 
   /* ---- tek kişilik mod ---- */
   for (const page of [a, b]) {
@@ -817,13 +823,13 @@ async function main() {
     const s = window.BlokDebug.snapshot();
     return { game: !document.getElementById('screen-game').hidden, mode: s.mode,
              players: s.players.length, room: window.BlokDebug.status().room,
-             peer: !!document.querySelector('.peer-panel .board.peer') };
+             peer: !!document.getElementById('board-rival') };
   })()`)));
   ok("rastgele eşleşme iki oyuncuyu aynı oyuna koydu",
     matched[0].game && matched[1].game && matched[0].mode === "versus" &&
     matched[0].players === 2 && matched[1].players === 2 &&
     matched[0].room && matched[0].room === matched[1].room, matched);
-  ok("eşleşen oyunda rakip tahtası görünüyor", matched[0].peer && matched[1].peer, matched);
+  ok("eşleşen oyunda rakip tahtası skor kartında görünüyor", matched[0].peer && matched[1].peer, matched);
 
   a.close();
   b.close();

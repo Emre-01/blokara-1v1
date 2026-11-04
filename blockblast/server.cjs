@@ -1002,6 +1002,40 @@ function handleMessage(conn, message) {
   const slot = room.players[info.index];
   if (!slot || slot.token !== info.token) return conn.send({ t: "error", message: "Oturum geçersiz." });
 
+  /* Canlı sürükleme: yalnızca diğer oyuncuya iletilir, sunucuda saklanmaz.
+     Böylece arkadaşın bloğu tutup gezdirdiği anlık görünür. */
+  if (t === "drag") {
+    if (room.phase !== "playing" || !room.game || room.game.phase !== "playing") return;
+    /* Saniyede en fazla ~25 mesaj: taşınma akıcı kalır, sunucu yorulmaz.
+       "Bıraktı" bildirimi hiç geciktirilmez; hayalet anında kaybolsun. */
+    const dragNow = Date.now();
+    if (message.on !== false) {
+      if (conn.dragAt && dragNow - conn.dragAt < 40) return;
+      conn.dragAt = dragNow;
+    }
+    const relay = {
+      t: "drag",
+      by: info.index,
+      on: message.on !== false,
+      piece: Math.max(0, Math.min(2, Number(message.piece) || 0)),
+      grabR: Number(message.grabR) || 0,
+      grabC: Number(message.grabC) || 0,
+      px: Number(message.px),
+      py: Number(message.py),
+      lift: Number(message.lift) || 0,
+      row: Number(message.row),
+      col: Number(message.col),
+      valid: !!message.valid
+    };
+    /* "Bıraktı" bildiriminde konum yok; yalnızca taşınma mesajında gerekir. */
+    if (relay.on && (!Number.isFinite(relay.px) || !Number.isFinite(relay.py))) return;
+    room.players.forEach((other, otherIndex) => {
+      if (otherIndex === info.index) return;
+      if (other.connected && other.conn && !other.conn.closed) other.conn.send(relay);
+    });
+    return;
+  }
+
   if (t === "mode") {
     if (room.phase !== "lobby") return;
     if (room.host !== info.index) return conn.send({ t: "error", message: "Modu sadece oda sahibi değiştirir." });
