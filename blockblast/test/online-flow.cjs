@@ -183,52 +183,47 @@ async function main() {
   ok("panel 'Çevrimiçi' rozetiyle ayrılıyor, eski 'uzaktan' ifadesi yok",
     !panel.banned && panel.badge === "Çevrimiçi" && panel.heading === "Arkadaşınla oyna", panel);
 
-  /* ---- hesap girişi: ad otomatik gelir, ad alanı gizlenir ---- */
+  /* ---- hesap: ad alanı hesap şeridinde, giriş zorunlu değil ---- */
   const account = await a.evaluate(`(async () => {
-    const field = document.querySelector('.play-name');
-    const edit = document.getElementById('name-edit');
+    const strip = document.getElementById('account-strip');
+    const input = document.getElementById('player-name');
     const signIn = document.getElementById('name-signin');
-    const guestVisible = !field.hidden;
-    const signInExists = !!signIn && signIn.parentElement === field.querySelector('.name-row');
+    const edit = document.getElementById('name-edit');
+    const insideStrip = !!input && strip.contains(input);
+    const onlineCard = document.getElementById('online-card');
+    const notInOnlineCard = !!input && !onlineCard.contains(input);
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 60));
+    const emptyAvatar = document.getElementById('account-avatar').textContent.trim();
+    input.value = 'Ada';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 60));
+    const typedAvatar = document.getElementById('account-avatar').textContent.trim();
     window.BlokGoogleResult({ name: 'Zeynep', sub: 'test-1' });
     await new Promise(r => setTimeout(r, 120));
     const afterSignIn = {
-      fieldHidden: field.hidden,
-      name: document.getElementById('account-name').textContent.trim(),
-      input: document.getElementById('player-name').value,
-      editVisible: !edit.hidden,
-      signInHidden: !!signIn && signIn.hidden,
-      note: document.getElementById('account-note').textContent.trim()
-    };
-    edit.click();
-    await new Promise(r => setTimeout(r, 80));
-    const editing = { fieldHidden: field.hidden, label: edit.textContent.trim() };
-    const input = document.getElementById('player-name');
-    input.value = 'Zey';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    await new Promise(r => setTimeout(r, 80));
-    const afterEdit = {
-      fieldHidden: field.hidden,
-      value: input.value,
-      label: edit.textContent.trim()
+      input: input.value,
+      stillVisible: !input.closest('.field') || getComputedStyle(input).display !== 'none',
+      signoutVisible: !document.getElementById('google-signout').hidden
     };
     document.getElementById('google-signout').click();
     await new Promise(r => setTimeout(r, 80));
     return {
-      guestVisible, signInExists, afterSignIn, editing, afterEdit,
-      afterSignOut: { fieldHidden: field.hidden, editVisible: !edit.hidden }
+      insideStrip, notInOnlineCard, emptyAvatar, typedAvatar,
+      signInGone: !signIn, editGone: !edit,
+      afterSignIn,
+      afterSignOut: { value: input.value, signoutHidden: document.getElementById('google-signout').hidden }
     };
   })()`);
-  ok("giriş yapınca ad otomatik gelir ve ad alanı gizlenir",
-    account.guestVisible && account.signInExists && account.afterSignIn.fieldHidden &&
-    account.afterSignIn.name === "Zeynep" &&
-    account.afterSignIn.input === "Zeynep" &&
-    account.afterSignIn.editVisible && account.afterSignIn.signInHidden, account);
-  ok("ad, ayarlardan isteğe bağlı değiştirilebilir",
-    !account.editing.fieldHidden && account.editing.label === "Adı kaydet" &&
-    account.afterEdit.fieldHidden && account.afterEdit.value === "Zey", account);
-  ok("çıkış yapınca misafir ad alanı geri gelir",
-    !account.afterSignOut.fieldHidden && !account.afterSignOut.editVisible, account);
+  ok("ad alanı 'Misafir oyuncu' şeridine taşındı, giriş düğmeleri kaldırıldı",
+    account.insideStrip && account.notInOnlineCard && account.signInGone && account.editGone, account);
+  ok("yazılan ad avatarı ve giriş durumunu günceller",
+    account.emptyAvatar === "?" && account.typedAvatar === "A" &&
+    account.afterSignIn.input === "Zeynep" && account.afterSignIn.stillVisible &&
+    account.afterSignIn.signoutVisible, account);
+  ok("çıkış yapınca son ad korunur",
+    account.afterSignOut.value === "Zeynep" && account.afterSignOut.signoutHidden, account);
 
   /* ---- oda kur / katıl ---- */
   await a.evaluate(`document.getElementById('player-name').value = 'Ada';`);

@@ -776,19 +776,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   font-size: 14px;
 }
 
-.play-name { max-width: 320px; }
-
-/* Misafir adı + "Giriş yap": yan yana, aynı hizada. */
-.name-row { display: flex; align-items: stretch; gap: 8px; }
-.name-row input { flex: 1 1 auto; }
-.name-row .btn {
-  flex: 0 0 auto;
-  min-height: 48px;
-  padding-inline: 13px;
-  white-space: nowrap;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
-}
-
 /* Doğrudan seçim: katlanan menü yok, üç yol yan yana. */
 .play-tabs {
   display: grid;
@@ -864,7 +851,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
     align-items: start;
   }
   .play-head { grid-area: head; }
-  .play-name { grid-area: name; max-width: none; }
   .play-tabs { grid-area: tabs; }
   .play-pane { grid-area: pane; }
 }
@@ -2041,8 +2027,35 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   color: var(--ink);
   overflow: hidden;
 }
-.account-meta { display: grid; gap: 2px; min-width: 0; }
-.account-name { font-weight: 700; font-size: 14.5px; color: var(--ink); }
+.account-meta { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.account-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.account-input {
+  width: 100%;
+  min-width: 0;
+  padding: 1px 0 3px;
+  border: 0;
+  border-bottom: 2px dashed rgba(28, 27, 46, 0.32);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.15;
+}
+.account-input:hover { border-bottom-color: rgba(28, 27, 46, 0.55); }
+.account-input:focus {
+  outline: none;
+  border-bottom-color: var(--mustard);
+  background: rgba(255, 255, 255, 0.4);
+}
+.account-input::placeholder { color: #9b927e; font-weight: 500; }
 .account-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .google-slot { display: flex; min-height: 0; }
 .site-foot a { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
@@ -2704,7 +2717,6 @@ html.screen-shake { animation: screen-shake 0.46s cubic-bezier(0.36, 0.07, 0.19,
   }
   .play-head .online-copy h2 { font-size: 18px; margin-bottom: 2px; }
   .play-head .online-copy p { display: none; }
-  .play-name { max-width: none; }
   .play-tabs { gap: 5px; padding: 4px; border-radius: 12px; }
   .play-tab { font-size: 12px; padding: 8px 4px; border-radius: 8px; }
   .play-pane { gap: 9px; }
@@ -2824,16 +2836,13 @@ body {
     row-gap: 14px;
   }
   .home-col-main .play-head { grid-area: head; align-self: end; }
-  .home-col-main .play-name { grid-area: name; align-self: start; }
   .home-col-main .play-tabs { grid-area: tabs; align-self: end; }
   .home-col-main .play-pane { grid-area: pane; align-self: start; }
   .home-col-main .online-note { grid-column: 1 / -1; }
   .home-col-main .play-head .online-copy h2 { font-size: 24px; }
-  .home-col-main .name-row .btn { align-self: center; }
 }
 .home-col-main .online-card .online-copy p { display: none; }
 .home-col-main .play-head .online-copy h2 { font-size: 20px; margin-bottom: 0; }
-.home-col-main .play-name { max-width: none; }
 .home-col-main .play-hint { font-size: 12px; }
 .home-col-main .online-create-row .btn { padding: 9px 10px; font-size: 13px; }
 
@@ -2921,72 +2930,83 @@ body {
   .site-foot { display: none; }
 
   .screen.home .mode-grid {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
-    gap: 8px;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    gap: clamp(5px, 0.9vh, 8px);
   }
-  .screen.home .mode-card.solo { grid-column: 1 / -1; }
+  .screen.home .mode-card.solo { grid-column: auto; }
 
-  /* Mod kartları: minik görsel + başlık + yuvarlak oynat düğmesi. */
+  /* Mod kartları: solda büyük tahta görseli, ortada başlık, sağda
+     yuvarlak oynat düğmesi. Ölçüler ekran yüksekliğine göre ölçeklenir;
+     böylece kısa telefonlarda da taşma ve kaydırma olmaz. */
   .screen.home .mode-card {
     flex-direction: row;
-    align-items: center;
-    min-height: 58px;
+    align-items: stretch;
+    min-height: clamp(54px, 7.4vh, 78px);
     border-radius: 14px;
   }
   .screen.home .mode-art {
     display: flex;
-    flex: 0 0 64px;
-    width: 64px;
+    flex: 0 0 clamp(70px, 9.6vh, 104px);
+    width: clamp(70px, 9.6vh, 104px);
     height: auto;
     align-self: stretch;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 5px 4px;
+    gap: 3px;
+    padding: 5px;
     border-bottom: 0;
     border-right: 2px solid var(--ink);
+    overflow: hidden;
   }
-  .screen.home .mode-art::before { opacity: 0.55; }
+  .screen.home .mode-art::before { opacity: 0.5; }
   .screen.home .mini-board {
-    width: 44px;
-    padding: 3px;
-    gap: 1px;
+    width: clamp(48px, 6.8vh, 72px);
+    padding: 4px;
+    gap: 1.5px;
     border-width: 1.5px;
-    border-radius: 6px;
+    border-radius: 7px;
     box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.32);
     transform: rotate(-4deg);
     align-self: center;
   }
   .screen.home .mini-board.right { transform: rotate(5deg); }
-  .screen.home .mini-board .mb { border-radius: 1px; }
-  .screen.home .versus-art { flex-basis: 82px; width: 82px; gap: 2px; }
-  .screen.home .versus-art .mini-board { width: 32px; }
+  .screen.home .mini-board .mb { border-radius: 1.5px; }
+  .screen.home .versus-art { flex-basis: clamp(98px, 13.4vh, 144px); width: clamp(98px, 13.4vh, 144px); gap: 3px; }
+  .screen.home .versus-art .mini-board { width: clamp(31px, 4.3vh, 46px); }
   .screen.home .vs-stamp {
     display: block;
-    font-size: 9px;
-    padding: 1px 3px;
+    font-size: clamp(9px, 1.35vh, 11px);
+    padding: 2px 4px;
     border-width: 1.5px;
-    border-radius: 5px;
+    border-radius: 6px;
     transform: rotate(-8deg);
   }
   .screen.home .mode-art .tag { display: none; }
   .screen.home .mode-body {
+    flex: 1 1 auto;
+    min-width: 0;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
-    padding: 7px 8px;
+    gap: 8px;
+    padding: clamp(5px, 0.9vh, 9px) 10px;
   }
   .screen.home .mode-body h2 {
-    font-size: 14.5px;
+    font-size: clamp(14px, 1.95vh, 17px);
     white-space: normal;
     line-height: 1.12;
+    overflow-wrap: anywhere;
   }
   .screen.home .mode-body p { display: none; }
-  .screen.home .mode-actions { margin-left: auto; padding: 0; }
+  .screen.home .mode-actions {
+    margin-left: auto;
+    padding: 0;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
   .screen.home .mode-actions .btn {
-    width: 40px;
-    height: 40px;
+    width: clamp(38px, 5.2vh, 52px);
+    height: clamp(38px, 5.2vh, 52px);
     min-height: 0;
     padding: 0;
     border-radius: 50%;
@@ -2999,47 +3019,35 @@ body {
   .screen.home .mode-actions .btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(28, 27, 46, 0.32); }
   .screen.home .mode-actions .btn .btn-label { display: none; }
   .screen.home .mode-actions .btn-play-icon {
-    width: 22px;
-    height: 22px;
+    width: clamp(20px, 2.8vh, 27px);
+    height: clamp(20px, 2.8vh, 27px);
     margin: 0 0 0 2px;
   }
+
+  /* Profil, hesap ve başarımlar da yüksekliğe göre nefes alır. */
+  .screen.home .profile-strip { padding: clamp(5px, 0.9vh, 10px) 12px; }
+  .screen.home .level-badge { width: clamp(30px, 4.4vh, 42px); height: clamp(30px, 4.4vh, 42px); }
+  .screen.home .account-strip { padding: clamp(5px, 0.9vh, 10px) 12px; }
+  .screen.home .account-avatar { width: clamp(30px, 4.4vh, 40px); height: clamp(30px, 4.4vh, 40px); }
+  .screen.home .ach-card { min-height: clamp(44px, 6.2vh, 64px); }
+  .screen.home .ach-card summary { padding: clamp(9px, 1.5vh, 15px) 20px; }
 }
 
 @media (max-width: 380px) {
-  .screen.home .mode-art { flex-basis: 54px; width: 54px; padding: 4px 3px; }
-  .screen.home .mini-board { width: 38px; }
-  .screen.home .versus-art { flex-basis: 66px; width: 66px; }
-  .screen.home .versus-art .mini-board { width: 27px; }
-  .screen.home .vs-stamp { font-size: 8px; padding: 0 2px; }
-  .screen.home .mode-body { padding: 6px 7px; gap: 4px; }
-  .screen.home .mode-body h2 { font-size: 13.5px; }
-  .screen.home .mode-actions .btn { width: 32px; height: 32px; }
-  .screen.home .mode-actions .btn-play-icon { width: 18px; height: 18px; margin: 0 0 0 2px; }
+  .screen.home .mode-art { flex-basis: clamp(66px, 9.2vh, 88px); width: clamp(66px, 9.2vh, 88px); padding: 4px; }
+  .screen.home .mini-board { width: clamp(46px, 6.4vh, 62px); }
+  .screen.home .versus-art { flex-basis: clamp(92px, 12.8vh, 124px); width: clamp(92px, 12.8vh, 124px); }
+  .screen.home .versus-art .mini-board { width: clamp(30px, 4.1vh, 40px); }
+  .screen.home .mode-body { padding: clamp(4px, 0.8vh, 8px) 8px; gap: 6px; }
 }
 
 /* Geniş portre ekranlar (9:16; mağaza görselleri bu oranda çizilir):
-   kartlar büyür, boşluklar dengelenir. Uzun-ince telefonlarda (ör. 412×915)
-   kompakt düzen korunur ve kaydırma hiçbir durumda oluşmaz. */
+   boşluklar biraz açılır. Kart ölçüleri zaten yüksekliğe göre ölçeklendiği
+   için burada sabit değer yok; kaydırma hiçbir durumda oluşmaz. */
 @media (max-width: 720px) and (min-height: 780px) and (min-aspect-ratio: 1/2), (max-width: 720px) and (min-width: 391px) and (min-height: 880px) {
-  .screen.home { gap: 11px; padding-top: 10px; padding-bottom: 10px; }
-  .screen.home .profile-strip { min-height: 78px; }
-  .screen.home .account-strip { min-height: 74px; }
-  .screen.home .mode-card { min-height: 92px; }
-  .screen.home .mode-art { flex-basis: clamp(74px, 18vw, 100px); width: clamp(74px, 18vw, 100px); }
-  .screen.home .mini-board { width: clamp(46px, 12vw, 66px); }
-  .screen.home .versus-art { flex-basis: clamp(96px, 23.7vw, 128px); width: clamp(96px, 23.7vw, 128px); }
-  .screen.home .versus-art .mini-board { width: clamp(33px, 9.3vw, 50px); }
-  .screen.home .vs-stamp { font-size: clamp(9px, 2vw, 11px); padding: 1px 4px; }
-  .screen.home .mode-body h2 { font-size: clamp(15px, 3.3vw, 18px); }
-  .screen.home .mode-actions .btn { width: clamp(42px, 9.8vw, 52px); height: clamp(42px, 9.8vw, 52px); }
-  .screen.home .mode-actions .btn-play-icon {
-    width: clamp(22px, 5vw, 27px);
-    height: clamp(22px, 5vw, 27px);
-    margin: 0 0 0 clamp(2px, 0.4vw, 3px);
-  }
-  .screen.home .online-card { padding: 18px 16px 20px; gap: 13px; min-height: 0; }
+  .screen.home { gap: clamp(8px, 1.1vh, 12px); padding-top: clamp(8px, 1.1vh, 12px); padding-bottom: clamp(6px, 1vh, 12px); }
+  .screen.home .online-card { padding: clamp(12px, 1.9vh, 18px) 16px; gap: clamp(9px, 1.4vh, 13px); min-height: 0; }
   .screen.home .online-card .play-hint { font-size: 13.5px; }
-  .screen.home .ach-card { min-height: 68px; }
 }
 
 /* ---------- dil seçici ---------- */
@@ -3090,18 +3098,21 @@ body {
   .screen.home .level-badge { width: 30px; height: 30px; font-size: 14px; }
   .screen.home .account-strip { min-height: 0; padding: 5px 9px; }
   .screen.home .mode-grid { gap: 5px; }
-  .screen.home .mode-card { min-height: 0; }
-  .screen.home .mode-art { flex-basis: 50px; width: 50px; padding: 3px 3px; }
-  .screen.home .mini-board { width: 32px; }
-  .screen.home .versus-art { flex-basis: 62px; width: 62px; }
-  .screen.home .versus-art .mini-board { width: 23px; }
-  .screen.home .mode-body { padding: 5px 8px; gap: 3px; }
-  .screen.home .mode-body h2 { font-size: 13.5px; }
+  .screen.home .mode-card { min-height: 58px; }
+  .screen.home .mode-art { flex-basis: 68px; width: 68px; padding: 3px; }
+  .screen.home .mini-board { width: 48px; padding: 3px; }
+  .screen.home .versus-art { flex-basis: 92px; width: 92px; }
+  .screen.home .versus-art .mini-board { width: 30px; }
+  .screen.home .vs-stamp { font-size: 9px; padding: 1px 3px; }
+  .screen.home .mode-body { padding: 5px 8px; gap: 5px; }
+  .screen.home .mode-body h2 { font-size: 13px; }
+  .screen.home .mode-actions .btn { width: 36px; height: 36px; }
+  .screen.home .mode-actions .btn-play-icon { width: 19px; height: 19px; }
   .screen.home .online-card { padding: 10px; gap: 8px; border-radius: 14px; }
   .online-badge { margin-bottom: 4px; font-size: 10.5px; padding: 2px 8px 2px 7px; }
   .play-head .online-copy h2 { font-size: 16px; }
-  .play-name .field label { font-size: 11px; }
-  .name-row input { font-size: 14px; padding: 7px 10px; }
+  .screen.home .account-input { font-size: 14px; }
+  .screen.home .account-label { font-size: 9.5px; }
   .play-tabs { gap: 4px; padding: 3px; }
   .play-tab { font-size: 11.5px; padding: 7px 3px; }
   .play-pane { gap: 7px; }

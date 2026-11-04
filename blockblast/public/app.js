@@ -2978,58 +2978,23 @@
     return text ? text.charAt(0).toUpperCase() : "?";
   }
 
-  /* Misafir ad alanının yanındaki "Giriş yap" düğmesi. Oturum açıkken
-     gizlenir; giriş yolu yoksa dokununca bilgi verir. */
-  function applyNameSignInButton() {
-    var button = $("#name-signin");
-    if (!button) return;
-    button.hidden = !!googleAccount.profile;
-    button.textContent = "Giriş yap";
-    button.setAttribute("aria-label", playGames.available
-      ? "Play Games ile giriş yap"
-      : "Google ile giriş yap");
+  /* Ad alanı hesap şeridinde durur: giriş gerekmez, her zaman yazılabilir.
+     Avatar yazılan adın ilk harfini gösterir. */
+  function accountName() {
+    var input = $("#player-name");
+    var typed = input ? input.value.trim() : "";
+    if (typed) return typed;
+    return googleAccount.profile ? googleAccount.profile.name : "";
   }
 
-  /* Hesap bağlıysa ad alanını gizle: ad otomatik gelir, isteyen "Adı
-     değiştir" ile açar. Misafirde alan her zaman görünür. */
-  function applyAccountNameField() {
-    var field = document.querySelector(".play-name");
-    var editBtn = $("#name-edit");
-    var signedIn = !!googleAccount.profile;
-    if (field) field.hidden = signedIn && !app.nameEditing;
-    if (editBtn) {
-      editBtn.hidden = !signedIn;
-      editBtn.textContent = app.nameEditing ? "Adı kaydet" : "Adı değiştir";
-      if (!signedIn) app.nameEditing = false;
-    }
-    applyNameSignInButton();
-  }
-
-  /* Ad düzenlemeyi açar: hesap bağlıysa gizli alanı gösterir, misafirde
-     mevcut alana odaklanır. */
-  function startNameEdit() {
-    app.nameEditing = true;
-    applyAccountNameField();
-    var field = $("#player-name");
-    if (!field) return;
-    var card = $("#online-card");
-    if (card && card.scrollIntoView) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+  function focusNameField() {
+    var input = $("#player-name");
+    if (!input) return;
+    var card = $("#account-strip");
+    if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(function () {
-      var input = $("#player-name");
-      if (!input) return;
-      input.focus();
-      try { input.select(); } catch (error) { /* yoksay */ }
-    }, 250);
-  }
-
-  function finishNameEdit(silent) {
-    app.nameEditing = false;
-    applyAccountNameField();
-    var field = $("#player-name");
-    if (field) field.blur();
-    if (!silent) toast("Adın güncellendi.");
+      try { input.focus(); input.select(); } catch (error) { /* yoksay */ }
+    }, 120);
   }
 
   /* Adı her yerden (oyun içi menü dâhil) düzenlemek için pencere. */
@@ -3069,8 +3034,6 @@
     save(LS_NAME, value);
     var field = $("#player-name");
     if (field) field.value = value;
-    app.nameEditing = false;
-    applyAccountNameField();
     closeOverlay();
     toast("Adın güncellendi.");
   }
@@ -3078,51 +3041,20 @@
   function renderAccount() {
     var profile = googleAccount.profile;
     var avatar = $("#account-avatar");
-    var nameEl = $("#account-name");
-    var note = $("#account-note");
     var signout = $("#google-signout");
     var slot = $("#google-slot");
     var nativeBtn = $("#google-native");
-    if (!avatar || !nameEl) return;
-    applyAccountNameField();
-    if (profile) {
-      nameEl.textContent = profile.name;
-      if (note) {
-        note.textContent = profile.source === "playgames"
-          ? "Play Games hesabı bağlı"
-          : "Google hesabı bağlı";
-      }
-      avatar.textContent = accountInitial(profile.name);
-      if (profile.picture) {
-        avatar.textContent = "";
-        avatar.style.backgroundImage = 'url("' + String(profile.picture).replace(/["\\]/g, "") + '")';
-      } else {
-        avatar.style.backgroundImage = "";
-      }
-      if (signout) signout.hidden = false;
-      if (slot) slot.hidden = true;
-      if (nativeBtn) nativeBtn.hidden = true;
-      return;
-    }
-    nameEl.textContent = "Misafir oyuncu";
-    if (note) {
-      if (playGames.available) {
-        note.textContent = "Play Games ile giriş yap, adın hazır olsun";
-      } else if (googleAccount.native || googleAccount.configured) {
-        note.textContent = "Google ile giriş yap, adın hazır olsun";
-      } else if (location.protocol === "file:") {
-        note.textContent = "Google girişi bu sürümde kapalı";
-      } else if (!googleAccount.attempted) {
-        note.textContent = "Google girişi yükleniyor…";
-      } else {
-        note.textContent = "Google girişi bu sunucuda tanımlı değil";
-      }
-    }
-    avatar.textContent = "?";
+    if (!avatar) return;
+    var name = accountName();
     avatar.style.backgroundImage = "";
-    if (signout) signout.hidden = true;
-    if (slot) slot.hidden = googleAccount.native || !googleAccount.ready;
-    if (nativeBtn) nativeBtn.hidden = !googleAccount.native;
+    avatar.textContent = accountInitial(name);
+    if (profile && profile.picture) {
+      avatar.textContent = "";
+      avatar.style.backgroundImage = 'url("' + String(profile.picture).replace(/["\\]/g, "") + '")';
+    }
+    if (signout) signout.hidden = !profile;
+    if (slot) slot.hidden = !!profile || googleAccount.native || !googleAccount.ready;
+    if (nativeBtn) nativeBtn.hidden = !!profile || !googleAccount.native;
   }
 
   function applyGoogleProfile(profile, options) {
@@ -3292,23 +3224,13 @@
     var signout = $("#google-signout");
     if (signout) signout.addEventListener("click", signOutGoogle);
 
-    var nameEdit = $("#name-edit");
-    if (nameEdit) {
-      nameEdit.addEventListener("click", function () {
-        if (app.nameEditing) {
-          finishNameEdit(false);
-          return;
-        }
-        startNameEdit();
-      });
-    }
-
     var nameField = $("#player-name");
     if (nameField) {
+      /* Enter'da klavyeyi kapat; ad zaten yazarken kaydediliyor. */
       nameField.addEventListener("keydown", function (event) {
-        if (event.key !== "Enter" || !app.nameEditing) return;
+        if (event.key !== "Enter") return;
         event.preventDefault();
-        finishNameEdit(false);
+        nameField.blur();
       });
     }
 
@@ -3344,9 +3266,6 @@
       if (playGames.available) nativeBtn.textContent = "Play Games ile giriş";
       nativeBtn.addEventListener("click", startGoogleSignInFlow);
     }
-
-    var nameSignIn = $("#name-signin");
-    if (nameSignIn) nameSignIn.addEventListener("click", startGoogleSignInFlow);
 
     if (googleAccount.native || location.protocol === "file:") return;
 
@@ -4123,6 +4042,7 @@
 
     $("#player-name").addEventListener("input", function (event) {
       save(LS_NAME, event.target.value.trim());
+      renderAccount();
       /* Arkadaş listesindeki adın canlı kalsın: kısa bir gecikmeyle
          sunucuya yeni adı bildir. */
       if (app.presenceTimer) clearTimeout(app.presenceTimer);

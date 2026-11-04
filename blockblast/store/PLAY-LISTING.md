@@ -1,7 +1,7 @@
 # Google Play Console — hazır bilgiler (Blokara 1v1)
 
 Bu dosya Play Console'a **kopyala-yapıştır** yapılacak metinleri ve form
-cevaplarını içerir. Sürüm: `2.0.4` (`versionCode 16`).
+cevaplarını içerir. Sürüm: `2.0.5` (`versionCode 17`).
 
 | Alan | Değer |
 |---|---|
@@ -150,7 +150,7 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 
 ---
 
-## 5. Sürüm notları (2.0.4)
+## 5. Sürüm notları (2.0.5)
 
 ```
 • Ana ekran sadeleşti: "Aynı cihaz" ve "Çevrimiçi" bölümleri ayrıldı.
@@ -161,6 +161,8 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 • Kazanma efekti zenginleşti: ışık huzmeleri, altın kıvılcımlar, geniş fanfar.
 • Satır ve sütun patlamaları artık ayrı seslerle duyuluyor; ikisi birden
   patlarsa özel "perfect" sesi çalıyor.
+• Mod kartlarındaki tahta görselleri büyütüldü; oynat düğmesi artık taşmıyor.
+• Oyuncu adı doğrudan "Misafir oyuncu" şeridine taşındı; ayrı giriş adımı yok.
 ```
 
 ---
@@ -177,7 +179,7 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 - [ ] İçerik derecelendirmesi anketi (bölüm 3).
 - [ ] Reklam beyanı: "Reklam içeriyor" işaretle.
 - [ ] Uygulama içi ürün `remove_ads` oluştur ve etkinleştir.
-- [ ] AAB yükle: `android/dist/Blokara-1v1-2.0.4.aab`.
+- [ ] AAB yükle: `android/dist/Blokara-1v1-2.0.5.aab`.
 - [ ] Kapalı test → 12 test kullanıcısı → 14 gün → üretime geçiş.
 - [ ] Üretim öncesi `assets/server.txt` kalıcı sunucu adresini gösteriyor mu
       kontrol et (tünel adresi kalıcı değildir).

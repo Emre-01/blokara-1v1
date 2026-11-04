@@ -46,8 +46,8 @@ val googleClientId = setting("blokiki.googleAndroidClientId", "")
 /* "Reklamları kaldır" ürün kimliği (Play Console → Uygulama içi ürünler). */
 val removeAdsProduct = setting("blokiki.removeAdsProduct", "remove_ads")
 
-val appVersionCode = setting("blokiki.versionCode", "16").toIntOrNull() ?: 16
-val appVersionName = setting("blokiki.versionName", "2.0.4")
+val appVersionCode = setting("blokiki.versionCode", "17").toIntOrNull() ?: 17
+val appVersionName = setting("blokiki.versionName", "2.0.5")
 
 android {
     namespace = "tr.blokiki.app"
@@ -141,10 +141,12 @@ dependencies {
     implementation("com.android.billingclient:billing:7.1.1")
 }
 
-/* public/ klasörü tek kaynak; APK'ya kopyalanır (servis çalışanı hariç). */
+/* public/ klasörü tek kaynak; APK'ya kopyalanır (servis çalışanı hariç).
+   1024 px ikon yalnızca mağaza/PWA kaynağıdır; uygulamada kullanılmaz ve
+   0,9 MB yer kaplar. Bu yüzden pakete girmez. */
 val syncWebAssets by tasks.registering(Sync::class) {
     from(rootProject.file("../public")) {
-        exclude("sw.js")
+        exclude("sw.js", "icons/icon-1024.png")
     }
     into(layout.buildDirectory.dir("generated/webassets/www"))
 }

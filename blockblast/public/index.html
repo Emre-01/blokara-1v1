@@ -138,15 +138,6 @@
         </div>
       </div>
 
-      <div class="field play-name">
-        <label for="player-name">Adın</label>
-        <div class="name-row">
-          <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
-                 placeholder="Örn. Ada" enterkeyhint="next">
-          <button class="btn btn-mustard btn-sm" id="name-signin" type="button" hidden>Giriş yap</button>
-        </div>
-      </div>
-
       <div class="play-tabs" role="tablist" aria-label="Nasıl oynamak istersin">
         <button class="play-tab is-active" id="tab-create" type="button" role="tab"
                 aria-selected="true" aria-controls="pane-create" data-pane="create">Oda kur</button>
@@ -201,18 +192,19 @@
       </div>
     </section>
 
-    <!-- Google hesabı: ad ve profil resmi oda adında kullanılır. -->
+    <!-- Oyuncu adı: oda adında ve skor tablosunda bu ad görünür.
+         Giriş zorunlu değil; adı doğrudan buradan yazabilirsin. -->
     <section class="account-strip" id="account-strip" aria-label="Hesap">
       <div class="account-person">
         <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
         <div class="account-meta">
-          <span class="account-name" id="account-name">Misafir oyuncu</span>
-          <span class="tiny" id="account-note">Giriş yap, adın hazır olsun</span>
+          <label class="account-label" for="player-name">Adın</label>
+          <input id="player-name" class="account-input" name="name" type="text" maxlength="16"
+                 autocomplete="nickname" placeholder="Misafir oyuncu" enterkeyhint="done">
         </div>
       </div>
       <div class="account-actions">
         <div class="google-slot" id="google-slot"></div>
-        <button class="btn btn-outline btn-sm" id="name-edit" type="button" hidden>Adı değiştir</button>
         <button class="btn btn-outline btn-sm" id="google-native" type="button" hidden>Google ile giriş</button>
         <button class="btn btn-outline btn-sm" id="google-signout" type="button" hidden>Çıkış yap</button>
       </div>
