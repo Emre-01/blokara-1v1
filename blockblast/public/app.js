@@ -2822,6 +2822,11 @@
     syncBannerVisibility();
     var first = sheet.querySelector("[data-autofocus]") || sheet.querySelector("button");
     if (first) setTimeout(function () { first.focus(); }, 30);
+    fitOverlaySheet();
+    setTimeout(fitOverlaySheet, 260);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(fitOverlaySheet).catch(function () { /* yoksay */ });
+    }
   }
 
   function closeOverlay() {
@@ -2841,14 +2846,14 @@
     syncBannerVisibility();
   }
 
-  /* Sonuç penceresini tek ekrana sığdırır. Önce normal ölçüler denenir;
+  /* Açık pencereyi tek ekrana sığdırır. Önce normal ölçüler denenir;
      içerik taşarsa compact, sonra tight sınıfı eklenir. Böylece kaydırma
      çubuğu görünmeden bütün düğmeler ekranda kalır. */
-  function fitResultSheet() {
+  function fitOverlaySheet() {
     var overlay = $("#overlay");
     if (!overlay || overlay.hidden) return;
     var sheet = $(".sheet", overlay);
-    if (!sheet || !sheet.classList.contains("result")) return;
+    if (!sheet) return;
     var overflows = function () {
       return sheet.scrollHeight > sheet.clientHeight + 1;
     };
@@ -2873,7 +2878,9 @@
         '<li><b>Arkadaşınla</b><span>Oda kurup 5 haneli kodu paylaş ya da <b>Rastgele eşleş</b> ile aynı anda bekleyen biriyle hemen oyna.</span></li>' +
         '<li><b>Klavye</b><span><b>Enter</b> ya da <b>Boşluk</b> ile blok seç; <b>ok tuşlarıyla</b> tahtada gez ve <b>Enter</b> ile bırak. <b>Esc</b> seçimi iptal eder.</span></li>' +
       '</ul>' +
-      '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Anladım</button></div>'
+      '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Anladım</button></div>',
+      true,
+      "help"
     );
   }
 
@@ -3069,7 +3076,12 @@
     var resultSheet = $(".sheet", $("#overlay"));
     if (resultSheet) {
       resultSheet.classList.add("result");
-      fitResultSheet();
+      fitOverlaySheet();
+      /* Yazı tipi geç yüklenirse ölçüler değişebilir; bir kez daha sığdır. */
+      setTimeout(fitOverlaySheet, 260);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitOverlaySheet).catch(function () { /* yoksay */ });
+      }
     }
     app.interstitialPending = true;
     if (s.phase === "over") {
@@ -4531,13 +4543,13 @@
      işi yapmaz. Paylaşım yolu yoksa son çare olarak bağlantı kopyalanır. */
   function shareRoom() {
     var code = $("#lobby-code").textContent.trim();
-    if (!code || code === "-----") {
-      toast("Önce bir oda kur.");
-      return;
-    }
+    if (!code || code === "-----") return;
     var url = location.origin + location.pathname + "?oda=" + encodeURIComponent(code);
-    var text = "Blokara 1v1 oynayalım mı? Oda kodu: " + code + "\n" + url;
-    var title = "Blokara 1v1 · Oda " + code;
+    var lead = (window.BlokI18n && window.BlokI18n.t)
+      ? window.BlokI18n.t("Blokara 1v1 oynayalım mı? Oda kodu:")
+      : "Blokara 1v1 oynayalım mı? Oda kodu:";
+    var text = lead + " " + code + "\n" + url;
+    var title = "Blokara 1v1";
 
     /* Android uygulamasında yerel paylaşım menüsü. */
     var bridge = window.BlokIkiServer;
@@ -4550,12 +4562,12 @@
     if (navigator.share) {
       navigator.share({ title: title, text: text, url: url }).catch(function (error) {
         if (error && error.name === "AbortError") return;
-        copyText(url, "Paylaşım açılamadı; bağlantı kopyalandı.");
+        copyText(url, "Oda bağlantısı kopyalandı.");
       });
       return;
     }
 
-    copyText(url, "Bu cihazda paylaşım menüsü yok; bağlantı kopyalandı.");
+    copyText(url, "Oda bağlantısı kopyalandı.");
   }
 
   /* ------------------------------------------------------------------ */
@@ -4626,9 +4638,9 @@
     });
     window.addEventListener("pagehide", function () { setBackgrounded(true); });
     window.addEventListener("pageshow", function () { setBackgrounded(false); });
-    window.addEventListener("resize", fitResultSheet);
+    window.addEventListener("resize", fitOverlaySheet);
     window.addEventListener("orientationchange", function () {
-      setTimeout(fitResultSheet, 160);
+      setTimeout(fitOverlaySheet, 160);
     });
   }
 

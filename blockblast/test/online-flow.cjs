@@ -237,6 +237,41 @@ async function main() {
   ok("oda oluşturuldu", created.screen === "lobby" && /^[A-Z0-9]{5}$/.test(created.code), created);
   const code = created.code;
 
+  /* ---- paylaş: sistem menüsü açar; kopyala yalnızca kodu yazar ---- */
+  const shareUi = await a.evaluate(`(async () => {
+    const shared = [];
+    let copied = [];
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: (payload) => { shared.push(payload); return Promise.resolve(); }
+    });
+    const realCopy = navigator.clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (text) => { copied.push(text); return Promise.resolve(); } }
+    });
+    document.getElementById('share-code').click();
+    await new Promise(r => setTimeout(r, 120));
+    const afterShareCopies = copied.slice();
+    document.getElementById('copy-code').click();
+    await new Promise(r => setTimeout(r, 120));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: realCopy });
+    delete navigator.share;
+    return {
+      shared: shared.length,
+      sharedText: shared[0] ? String(shared[0].text || '') : '',
+      sharedUrl: shared[0] ? String(shared[0].url || '') : '',
+      afterShareCopies,
+      copied,
+      code: document.getElementById('lobby-code').textContent.trim()
+    };
+  })()`);
+  ok("paylaş düğmesi paylaşım menüsünü açıyor, panoya kopyalamıyor",
+    shareUi.shared === 1 && shareUi.afterShareCopies.length === 0 &&
+    shareUi.sharedText.includes(code) && shareUi.sharedUrl.includes("oda=" + code), shareUi);
+  ok("kopyala düğmesi yalnızca oda kodunu kopyalıyor",
+    shareUi.copied.length === 1 && shareUi.copied[0].trim() === code, shareUi);
+
   const joined = await b.evaluate(`(async () => {
     document.getElementById('player-name').value = 'Efe';
     document.getElementById('join-code').value = '${code}';
