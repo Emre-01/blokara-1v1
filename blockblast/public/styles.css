@@ -2929,9 +2929,12 @@ body {
   .home-col-side .ach-card { margin-top: 0; }
   .site-foot { display: none; }
 
+  /* Üç mod kutusu birebir aynı ölçüde: satır yükseklikleri eşitlenir,
+     böylece görsel ve başlıklar aynı hizada durur. */
   .screen.home .mode-grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
+    grid-auto-rows: 1fr;
     gap: clamp(5px, 0.9vh, 8px);
   }
   .screen.home .mode-card.solo { grid-column: auto; }
@@ -2972,15 +2975,44 @@ body {
   }
   .screen.home .mini-board.right { transform: rotate(5deg); }
   .screen.home .mini-board .mb { border-radius: 1.5px; }
-  .screen.home .versus-art { flex-basis: clamp(98px, 13.4vh, 144px); width: clamp(98px, 13.4vh, 144px); gap: 3px; }
-  .screen.home .versus-art .mini-board { width: clamp(31px, 4.3vh, 46px); }
+
+  /* Rakip kartı da diğerleriyle aynı genişlikte görsel kutusu kullanır.
+     İki tahta çapraz yerleşir (sadece köşelerden bindirilir), "VS" damgası
+     tam ortada durur; böylece kapışma hissi net kalır. */
+  .screen.home .versus-art {
+    flex-basis: clamp(70px, 9.6vh, 104px);
+    width: clamp(70px, 9.6vh, 104px);
+    position: relative;
+    gap: 0;
+  }
+  .screen.home .versus-art .mini-board {
+    position: absolute;
+    width: 55%;
+    padding: 3px;
+    gap: 1px;
+    box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.3);
+  }
+  .screen.home .versus-art .mini-board.left {
+    top: 7%;
+    left: 5%;
+    transform: rotate(-6deg);
+  }
+  .screen.home .versus-art .mini-board.right {
+    right: 5%;
+    bottom: 7%;
+    transform: rotate(5deg);
+  }
   .screen.home .vs-stamp {
-    display: block;
-    font-size: clamp(9px, 1.35vh, 11px);
-    padding: 2px 4px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(-8deg);
+    z-index: 3;
+    font-size: clamp(8px, 1.1vh, 10px);
+    padding: 1px 4px;
     border-width: 1.5px;
-    border-radius: 6px;
-    transform: rotate(-8deg);
+    border-radius: 5px;
+    box-shadow: 1px 1px 0 var(--ink);
   }
   .screen.home .mode-art .tag { display: none; }
   .screen.home .mode-body {
@@ -3036,8 +3068,6 @@ body {
 @media (max-width: 380px) {
   .screen.home .mode-art { flex-basis: clamp(66px, 9.2vh, 88px); width: clamp(66px, 9.2vh, 88px); padding: 4px; }
   .screen.home .mini-board { width: clamp(46px, 6.4vh, 62px); }
-  .screen.home .versus-art { flex-basis: clamp(92px, 12.8vh, 124px); width: clamp(92px, 12.8vh, 124px); }
-  .screen.home .versus-art .mini-board { width: clamp(30px, 4.1vh, 40px); }
   .screen.home .mode-body { padding: clamp(4px, 0.8vh, 8px) 8px; gap: 6px; }
 }
 
@@ -3101,9 +3131,7 @@ body {
   .screen.home .mode-card { min-height: 58px; }
   .screen.home .mode-art { flex-basis: 68px; width: 68px; padding: 3px; }
   .screen.home .mini-board { width: 48px; padding: 3px; }
-  .screen.home .versus-art { flex-basis: 92px; width: 92px; }
-  .screen.home .versus-art .mini-board { width: 30px; }
-  .screen.home .vs-stamp { font-size: 9px; padding: 1px 3px; }
+  .screen.home .vs-stamp { font-size: 8px; padding: 1px 3px; }
   .screen.home .mode-body { padding: 5px 8px; gap: 5px; }
   .screen.home .mode-body h2 { font-size: 13px; }
   .screen.home .mode-actions .btn { width: 36px; height: 36px; }
