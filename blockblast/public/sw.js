@@ -1,11 +1,13 @@
-/* Blok İki — çevrimdışı kullanım için basit önbellek */
+/* Blokara 1v1 — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v10";
+const VERSION = "blok-iki-v16";
 const SHELL = [
   "/",
   "/index.html",
   "/styles.css",
+  "/i18n-data.js",
+  "/i18n.js",
   "/app.js",
   "/game-core.js",
   "/progress.js",

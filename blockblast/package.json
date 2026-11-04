@@ -1,15 +1,20 @@
 {
   "name": "blok-iki",
-  "version": "2.0.0",
+  "version": "2.0.3",
   "private": true,
-  "description": "Blok İki — iki kişilik Block Blast ve oda kodlu online multiplayer",
+  "description": "Blokara 1v1 — iki kişilik Block Blast ve oda kodlu online multiplayer",
   "main": "server.cjs",
   "scripts": {
     "start": "node server.cjs",
     "dev": "node server.cjs",
+    "guard": "node server-guard.cjs",
+    "service:install": "powershell -ExecutionPolicy Bypass -File install-service.ps1",
+    "service:status": "powershell -ExecutionPolicy Bypass -File install-service.ps1 -Status",
+    "service:remove": "powershell -ExecutionPolicy Bypass -File install-service.ps1 -Remove",
     "test": "node test/core-test.cjs && node test/socket-test.cjs && node test/check-html.cjs",
     "test:ui": "node --experimental-websocket test/online-flow.cjs",
-    "apk": "powershell -ExecutionPolicy Bypass -File android/build-apk.ps1"
+    "apk": "powershell -ExecutionPolicy Bypass -File android/build-apk.ps1",
+    "aab": "powershell -ExecutionPolicy Bypass -File android/build-aab.ps1"
   },
   "engines": {
     "node": ">=18"

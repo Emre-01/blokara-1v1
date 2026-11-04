@@ -1,0 +1,29 @@
+## Örnek yapılandırma. Bu dosyayı "local.properties" olarak kopyalayın.
+## local.properties sürüm kontrolüne girmez.
+
+## Android SDK yolu (Android Studio genelde kendisi yazar):
+# sdk.dir=C\:\\Users\\KULLANICI\\AppData\\Local\\Android\\Sdk
+
+## Sunucu adresi (APK'ya gömülür). Boşsa yalnızca tek cihaz modları.
+# blokiki.serverUrl=https://blok-iki.onrender.com
+
+## Android OAuth istemci kimliği (…apps.googleusercontent.com).
+# blokiki.googleAndroidClientId=1234-abc.apps.googleusercontent.com
+
+## Play Games Services uygulama kimliği (Play Console → Oyun hizmetleri).
+## Boş veya 0 ise Play Games kapalı; Google OAuth kullanılır.
+# blokiki.gamesAppId=123456789
+
+## AdMob kimlikleri. Boşsa Google'ın resmî TEST kimlikleri kullanılır.
+# blokiki.admobAppId=ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+# blokiki.admobInterstitial=ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ
+# blokiki.admobRewarded=ca-app-pub-XXXXXXXXXXXXXXXX/WWWWWWWWWW
+
+## Release imza anahtarı (yayın için mutlaka değiştirin).
+# blokiki.storePass=guclu-parola
+# blokiki.keyPass=guclu-parola
+# blokiki.keyAlias=blokiki
+
+## Sürüm (boşsa build.gradle.kts varsayılanı: 1.6 / 8).
+# blokiki.versionName=1.6
+# blokiki.versionCode=8

@@ -1,4 +1,4 @@
-/* Blok İki sunucu testi — node test/socket-test.cjs  (sunucu 8099'da ayağa kalkar) */
+/* Blokara 1v1 sunucu testi — node test/socket-test.cjs  (sunucu 8099'da ayağa kalkar) */
 "use strict";
 
 const { spawn } = require("child_process");
@@ -304,6 +304,106 @@ async function main() {
   h.close();
   i.close();
   await wait(200);
+
+  /* ---------- rastgele eşleşme ---------- */
+  const m1 = await connect();
+  m1.send({ t: "quickmatch", name: "Rastgele 1", mode: "versus" });
+  const queued = await m1.next((m) => m.t === "queued");
+  assert.strictEqual(queued.waiting, 1);
+
+  const m2 = await connect();
+  m2.send({ t: "quickmatch", name: "Rastgele 2", mode: "versus" });
+  const matched1 = await m1.next(isWelcome);
+  const matched2 = await m2.next(isWelcome);
+  assert.strictEqual(matched1.state.phase, "playing");
+  assert.strictEqual(matched2.state.phase, "playing");
+  assert.strictEqual(matched1.state.mode, "versus");
+  assert.strictEqual(matched1.state.players.length, 2);
+  assert.strictEqual(matched1.you, 0);
+  assert.strictEqual(matched2.you, 1);
+  assert.strictEqual(matched1.state.players[0].name, "Rastgele 1");
+  assert.strictEqual(matched2.state.players[1].name, "Rastgele 2");
+  assert.strictEqual(matched1.code, matched2.code);
+  assert.ok(Array.isArray(matched2.state.players[1].board));
+
+  // eşleşen oyun normal akışla oynanabilir
+  const quickTray = matched2.state.players[1].tray;
+  let quickMoved = false;
+  for (let p = 0; p < quickTray.length && !quickMoved; p++) {
+    for (let r = 0; r < 8 && !quickMoved; r++) {
+      for (let c = 0; c < 8 && !quickMoved; c++) {
+        m2.send({ t: "move", piece: p, row: r, col: c });
+        const moved = await m2.next(
+          (m) => (m.t === "state" && m.state.players[1].blocks > 0) || m.t === "error",
+          700
+        ).catch(() => null);
+        if (moved && moved.t === "state") quickMoved = true;
+      }
+    }
+  }
+  assert.ok(quickMoved, "eşleşen oyunda hamle kabul edilmedi");
+
+  // kuyruktan iptal
+  const m3 = await connect();
+  m3.send({ t: "quickmatch", name: "İptal", mode: "versus" });
+  await m3.next((m) => m.t === "queued");
+  m3.send({ t: "cancelmatch" });
+  const cancelled = await m3.next((m) => m.t === "matchcancel");
+  assert.strictEqual(cancelled.t, "matchcancel");
+
+  m1.close();
+  m2.close();
+  m3.close();
+  await wait(200);
+
+  /* ---------- arkadaşlar: durum, arama ve davet ---------- */
+  const f1 = await connect();
+  f1.send({ t: "presence", code: "K7M2QX", name: "Ada" });
+  const presenceAck = await f1.next((m) => m.t === "presence");
+  assert.strictEqual(presenceAck.ok, true);
+  assert.strictEqual(presenceAck.code, "K7M2QX");
+
+  const f2 = await connect();
+  f2.send({ t: "presence", code: "p-3", name: "Efe" });
+  const badCode = await f2.next((m) => m.t === "presence");
+  assert.strictEqual(badCode.ok, false, "geçersiz kod reddedilmeli");
+
+  f2.send({ t: "lookup", code: "k7m2qx" });
+  const found = await f2.next((m) => m.t === "lookup");
+  assert.strictEqual(found.online, true);
+  assert.strictEqual(found.name, "Ada");
+
+  f2.send({ t: "lookup", code: "ZZZZZZ" });
+  const missing = await f2.next((m) => m.t === "lookup");
+  assert.strictEqual(missing.online, false);
+
+  // Davet için gerçek bir oda gerekir.
+  f2.send({ t: "create", mode: "versus", name: "Efe" });
+  const inviteRoom = await f2.next(isWelcome);
+
+  f2.send({ t: "invite", to: "K7M2QX", code: inviteRoom.code });
+  const invited = await f2.next((m) => m.t === "invited");
+  assert.strictEqual(invited.ok, true);
+  const incoming = await f1.next((m) => m.t === "invite");
+  assert.strictEqual(incoming.code, inviteRoom.code);
+  assert.strictEqual(incoming.from, "Efe");
+  assert.strictEqual(incoming.mode, "versus");
+
+  // Çevrimdışı arkadaşa davet hata döndürür.
+  f2.send({ t: "invite", to: "ZZZZZZ", code: inviteRoom.code });
+  const offlineInvite = await f2.next((m) => m.t === "invited");
+  assert.strictEqual(offlineInvite.ok, false);
+
+  // Bağlantı kapanınca durum temizlenir; son bilinen ad korunur.
+  f1.close();
+  await wait(200);
+  f2.send({ t: "lookup", code: "K7M2QX" });
+  const gone = await f2.next((m) => m.t === "lookup");
+  assert.strictEqual(gone.online, false);
+  assert.strictEqual(gone.name, "Ada", "çevrimdışı arkadaşın son adı korunmalı");
+
+  f2.close();
+  await wait(150);
 
   console.log("\nTüm sunucu testleri geçti.");
 }

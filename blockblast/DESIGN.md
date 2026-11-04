@@ -1,4 +1,4 @@
-# Blok İki 2.0 — Tasarım Notları
+# Blokara 1v1 2.0 — Tasarım Notları
 
 Bu belge, oyunu "tek oyunluk deneme"den "her gün açılan" bir oyuna çevirmek için
 yapılan kararları ve gerekçelerini toplar. Uygulama sırası da bu belgedeki sıradır.
@@ -29,7 +29,9 @@ Block Blast tek kişilik. Bizim farkımız iki kişilik olması. Bu yüzden:
 - Tek kişilik mod **giriş kapısı** (APK'yı kuran hemen oynayabilsin).
 - **Ortak tahta** = omuz omuza, "birlikte hayatta kalma" gerilimi.
 - **Rakip** = baskı (garbage), aynı blok sırası, karşılıklı sabotaj.
-- **Bot** = tek başına rakip modunu da oynanabilir kılar (APK tek başına açılırsa ölü kalmasın).
+- **Tek başına rakip yok.** Yapay zekâ botu kaldırıldı; rakip modu ya aynı cihazda
+  iki kişiyle ya da çevrimiçi oda/rastgele eşleşmeyle oynanır. Tek başına oynamak
+  isteyen **Tek kişilik** modunu seçer, böylece APK tek başına da anlamlı kalır.
 
 ## Uygulanan sistemler
 
@@ -60,6 +62,9 @@ Katsayılar `game-core.js` içinde `LINE_POINTS`, `CROSS_BONUS`, `CROSS_POINTS` 
 - Patlayan her hücre için parçacık (canvas, tek katman).
 - Patlama noktasında yüzen puan yazısı (`+24`, `+36`).
 - 2+ satırda ekran sarsıntısı; 3+ satırda konfeti.
+- Satır + sütun aynı hamlede patlarsa **PERFECT!**, 2+ satırda **GREAT!** yazısı,
+  tam ekran kısa parlama, bas/derin patlama sesi, titreşim ve isteğe bağlı sesli
+  anons (konuşma sentezi, düşük perde).
 - Combo bandı: "COMBO ×3" ölçeklenerek girer.
 - Yerleşme: blok "pop" + hafif titreşim; patlama: artan perdeli ses.
 - Sonsuz döngü yok: her animasyon ≤ 500 ms, oyuncuyu bekletmez.
@@ -69,7 +74,7 @@ Yerel (localStorage). Sunucu gerekmez, çevrimdışı çalışır.
 - Oyun sonunda: puan → XP ve coin.
 - Seviye eğrisi: `seviye n için 80·n^1.18` XP (erken seviyeler hızlı, sonra yavaşlar).
 - Coin: puan/40 + satır×2 + galibiyet bonusu + günlük bonus.
-- Rekor: mod başına (bot, ortak, rakip, günlük).
+- Rekor: mod başına (tek kişilik, ortak, rakip, günlük).
 
 ### 4. Günün Tahtası (daily challenge)
 - Tarihten türetilen sabit tohum → herkes aynı blok sırasını alır.
@@ -93,28 +98,52 @@ Aynı hamlede 2 satır → rakibe **1 çöp satır**, 3+ satır → **2 çöp sa
 Çöp satır 2 deliklidir (temizlenebilir), alttan yukarı itilir. Rakip hamle yapmadan
 önce uygulanır ve uyarı şeridi olarak görünür. Üst satır doluyken çöp gelirse oyuncu kaybeder.
 
-### 8. Bot
-Tek başına rakip modu. Zorluk: kolay / orta / zor.
-Sezgisel: satır patlatmayı, kompakt yerleşimi ve kenar kullanımını ödüllendirir;
-delik (üstü kapalı boşluk) ve pürüzlülüğü cezalandırır. Zorluk, en iyi hamleler
-arasından seçim yüzdesini belirler.
+### 8. Rakip tahtası yan görünüm
+Çevrimiçi rakip oyununda iki tahta aynı anda ekranda durur: kendi tahtan büyük,
+rakibinki yanda daha küçük ve canlı güncellenir. Böylece rakip hamlesini beklerken
+onun tahtasının dolup dolmadığını görürsün. Dar ekranda panel alt alta düşer,
+yatay taşma olmaz.
 
 ### 9. Sonuç ekranı
 Büyük puan, rekor kutlaması, XP/coin kazanımı, kazanılan başarımlar, günlük durumu,
 tek dokunuşla "Tekrar" ve "Ana menü". Sonuç ekranı kapatılabilir (yarıda bırakma cezası yok).
 
 ### 10. Ayarlar
-Ses, titreşim, varsayılan süre modu, ilerlemeyi sıfırla.
+Ses, titreşim, varsayılan süre modu, ad değiştirme, ilerlemeyi sıfırla.
 
-### 11. Paketleme (APK)
-Gradle'sız derleme: `android/build-apk.ps1` aapt2 → javac → d8 → zipalign → apksigner
-zincirini doğrudan çalıştırır. Web varlıkları `assets/www` altına kopyalanır, `-ServerUrl`
-parametresi verilirse yayınlanan sunucu adresi `assets/server.txt` olarak gömülür.
-WebView `file:///android_asset/www/index.html` açar; uzaktan oyun için gömülü adres,
-yerel oyunlar için hiçbir şey gerekmez.
+### 11. Hesap ve ad
+Giriş yapılmışsa ad alanı **gösterilmez**: ad, Play Games/Google profilinden
+otomatik gelir. Misafirken ad alanının yanındaki **Giriş yap** düğmesi aynı
+Play Games/Google akışını başlatır. İsteyen "Adı değiştir" düğmesiyle (hesap
+şeridi veya oyun içi menü) kendi adını yazar; bu ad cihazda saklanır ve oyun onu
+kullanır. Çıkış yapılınca misafir ad alanı geri gelir.
+
+### 12. Arkadaşlar
+Ses düğmesinin yanındaki arkadaşlar düğmesi cihazda kalan bir liste açar.
+Her oyuncunun 6 haneli arkadaş kodu vardır; kodla ekleme, çevrimiçi durumu,
+tek dokunuşla oda daveti ve gelen davet için "Katıl" şeridi burada. Liste,
+sunucudaki **güncel adı** gösterir: ad değişince veya yeniden bağlanınca tazelenir;
+çevrimdışıyken son bilinen ad korunur. Durum ve son adlar sunucuda yalnızca
+bellekte tutulur.
+
+### 13. Reklamlar ve satın alma
+Geçiş reklamı **her tur sonucu** kapatılırken bir kez gösterilir. Oyun ekranında
+alt banner, sonuç/menü penceresi açıkken gizlenir. Ödüllü reklam sonuç ekranında
+isteğe bağlıdır (2× coin). "Reklamları kaldır" tek seferlik uygulama içi satın
+almadır (`remove_ads`); alınınca geçiş reklamı ve banner hiç gösterilmez, ödüllü
+reklam kullanıcı isterse çalışır. Sahiplik Play'den doğrulanır.
+
+### 14. Paketleme (APK)
+Gradle (AGP 8.12.3 + Gradle 8.14.3, JDK 17). `android/build-apk.ps1` ve
+`android/build-aab.ps1` Gradle görevlerini sarar; kimlikler `android/local.properties`
+veya `-Pblokiki.*` parametreleriyle verilir. Web varlıkları `assets/www` altına
+kopyalanır, `-ServerUrl` verilirse `assets/server.txt` olarak gömülür.
+WebView `file:///android_asset/www/index.html` açar; arkadaşla oyun için gömülü
+adres, yerel oyunlar için hiçbir şey gerekmez.
 
 ## Uygulanmayanlar (bilinçli)
-- Reklam / IAP: yok. Oyun ücretsiz ve temiz kalacak.
+- Oyun sırasında tam ekran reklam yok; yalnızca alt banner, tur sonucu
+  kapatılırken geçiş reklamı ve isteğe bağlı ödüllü reklam (2× coin) vardır.
 - Enerji / can sistemi: yok. "İstediğin kadar oyna" ilkesi korunuyor.
 - Yapay zorluk (kasıtlı ölümcül blok): yok. Bloklar adil ve tohumla tekrarlanabilir.
 - Hesap / bulut kayıt: yerel profil yeterli; online oda zaten sunucuda.

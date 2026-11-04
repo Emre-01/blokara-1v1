@@ -1,7 +1,7 @@
 {
-  "name": "Blok İki — iki kişilik blok oyunu",
-  "short_name": "Blok İki",
-  "description": "İki kişilik blok oyunu. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın.",
+  "name": "Blokara 1v1 — blok patlatma oyunu",
+  "short_name": "Blokara 1v1",
+  "description": "Blok patlatma oyunu: tek başına rekor kır, ortak tahtada birlikte oyna ya da ayrı tahtalarda yarış.",
   "lang": "tr",
   "dir": "ltr",
   "start_url": "/",

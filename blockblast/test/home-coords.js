@@ -1,5 +1,5 @@
 (function () {
-  var ids = ["play-bot", "join-btn", "daily-card"];
+  var ids = ["quick-match", "join-btn"];
   var out = {};
   ids.forEach(function (id) {
     var el = document.getElementById(id);

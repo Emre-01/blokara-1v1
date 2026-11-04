@@ -1,0 +1,41 @@
+# Render ücretsiz planı ~15 dakika boşta kalınca uykuya geçer.
+# Bu iş, sunucuyu düzenli aralıklarla dürtükleyerek uyanık tutar.
+#
+# Kurulum: depo → Settings → Secrets and variables → Actions → New repository
+# secret: SUNUCU_URL = https://blok-iki.onrender.com  (sonunda / olmadan)
+#
+# Not: GitHub zamanlanmış işleri yoğun saatlerde birkaç dakika gecikebilir.
+# Daha güvenilir bir bekçi istersen UptimeRobot (ücretsiz, 5 dakikada bir)
+# ile aynı /healthz adresini izle.
+
+name: Sunucuyu uyanık tut
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Sağlık kontrolü
+        env:
+          SUNUCU_URL: ${{ secrets.SUNUCU_URL }}
+        run: |
+          if [ -z "$SUNUCU_URL" ]; then
+            echo "SUNUCU_URL secret tanımlı değil; atlanıyor."
+            exit 0
+          fi
+          for i in 1 2 3; do
+            if curl -fsS --max-time 40 "$SUNUCU_URL/healthz"; then
+              echo ""
+              echo "Sunucu ayakta."
+              exit 0
+            fi
+            echo "Deneme $i başarısız, 15 sn sonra tekrar..."
+            sleep 15
+          done
+          echo "Sunucuya ulaşılamadı."
+          exit 1

@@ -90,7 +90,21 @@ async function openPage(url) {
 async function boot(page) {
   for (let i = 0; i < 40; i++) {
     const ready = await page.evaluate("!!(window.BlokDebug && document.getElementById('player-name'))").catch(() => false);
-    if (ready) return;
+    if (ready) {
+      await page.evaluate(`window.__anyMove = function (board, tray) {
+        for (var p = 0; p < (tray || []).length; p++) {
+          var piece = tray[p];
+          if (!piece) continue;
+          for (var r = 0; r < window.BlokIki.SIZE; r++) {
+            for (var c = 0; c < window.BlokIki.SIZE; c++) {
+              if (window.BlokIki.canPlace(board, piece, r, c)) return { piece: p, row: r, col: c };
+            }
+          }
+        }
+        return null;
+      };`);
+      return;
+    }
     await wait(200);
   }
   throw new Error("Sayfa hazır olmadı");
@@ -128,6 +142,94 @@ async function main() {
   await boot(a);
   await boot(b);
 
+  /* ---- bot oynanabilirliği tamamen kaldırıldı ---- */
+  const botGone = await a.evaluate(`({
+    playBot: !!document.getElementById('play-bot'),
+    botLevel: !!document.getElementById('bot-level'),
+    botButton: !!document.querySelector('[data-bot]'),
+    botText: /bota karşı/i.test(document.body.innerText)
+  })`);
+  ok("bota karşı oynama arayüzden kaldırıldı",
+    !botGone.playBot && !botGone.botLevel && !botGone.botButton && !botGone.botText, botGone);
+
+  /* ---- arkadaşınla oyna: katlanan menü yok, doğrudan seçim ---- */
+  const panel = await a.evaluate(`(async () => {
+    const card = document.getElementById('online-card');
+    const visible = (id) => { const el = document.getElementById(id); return !!el && !el.hidden; };
+    const before = { create: visible('pane-create'), join: visible('pane-join'), match: visible('pane-match') };
+    document.getElementById('tab-join').click();
+    await new Promise(r => setTimeout(r, 250));
+    const afterJoin = { create: visible('pane-create'), join: visible('pane-join'), match: visible('pane-match') };
+    document.getElementById('tab-match').click();
+    await new Promise(r => setTimeout(r, 250));
+    const afterMatch = { create: visible('pane-create'), join: visible('pane-join'), match: visible('pane-match') };
+    document.getElementById('tab-create').click();
+    return {
+      details: !!card.querySelector('details, summary'),
+      heading: card.querySelector('h2').textContent.trim(),
+      banned: /uzaktan/i.test(card.innerText),
+      badge: (card.querySelector('.online-badge') || {}).textContent?.trim() || '',
+      tabs: [...card.querySelectorAll('.play-tab')].map(t => t.textContent.trim()),
+      before, afterJoin, afterMatch,
+      focused: afterJoin.join
+    };
+  })()`);
+  ok("arkadaşınla oyna panelinde açılır menü yok, üç yol doğrudan görünüyor",
+    !panel.details && panel.tabs.length === 3 && panel.before.create &&
+    !panel.before.join && !panel.before.match, panel);
+  ok("sekmeler arasında geçiş yapılıyor",
+    panel.afterJoin.join && !panel.afterJoin.create && !panel.afterJoin.match &&
+    panel.afterMatch.match && !panel.afterMatch.create && !panel.afterMatch.join, panel);
+  ok("panel 'Çevrimiçi' rozetiyle ayrılıyor, eski 'uzaktan' ifadesi yok",
+    !panel.banned && panel.badge === "Çevrimiçi" && panel.heading === "Arkadaşınla oyna", panel);
+
+  /* ---- hesap girişi: ad otomatik gelir, ad alanı gizlenir ---- */
+  const account = await a.evaluate(`(async () => {
+    const field = document.querySelector('.play-name');
+    const edit = document.getElementById('name-edit');
+    const signIn = document.getElementById('name-signin');
+    const guestVisible = !field.hidden;
+    const signInExists = !!signIn && signIn.parentElement === field.querySelector('.name-row');
+    window.BlokGoogleResult({ name: 'Zeynep', sub: 'test-1' });
+    await new Promise(r => setTimeout(r, 120));
+    const afterSignIn = {
+      fieldHidden: field.hidden,
+      name: document.getElementById('account-name').textContent.trim(),
+      input: document.getElementById('player-name').value,
+      editVisible: !edit.hidden,
+      signInHidden: !!signIn && signIn.hidden,
+      note: document.getElementById('account-note').textContent.trim()
+    };
+    edit.click();
+    await new Promise(r => setTimeout(r, 80));
+    const editing = { fieldHidden: field.hidden, label: edit.textContent.trim() };
+    const input = document.getElementById('player-name');
+    input.value = 'Zey';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await new Promise(r => setTimeout(r, 80));
+    const afterEdit = {
+      fieldHidden: field.hidden,
+      value: input.value,
+      label: edit.textContent.trim()
+    };
+    document.getElementById('google-signout').click();
+    await new Promise(r => setTimeout(r, 80));
+    return {
+      guestVisible, signInExists, afterSignIn, editing, afterEdit,
+      afterSignOut: { fieldHidden: field.hidden, editVisible: !edit.hidden }
+    };
+  })()`);
+  ok("giriş yapınca ad otomatik gelir ve ad alanı gizlenir",
+    account.guestVisible && account.signInExists && account.afterSignIn.fieldHidden &&
+    account.afterSignIn.name === "Zeynep" &&
+    account.afterSignIn.input === "Zeynep" &&
+    account.afterSignIn.editVisible && account.afterSignIn.signInHidden, account);
+  ok("ad, ayarlardan isteğe bağlı değiştirilebilir",
+    !account.editing.fieldHidden && account.editing.label === "Adı kaydet" &&
+    account.afterEdit.fieldHidden && account.afterEdit.value === "Zey", account);
+  ok("çıkış yapınca misafir ad alanı geri gelir",
+    !account.afterSignOut.fieldHidden && !account.afterSignOut.editVisible, account);
+
   /* ---- oda kur / katıl ---- */
   await a.evaluate(`document.getElementById('player-name').value = 'Ada';`);
   const created = await a.evaluate(`(async () => {
@@ -151,6 +253,110 @@ async function main() {
   })()`);
   ok("ikinci oyuncu odaya girdi", joined.screen === "lobby" && joined.slots === 2, joined);
   ok("süre modu oda sahibinde (misafirde kilitli)", joined.timerLocked === true, joined);
+
+  /* ---- arkadaşlar: ses düğmesinin yanında, kod ekleme ve davet ---- */
+  const friendUi = await a.evaluate(`(async () => {
+    const sound = document.getElementById('sound-btn');
+    const btn = document.getElementById('friends-btn');
+    const header = btn ? btn.parentElement : null;
+    const order = header ? [...header.children].map(el => el.id).filter(Boolean) : [];
+    btn.click();
+    await new Promise(r => setTimeout(r, 350));
+    const code = document.getElementById('my-friend-code');
+    const stored = localStorage.getItem('blokara.friendCode');
+    const sheetOpen = !document.getElementById('overlay').hidden;
+    return { exists: !!btn, beforeSound: order.indexOf('friends-btn') < order.indexOf('sound-btn'),
+             sheetOpen, code: code ? code.textContent.trim() : '', stored,
+             hasForm: !!document.getElementById('friend-add-form') };
+  })()`);
+  ok("arkadaş menüsü ses düğmesinin yanında açılıyor",
+    friendUi.exists && friendUi.beforeSound && friendUi.sheetOpen && friendUi.hasForm, friendUi);
+  ok("arkadaş kodu üretiliyor ve gösteriliyor",
+    /^[A-Z0-9]{6}$/.test(friendUi.code) && friendUi.code === friendUi.stored, friendUi);
+
+  const otherCode = await b.evaluate(`(async () => {
+    window.BlokDebug.setFriendCode('K7M2QX');
+    await new Promise(r => setTimeout(r, 250));
+    return window.BlokDebug.friendCode();
+  })()`);
+  const friendAdd = await a.evaluate(`(async () => {
+    const input = document.getElementById('friend-code-input');
+    input.value = '${otherCode}';
+    document.getElementById('friend-add-form').requestSubmit();
+    await new Promise(r => setTimeout(r, 900));
+    const rows = [...document.querySelectorAll('#friend-list .friend-row')];
+    return { count: rows.length, text: rows.length ? rows[0].innerText : '',
+             stored: JSON.parse(localStorage.getItem('blokara.friends') || '[]'),
+             inviteButton: !!document.querySelector('[data-friend-invite="${otherCode}"]') };
+  })()`);
+  ok("arkadaş kodla ekleniyor ve çevrimiçi görünüyor",
+    friendAdd.count === 1 && /çevrimiçi/.test(friendAdd.text) &&
+    /Efe/.test(friendAdd.text) &&
+    friendAdd.stored.some(f => f.code === otherCode) && friendAdd.inviteButton, friendAdd);
+
+  /* Arkadaş adını değiştirince liste sunucudaki yeni adı göstermeli. */
+  await b.evaluate(`(async () => {
+    const input = document.getElementById('player-name');
+    input.value = 'Efe Yeni';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 800));
+  })()`);
+  const liveName = await a.evaluate(`(async () => {
+    document.querySelector('#overlay [data-close]').click();
+    await new Promise(r => setTimeout(r, 150));
+    document.getElementById('friends-btn').click();
+    await new Promise(r => setTimeout(r, 900));
+    const row = document.querySelector('#friend-list .friend-row');
+    return { text: row ? row.innerText : '' };
+  })()`);
+  ok("arkadaş listesi kişinin güncel adını gösteriyor",
+    /Efe Yeni/.test(liveName.text), liveName);
+
+  const inviteSent = await a.evaluate(`(async () => {
+    document.querySelector('[data-friend-invite="${otherCode}"]').click();
+    await new Promise(r => setTimeout(r, 700));
+    return { room: window.BlokDebug.snapshot() ? true : false,
+             toast: document.getElementById('toast').textContent.trim() };
+  })()`);
+  const inviteSeen = await b.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 400));
+    const banner = document.getElementById('invite-banner');
+    const data = { hidden: banner.hidden,
+                   from: document.getElementById('invite-from').textContent.trim(),
+                   code: document.getElementById('invite-code').textContent.trim() };
+    document.getElementById('invite-dismiss').click();
+    await new Promise(r => setTimeout(r, 150));
+    data.dismissed = document.getElementById('invite-banner').hidden;
+    return data;
+  })()`);
+  ok("arkadaşa davet gönderiliyor", /davet/i.test(inviteSent.toast), inviteSent);
+  ok("davet karşı tarafta oda koduyla görünüyor ve kapatılabiliyor",
+    !inviteSeen.hidden && inviteSeen.from === "Ada" && inviteSeen.code === code && inviteSeen.dismissed, inviteSeen);
+
+  await a.evaluate(`(async () => {
+    document.querySelector('#overlay [data-close]').click();
+    await new Promise(r => setTimeout(r, 200));
+    return true;
+  })()`);
+
+  const timerLayout = await a.evaluate(`(async () => {
+    const box = document.getElementById('lobby-timer');
+    const b = box.getBoundingClientRect();
+    const buttons = [...box.querySelectorAll('button')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { text: el.textContent, left: r.left, right: r.right, width: r.width };
+    });
+    return {
+      overflowX: box.scrollWidth - box.clientWidth,
+      boxLeft: b.left,
+      boxRight: b.right,
+      buttons
+    };
+  })()`);
+  ok("lobi süre seçici kapsayıcıdan taşmıyor",
+    timerLayout.overflowX <= 1 && timerLayout.buttons.length === 3 &&
+    timerLayout.buttons.every((x) => x.left >= timerLayout.boxLeft - 1 && x.right <= timerLayout.boxRight + 1),
+    timerLayout);
 
   /* ---- süre modu değişimi iki tarafta görünür ---- */
   const hostTimer = await a.evaluate(`(async () => {
@@ -184,7 +390,7 @@ async function main() {
   /* ---- sıra: A oynar, B görür ---- */
   const moveA = await a.evaluate(`(async () => {
     const s0 = window.BlokDebug.snapshot();
-    const mv = window.BlokIki.botMove(s0.shared.board, s0.shared.tray, 'hard');
+    const mv = window.__anyMove(s0.shared.board, s0.shared.tray);
     if (!mv) return { error: 'hamle yok' };
     const p = document.querySelector('.piece[data-piece="' + mv.piece + '"]');
     const r = p.getBoundingClientRect();
@@ -224,7 +430,7 @@ async function main() {
   /* ---- B oynar, A görür ---- */
   const moveB = await b.evaluate(`(async () => {
     const s0 = window.BlokDebug.snapshot();
-    const mv = window.BlokIki.botMove(s0.shared.board, s0.shared.tray, 'hard');
+    const mv = window.__anyMove(s0.shared.board, s0.shared.tray);
     if (!mv) return { error: 'hamle yok' };
     const p = document.querySelector('.piece[data-piece="' + mv.piece + '"]');
     const r = p.getBoundingClientRect();
@@ -311,7 +517,7 @@ async function main() {
 
   await a.evaluate(`(async () => {
     const s0 = window.BlokDebug.snapshot();
-    const mv = window.BlokIki.botMove(s0.players[0].board, s0.players[0].tray, 'hard');
+    const mv = window.__anyMove(s0.players[0].board, s0.players[0].tray);
     if (!mv) return false;
     const piece = document.querySelector('.piece[data-piece="' + mv.piece + '"]');
     const r = piece.getBoundingClientRect();
@@ -332,6 +538,297 @@ async function main() {
              rivalCells: s.players[0].board.flat().filter(Boolean).length };
   })()`);
   ok("rakip modunda hamle karşı tahtaya taşınmıyor", rivalView.rivalCells > 0 && rivalView.mine === 0, { rivalView });
+
+  const peerView = await b.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 400));
+    const board = document.querySelector('.peer-panel .board.peer');
+    const mine = document.querySelector('.versus-main .board');
+    return {
+      exists: !!board,
+      readonly: board ? board.classList.contains('readonly') : false,
+      cells: board ? board.querySelectorAll('.cell.on').length : 0,
+      smaller: board && mine ? board.getBoundingClientRect().width < mine.getBoundingClientRect().width : false
+    };
+  })()`);
+  ok("rakip tahtası yanda ve daha küçük görünüyor",
+    peerView.exists && peerView.readonly && peerView.smaller && peerView.cells === rivalView.rivalCells, peerView);
+
+  /* ---- tek kişilik mod ---- */
+  for (const page of [a, b]) {
+    await page.evaluate(`(async () => {
+      document.getElementById('exit-btn').click();
+      await new Promise(r => setTimeout(r, 250));
+      const confirm = document.querySelector('[data-confirm]');
+      if (confirm) confirm.click();
+      await new Promise(r => setTimeout(r, 700));
+      return true;
+    })()`);
+  }
+
+  const winnerText = await a.evaluate(`(async () => {
+    document.querySelector('[data-local="versus"]').click();
+    await new Promise(r => setTimeout(r, 600));
+    window.BlokDebug.finish(0, 'Oyuncu 1 kazandı.');
+    await new Promise(r => setTimeout(r, 250));
+    const title = document.querySelector('#overlay h2');
+    const badge = document.querySelector('#overlay .result-badge');
+    const hint = document.getElementById('game-hint');
+    return { title: title ? title.textContent : '', badge: badge ? badge.textContent : '',
+             hint: hint ? hint.textContent : '' };
+  })()`);
+  ok("kazanan metni 'Kazandın!' diyor",
+    winnerText.title === "Kazandın!" && winnerText.badge === "kazandın" &&
+    /^Kazandın[.!]$/.test(winnerText.hint), winnerText);
+
+  await a.evaluate(`(async () => {
+    const home = document.querySelector('#overlay [data-home]');
+    if (home) home.click();
+    await new Promise(r => setTimeout(r, 500));
+    return true;
+  })()`);
+
+  const solo = await a.evaluate(`(async () => {
+    document.querySelector('[data-local="solo"]').click();
+    await new Promise(r => setTimeout(r, 700));
+    const s = window.BlokDebug.snapshot();
+    return {
+      game: !document.getElementById('screen-game').hidden,
+      mode: s.mode,
+      players: s.players.length,
+      timeMode: s.timeMode,
+      cards: document.querySelectorAll('#scoreboard .score-card').length,
+      soloClass: document.getElementById('scoreboard').classList.contains('solo'),
+      timer: !!document.querySelector('#timer-track:not([hidden])')
+    };
+  })()`);
+  ok("tek kişilik mod açılıyor", solo.game && solo.mode === "solo" && solo.players === 1, solo);
+  ok("tek kişilikte tek kart ve sayaç yok",
+    solo.cards === 1 && solo.soloClass && solo.timeMode === "none" && !solo.timer, solo);
+
+  const soloMove = await a.evaluate(`(async () => {
+    const s0 = window.BlokDebug.snapshot();
+    const mv = window.__anyMove(s0.players[0].board, s0.players[0].tray);
+    if (!mv) return { error: 'hamle yok' };
+    const piece = document.querySelector('.piece[data-piece="' + mv.piece + '"]');
+    const r = piece.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch', isPrimary: true,
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    piece.dispatchEvent(new PointerEvent('pointerdown', o));
+    await new Promise(r => setTimeout(r, 80));
+    document.dispatchEvent(new PointerEvent('pointerup', o));
+    await new Promise(r => setTimeout(r, 300));
+    document.querySelector('.cell[data-r="' + mv.row + '"][data-c="' + mv.col + '"]').click();
+    await new Promise(r => setTimeout(r, 900));
+    const s = window.BlokDebug.snapshot();
+    return { blocks: s.players[0].blocks, phase: s.phase, players: s.players.length };
+  })()`);
+  ok("tek kişilikte hamle yapılıyor", soloMove.blocks > 0 && soloMove.players === 1, soloMove);
+
+  /* ---- her tur sonunda bir geçiş reklamı ---- */
+  const interstitial = await a.evaluate(`(async () => {
+    window.__ads = 0;
+    window.BlokAds = {
+      available: () => true,
+      hasRewarded: () => false,
+      free: () => false,
+      showInterstitial: () => { window.__ads += 1; },
+      showRewarded: () => {},
+      requestConsent: () => {},
+      refresh: () => {}
+    };
+    const round = async (label) => {
+      window.BlokDebug.start('solo');
+      await new Promise(r => setTimeout(r, 350));
+      window.BlokDebug.finish(null, 'test');
+      await new Promise(r => setTimeout(r, 350));
+      const shown = !document.getElementById('overlay').hidden;
+      const close = document.querySelector('#overlay [data-close]') ||
+                    document.querySelector('#overlay .sheet-actions .btn');
+      if (close) close.click();
+      await new Promise(r => setTimeout(r, 900));
+      return shown ? window.__ads : -1;
+    };
+    const first = await round('1');
+    const second = await round('2');
+    /* Sonraki kontroller için temiz bir tek kişilik oyun bırak. */
+    window.BlokDebug.start('solo');
+    await new Promise(r => setTimeout(r, 400));
+    return { first, second, free: localStorage.getItem('blokara.adsFree') };
+  })()`);
+  ok("her turdan sonra bir geçiş reklamı isteniyor",
+    interstitial.first === 1 && interstitial.second === 2, interstitial);
+
+  /* ---- oyun sırasında alt banner ---- */
+  const bannerAd = await a.evaluate(`(async () => {
+    window.__banner = { show: 0, hide: 0 };
+    window.BlokAds.hasBanner = () => true;
+    window.BlokAds.showBanner = () => { window.__banner.show += 1; };
+    window.BlokAds.hideBanner = () => { window.__banner.hide += 1; };
+    window.BlokAdsEvent('banner-loaded');
+    window.BlokAdsEvent('banner:56');
+    await new Promise(r => setTimeout(r, 200));
+    const running = {
+      show: window.__banner.show,
+      hide: window.__banner.hide,
+      adB: getComputedStyle(document.documentElement).getPropertyValue('--ad-b').trim()
+    };
+    window.BlokDebug.finish(null, 'test');
+    await new Promise(r => setTimeout(r, 450));
+    const result = {
+      show: window.__banner.show,
+      hide: window.__banner.hide,
+      overlay: !document.getElementById('overlay').hidden
+    };
+    const close = document.querySelector('#overlay [data-close]') ||
+                  document.querySelector('#overlay .sheet-actions .btn');
+    if (close) close.click();
+    await new Promise(r => setTimeout(r, 500));
+    const afterClose = { show: window.__banner.show, hide: window.__banner.hide };
+    /* Sonraki kontroller için taze bir tek kişilik oyun bırak. */
+    window.BlokDebug.start('solo');
+    await new Promise(r => setTimeout(r, 400));
+    return { running, result, afterClose };
+  })()`);
+  ok("oyun sırasında alt banner açılıyor, sonuç penceresinde gizleniyor",
+    bannerAd.running.show >= 1 && bannerAd.running.adB === "56px" &&
+    bannerAd.result.overlay && bannerAd.result.hide >= 1 &&
+    bannerAd.afterClose.show > bannerAd.running.show, bannerAd);
+
+  /* ---- oyun içi menüden ad değiştirme ---- */
+  const rename = await a.evaluate(`(async () => {
+    document.getElementById('game-menu').click();
+    await new Promise(r => setTimeout(r, 250));
+    const hasEntry = !!document.querySelector('#overlay [data-rename]');
+    document.querySelector('#overlay [data-rename]').click();
+    await new Promise(r => setTimeout(r, 250));
+    const input = document.getElementById('name-edit-input');
+    const opened = !!input;
+    if (input) {
+      input.value = 'Ada2';
+      document.querySelector('#overlay [data-save-name]').click();
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return {
+      hasEntry, opened,
+      stored: localStorage.getItem('blokiki.name'),
+      field: document.getElementById('player-name').value,
+      closed: document.getElementById('overlay').hidden
+    };
+  })()`);
+  ok("ad oyun içi menüden de değiştirilebiliyor",
+    rename.hasEntry && rename.opened && rename.stored === "Ada2" &&
+    rename.field === "Ada2" && rename.closed, rename);
+
+  const feedback = await a.evaluate(`(async () => {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    let oscillators = 0;
+    if (AC) {
+      const original = AC.prototype.createOscillator;
+      AC.prototype.createOscillator = function () {
+        oscillators += 1;
+        return original.apply(this, arguments);
+      };
+    }
+    const g = window.BlokDebug.game();
+    g.players[0].board = window.BlokIki.emptyBoard();
+    g.players[0].tray = [{ shape: 0, name: 'nokta', cells: [[0, 0]], w: 1, h: 1, color: 'coral' }];
+    window.BlokDebug.fillRegion(7, 0, 1, 7, 'mint');
+    const before = oscillators;
+    const piece = document.querySelector('.piece[data-piece="0"]');
+    const r = piece.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch', isPrimary: true,
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    piece.dispatchEvent(new PointerEvent('pointerdown', o));
+    await new Promise(r => setTimeout(r, 60));
+    document.dispatchEvent(new PointerEvent('pointerup', o));
+    await new Promise(r => setTimeout(r, 120));
+    document.querySelector('.cell[data-r="7"][data-c="7"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    const s = window.BlokDebug.snapshot();
+    return {
+      score: s.players[0].score,
+      texts: [...document.querySelectorAll('.fx-text')].map((el) => el.textContent),
+      shaking: document.documentElement.classList.contains('screen-shake'),
+      flashing: !!document.querySelector('.fx-flash'),
+      hasShakeFn: typeof window.BlokFx.screenShake === 'function',
+      hasFlashFn: typeof window.BlokFx.flash === 'function',
+      scoreSound: oscillators > before
+    };
+  })()`);
+  ok("satır patlaması güçlü geri bildirim veriyor",
+    feedback.score > 0 && feedback.hasShakeFn && feedback.hasFlashFn &&
+    feedback.shaking && feedback.flashing && feedback.scoreSound &&
+    feedback.texts.some((text) => /^(GOOD|GREAT|PERFECT)!$/.test(text)), feedback);
+
+  /* Satır ve sütun aynı hamlede patlarsa PERFECT + güçlü ekran efekti. */
+  const crossFeedback = await a.evaluate(`(async () => {
+    const g = window.BlokDebug.game();
+    g.players[0].board = window.BlokIki.emptyBoard();
+    g.players[0].score = 0;
+    g.players[0].tray = [{ shape: 0, name: 'nokta', cells: [[0, 0]], w: 1, h: 1, color: 'coral' }];
+    window.BlokDebug.fillRegion(7, 0, 1, 7, 'mint');
+    window.BlokDebug.fillRegion(0, 7, 7, 1, 'mint');
+    const piece = document.querySelector('.piece[data-piece="0"]');
+    const r = piece.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch', isPrimary: true,
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    piece.dispatchEvent(new PointerEvent('pointerdown', o));
+    await new Promise(r => setTimeout(r, 60));
+    document.dispatchEvent(new PointerEvent('pointerup', o));
+    await new Promise(r => setTimeout(r, 120));
+    document.querySelector('.cell[data-r="7"][data-c="7"]').click();
+    await new Promise(r => setTimeout(r, 160));
+    const s = window.BlokDebug.snapshot();
+    return {
+      score: s.players[0].score,
+      texts: [...document.querySelectorAll('.fx-text')].map((el) => el.textContent),
+      shaking: document.documentElement.classList.contains('screen-shake'),
+      crossFlash: !!document.querySelector('.fx-flash.cross'),
+      perfectText: !!document.querySelector('.fx-text.perfect')
+    };
+  })()`);
+  ok("satır + sütun patlaması PERFECT ve ekran parlaması veriyor",
+    crossFeedback.score >= 100 && crossFeedback.shaking && crossFeedback.crossFlash &&
+    crossFeedback.perfectText &&
+    crossFeedback.texts.indexOf("PERFECT!") >= 0, crossFeedback);
+
+  await a.evaluate(`(async () => {
+    document.getElementById('exit-btn').click();
+    await new Promise(r => setTimeout(r, 250));
+    const confirm = document.querySelector('[data-confirm]');
+    if (confirm) confirm.click();
+    await new Promise(r => setTimeout(r, 700));
+    return true;
+  })()`);
+
+  /* ---- rastgele eşleşme (iki sekme) ---- */
+  await a.evaluate(`document.getElementById('player-name').value = 'Rastgele A';`);
+  await b.evaluate(`document.getElementById('player-name').value = 'Rastgele B';`);
+  await a.evaluate(`document.getElementById('quick-match').click()`);
+  await wait(300);
+  const waiting = await a.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 400));
+    const btn = document.getElementById('quick-match');
+    return { screen: document.getElementById('screen-home').hidden ? 'other' : 'home',
+             text: btn.textContent, pressed: btn.getAttribute('aria-pressed') };
+  })()`);
+  ok("ilk oyuncu eşleşme kuyruğunda bekliyor",
+    waiting.screen === "home" && /iptal/i.test(waiting.text) && waiting.pressed === "true", waiting);
+
+  await b.evaluate(`document.getElementById('quick-match').click()`);
+  await wait(1600);
+  const matched = await Promise.all([a, b].map((page) => page.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 400));
+    const s = window.BlokDebug.snapshot();
+    return { game: !document.getElementById('screen-game').hidden, mode: s.mode,
+             players: s.players.length, room: window.BlokDebug.status().room,
+             peer: !!document.querySelector('.peer-panel .board.peer') };
+  })()`)));
+  ok("rastgele eşleşme iki oyuncuyu aynı oyuna koydu",
+    matched[0].game && matched[1].game && matched[0].mode === "versus" &&
+    matched[0].players === 2 && matched[1].players === 2 &&
+    matched[0].room && matched[0].room === matched[1].room, matched);
+  ok("eşleşen oyunda rakip tahtası görünüyor", matched[0].peer && matched[1].peer, matched);
 
   a.close();
   b.close();

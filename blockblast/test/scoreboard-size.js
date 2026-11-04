@@ -20,7 +20,7 @@
   return (async function () {
     var dbg = window.BlokDebug;
     if (!dbg) return "BlokDebug yok";
-    dbg.start("versus", { bot: "hard", timeMode: "shared" });
+    dbg.start("versus", { timeMode: "shared" });
     await wait(600);
     var out = { start: metrics() };
 

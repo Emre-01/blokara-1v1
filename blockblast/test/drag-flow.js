@@ -4,7 +4,7 @@
   return (async function () {
     var dbg = window.BlokDebug;
     if (!dbg) return "BlokDebug yok";
-    dbg.start("versus", { bot: "easy", timeMode: "none" });
+    dbg.start("versus", { timeMode: "none" });
     await wait(500);
 
     var boardEl = document.querySelector(".board");

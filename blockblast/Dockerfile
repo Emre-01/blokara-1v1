@@ -10,8 +10,12 @@ ENV HOST=0.0.0.0
 
 COPY package.json ./
 COPY server.cjs ./
+COPY server-guard.cjs ./
 COPY public ./public
 
+# Bekçi kendi günlük klasörünü yazar; node kullanıcısına izin ver.
+RUN mkdir -p /app/logs && chown -R node:node /app
 EXPOSE 8080
 USER node
-CMD ["node", "server.cjs"]
+# Bekçi, çöken/donmuş sunucuyu kendisi yeniden başlatır.
+CMD ["node", "server-guard.cjs"]

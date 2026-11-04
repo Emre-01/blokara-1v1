@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Blok İki — iki kişilik blok oyunu</title>
-  <meta name="description" content="İki kişilik blok oyunu. Ortak tahtada birlikte oynayın ya da ayrı tahtalarda yarışın. Aynı cihazda veya oda koduyla uzaktan.">
+  <title>Blokara 1v1 — blok patlatma oyunu</title>
+  <meta name="description" content="Blokara 1v1: tek başına rekor kır, aynı tahtada omuz omuza oyna ya da ayrı tahtalarda yarış. Aynı cihazda veya oda koduyla arkadaşlarınla.">
   <meta name="theme-color" content="#F3EAD8">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Blok İki">
+  <meta name="apple-mobile-web-app-title" content="Blokara 1v1">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" sizes="192x192">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -23,16 +23,59 @@
 
 <header class="topbar">
   <button class="brand" id="brand" type="button" aria-label="Ana menüye dön">
-    <span class="brand-mark" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></span>
-    <span class="brand-word">Blok<em>İki</em></span>
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 40 40" role="img" aria-hidden="true">
+        <!-- Sol blok: ortaya doğru savrulan T parçası -->
+        <g class="piece piece-warm">
+          <rect x="5.8" y="9" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="5.8" y="14.8" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="5.8" y="20.6" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="11.6" y="14.8" width="5.6" height="5.6" rx="1.3"/>
+        </g>
+        <!-- Sağ blok: ona doğru gelen T parçası -->
+        <g class="piece piece-cool">
+          <rect x="28.6" y="9" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="28.6" y="14.8" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="28.6" y="20.6" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="22.8" y="14.8" width="5.6" height="5.6" rx="1.3"/>
+        </g>
+        <!-- Tokuşma noktası: dört kollu kıvılcım + halka -->
+        <g class="impact">
+          <path class="burst" d="M20 12 21.3 16.2 25.2 17.6 21.3 19 20 23.2 18.7 19 14.8 17.6 18.7 16.2Z"/>
+          <circle class="burst-ring" cx="20" cy="17.6" r="5.4"/>
+          <circle class="burst-core" cx="20" cy="17.6" r="1.5"/>
+        </g>
+        <!-- Çarpışmadan fırlayan kıymıklar -->
+        <g class="shards">
+          <rect class="shard shard-a" x="13.4" y="4.6" width="2.3" height="2.3" rx="0.6"/>
+          <rect class="shard shard-b" x="24.4" y="29.6" width="2.1" height="2.1" rx="0.6"/>
+          <rect class="shard shard-c" x="31.2" y="4.2" width="1.8" height="1.8" rx="0.5"/>
+          <rect class="shard shard-d" x="6.6" y="30.4" width="1.6" height="1.6" rx="0.5"/>
+        </g>
+      </svg>
+    </span>
+    <span class="brand-word">Blokara<em>1v1</em></span>
   </button>
   <div class="top-actions">
     <span class="room-badge" id="room-badge" hidden></span>
+    <button class="icon-btn" id="friends-btn" type="button" aria-label="Arkadaşlar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.2c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2"/><path d="M16.2 5.6a3 3 0 0 1 0 5.8M17.6 13.8c1.9.5 3.2 2.1 3.2 4.2"/></svg>
+    </button>
     <button class="icon-btn" id="sound-btn" type="button" aria-label="Sesi kapat" aria-pressed="true">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
     </button>
+    <button class="icon-btn" id="lang-btn" type="button" aria-label="Dil seç" title="Dil seç">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4"/><path d="M3.8 12h16.4M12 3.6c2.3 2.4 3.4 5.3 3.4 8.4S14.3 18 12 20.4C9.7 18 8.6 15.1 8.6 12S9.7 6 12 3.6Z"/></svg>
+    </button>
     <button class="icon-btn" id="help-btn" type="button" aria-label="Nasıl oynanır?">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9a3 3 0 1 1 4.8 2.4c-1.1.8-2 1.5-2 3.1"/><circle cx="12" cy="18" r="1"/></svg>
+    </button>
+    <button class="icon-btn adfree-btn" id="buy-remove-ads" type="button" aria-label="Reklamları kaldır" title="Reklamları kaldır" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.2" y="6.4" width="17.6" height="11.8" rx="2.6"/>
+        <path d="M6.6 10.2h4.2M6.6 13.6h7.2"/>
+        <path class="adfree-slash" d="M4.4 20.2 20.2 3.8"/>
+      </svg>
     </button>
     <button class="icon-btn exit-btn" id="exit-btn" type="button" aria-label="Oyundan çık" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -40,19 +83,32 @@
   </div>
 </header>
 
+<div class="invite-banner" id="invite-banner" role="status" aria-live="polite" hidden>
+  <div class="invite-copy">
+    <span class="invite-kicker">Oyun daveti</span>
+    <p><b id="invite-from">Arkadaşın</b> seni odasına çağırdı · <strong id="invite-code">-----</strong></p>
+  </div>
+  <div class="invite-actions">
+    <button class="btn btn-coral btn-sm" id="invite-accept" type="button">Katıl</button>
+    <button class="btn btn-outline btn-sm" id="invite-dismiss" type="button">Kapat</button>
+  </div>
+</div>
+
 <main id="main">
 
   <!-- ============================== ANA SAYFA ============================== -->
   <section class="screen home" id="screen-home">
+    <div class="home-col home-col-main">
     <div class="home-hero">
       <div class="home-copy">
-        <p class="kicker">İki kişilik blok oyunu</p>
-        <h1>Blokları <span class="marker">iki kişi</span><br> dizersiniz.</h1>
-        <p class="lead">Aynı tahtada omuz omuza hayatta kalın ya da ayrı tahtalarda
-          birbirinizi geçin. Aynı telefonda veya oda koduyla uzaktan.</p>
+        <p class="kicker">Tek kişilik ve iki kişilik blok oyunu</p>
+        <h1>Blokları <span class="marker">diz</span><br> satırları patlat.</h1>
+        <p class="lead">Tek başına rekor kır, aynı tahtada omuz omuza hayatta kal ya da
+          ayrı tahtalarda birbirinizi geçin. Aynı telefonda, oda koduyla veya
+          rastgele eşleşerek arkadaşlarınla.</p>
         <div class="hero-facts" aria-label="Oyun bilgileri">
           <span><b>8×8</b> tahta</span>
-          <span><b>2</b> oyuncu</span>
+          <span><b>1–2</b> oyuncu</span>
           <span><b>sınırsız</b> tur</span>
         </div>
       </div>
@@ -65,6 +121,71 @@
       </div>
     </div>
 
+    <section class="online-card" id="online-card" aria-labelledby="play-title">
+      <div class="play-head">
+        <p class="online-badge">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <ellipse cx="8" cy="8" rx="2.7" ry="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M2 8h12" stroke="currentColor" stroke-width="1.3"/>
+          </svg>
+          <span>Çevrimiçi</span>
+        </p>
+        <div class="online-copy">
+          <h2 id="play-title">Arkadaşınla oyna</h2>
+          <p>Kendi odanı kur ve kodunu paylaş, elindeki kodla bir odaya gir ya da
+            aynı anda bekleyen biriyle hemen eşleş.</p>
+        </div>
+      </div>
+
+      <div class="field play-name">
+        <label for="player-name">Adın</label>
+        <div class="name-row">
+          <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
+                 placeholder="Örn. Ada" enterkeyhint="next">
+          <button class="btn btn-mustard btn-sm" id="name-signin" type="button" hidden>Giriş yap</button>
+        </div>
+      </div>
+
+      <div class="play-tabs" role="tablist" aria-label="Nasıl oynamak istersin">
+        <button class="play-tab is-active" id="tab-create" type="button" role="tab"
+                aria-selected="true" aria-controls="pane-create" data-pane="create">Oda kur</button>
+        <button class="play-tab" id="tab-join" type="button" role="tab"
+                aria-selected="false" aria-controls="pane-join" data-pane="join">Koda katıl</button>
+        <button class="play-tab" id="tab-match" type="button" role="tab"
+                aria-selected="false" aria-controls="pane-match" data-pane="match">Rastgele eşleş</button>
+      </div>
+
+      <div class="play-pane" id="pane-create" role="tabpanel" aria-labelledby="tab-create">
+        <p class="play-hint">İki moddan birini seç, oda açılır. Kodu arkadaşına gönder.</p>
+        <div class="online-create-row">
+          <button class="btn btn-outline" type="button" data-host="coop">Ortak tahta</button>
+          <button class="btn btn-outline" type="button" data-host="versus">Rakip</button>
+        </div>
+      </div>
+
+      <div class="play-pane" id="pane-join" role="tabpanel" aria-labelledby="tab-join" hidden>
+        <p class="play-hint">Arkadaşının verdiği 5 haneli kodu yaz.</p>
+        <form id="join-form" class="join-form" novalidate>
+          <div class="field">
+            <label for="join-code">Oda kodu</label>
+            <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
+                   autocapitalize="characters" autocomplete="off" spellcheck="false"
+                   inputmode="text" enterkeyhint="go">
+          </div>
+          <button class="btn btn-coral" type="submit" id="join-btn">Katıl</button>
+        </form>
+      </div>
+
+      <div class="play-pane" id="pane-match" role="tabpanel" aria-labelledby="tab-match" hidden>
+        <p class="play-hint">Aynı anda bekleyen biriyle hemen rakip olarak eşleş.</p>
+        <button class="btn btn-mustard" id="quick-match" type="button" aria-pressed="false">Rakip bul</button>
+        <p class="form-note" id="match-note">Adını yaz, düğmeye bas ve bekle.</p>
+      </div>
+    </section>
+    </div>
+
+    <div class="home-col home-col-side">
     <section class="profile-strip" aria-label="Profilin">
       <div class="profile-level">
         <span class="level-badge" id="level-badge">1</span>
@@ -77,74 +198,62 @@
       <div class="profile-stats">
         <span><b id="stat-coins">0</b> coin</span>
         <span><b id="stat-best">0</b> rekor</span>
-        <span><b id="stat-streak">0</b> gün seri</span>
       </div>
     </section>
 
-    <!-- Uzaktan oyun: temel mekanik, ana sayfanın üst kısmında -->
-    <details class="online-card" id="online-card">
-      <summary class="online-summary">
-        <span class="online-summary-title">Uzaktan oyna</span>
-        <span class="online-summary-sub">Kodla katıl</span>
-      </summary>
-      <div class="online-body">
-        <div class="online-copy">
-          <h2 id="online-title">Uzaktan oyna</h2>
-          <p>Arkadaşının oda kodunu gir ve katıl. Kendin oda kuruyorsan kodu ona gönder.</p>
-        </div>
-        <div class="online-form">
-          <div class="field">
-            <label for="player-name">Adın</label>
-            <input id="player-name" name="name" type="text" maxlength="16" autocomplete="nickname"
-                   placeholder="Örn. Ada" enterkeyhint="next">
-          </div>
-          <form id="join-form" class="join-form" novalidate>
-            <div class="field">
-              <label for="join-code">Oda kodu</label>
-              <input id="join-code" name="code" type="text" maxlength="5" placeholder="K7X2M"
-                     autocapitalize="characters" autocomplete="off" spellcheck="false"
-                     inputmode="text" enterkeyhint="go">
-            </div>
-            <button class="btn btn-coral" type="submit" id="join-btn">Katıl</button>
-          </form>
-          <div class="online-create">
-            <span class="setup-label">Oda kur</span>
-            <div class="online-create-row">
-              <button class="btn btn-outline btn-sm" type="button" data-host="coop">Ortak tahta</button>
-              <button class="btn btn-outline btn-sm" type="button" data-host="versus">Rakip</button>
-            </div>
-          </div>
+    <!-- Google hesabı: ad ve profil resmi oda adında kullanılır. -->
+    <section class="account-strip" id="account-strip" aria-label="Hesap">
+      <div class="account-person">
+        <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
+        <div class="account-meta">
+          <span class="account-name" id="account-name">Misafir oyuncu</span>
+          <span class="tiny" id="account-note">Giriş yap, adın hazır olsun</span>
         </div>
       </div>
-    </details>
-
-    <section class="quick-card" aria-labelledby="quick-title">
-      <div class="quick-head">
-        <h2 id="quick-title">Hızlı başla</h2>
-        <p>Süre modunu seç, bota karşı tek başına oyna.</p>
-      </div>
-      <div class="quick-controls">
-        <div class="setup-field">
-          <span class="setup-label">Süre</span>
-          <div class="seg" id="time-mode" role="group" aria-label="Süre modu">
-            <button type="button" data-time="shared">Ortak 2:00</button>
-            <button type="button" data-time="turn">Sıra 0:30</button>
-            <button type="button" data-time="none">Süresiz</button>
-          </div>
-        </div>
-        <div class="setup-field">
-          <span class="setup-label">Bot zorluğu</span>
-          <div class="seg" id="bot-level" role="group" aria-label="Bot zorluğu">
-            <button type="button" data-bot="easy">Kolay</button>
-            <button type="button" data-bot="normal">Orta</button>
-            <button type="button" data-bot="hard">Zor</button>
-          </div>
-        </div>
-        <button class="btn btn-ink quick-play-btn" type="button" id="play-bot">Bota karşı oyna</button>
+      <div class="account-actions">
+        <div class="google-slot" id="google-slot"></div>
+        <button class="btn btn-outline btn-sm" id="name-edit" type="button" hidden>Adı değiştir</button>
+        <button class="btn btn-outline btn-sm" id="google-native" type="button" hidden>Google ile giriş</button>
+        <button class="btn btn-outline btn-sm" id="google-signout" type="button" hidden>Çıkış yap</button>
       </div>
     </section>
+
+    <p class="home-label">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <rect x="4" y="1.6" width="8" height="12.8" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M6.9 12.1h2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Aynı cihaz</span>
+    </p>
 
     <div class="mode-grid">
+      <article class="mode-card solo">
+        <div class="mode-art solo-art" aria-hidden="true">
+          <div class="mini-board">
+            <span class="mb c-mint" style="--mr:2;--mc:2"></span>
+            <span class="mb c-mint" style="--mr:2;--mc:3"></span>
+            <span class="mb c-mustard" style="--mr:4;--mc:4"></span>
+            <span class="mb c-mustard" style="--mr:5;--mc:4"></span>
+            <span class="mb c-coral" style="--mr:6;--mc:2"></span>
+            <span class="mb c-coral" style="--mr:6;--mc:3"></span>
+          </div>
+          <span class="tag tag-a">SOLO</span>
+        </div>
+        <div class="mode-body">
+          <h2>Tek kişilik</h2>
+          <p>Kendi tahtanda, kendi hızında. Satırları patlat, combo yap ve
+            tahta tıkanana kadar rekorunu yükselt.</p>
+          <div class="mode-actions">
+            <button class="btn btn-ink" type="button" data-local="solo">
+              <svg class="btn-play-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M7 4.9 16.2 10 7 15.1Z" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+              </svg>
+              <span class="btn-label">Tek başına oyna</span>
+            </button>
+          </div>
+        </div>
+      </article>
+
       <article class="mode-card coop">
         <div class="mode-art coop-art" aria-hidden="true">
           <div class="mini-board">
@@ -163,7 +272,12 @@
           <p>Tek tahta, tek skor. Sırayla blok koyun, satırları birlikte patlatın.
             Ne kadar dayanırsınız?</p>
           <div class="mode-actions">
-            <button class="btn btn-ink" type="button" data-local="coop">Aynı cihazda oyna</button>
+            <button class="btn btn-ink" type="button" data-local="coop">
+              <svg class="btn-play-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M7 4.9 16.2 10 7 15.1Z" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+              </svg>
+              <span class="btn-label">Aynı cihazda oyna</span>
+            </button>
           </div>
         </div>
       </article>
@@ -189,32 +303,26 @@
           <p>Herkesin kendi tahtası var, blok dizisi aynı. İlk tıkanan kaybeder;
             skor tablosu seni bekliyor.</p>
           <div class="mode-actions">
-            <button class="btn btn-ink" type="button" data-local="versus">Aynı cihazda oyna</button>
+            <button class="btn btn-ink" type="button" data-local="versus">
+              <svg class="btn-play-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M7 4.9 16.2 10 7 15.1Z" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+              </svg>
+              <span class="btn-label">Aynı cihazda oyna</span>
+            </button>
           </div>
         </div>
       </article>
     </div>
 
-    <section class="daily-card" id="daily-card" aria-labelledby="daily-title">
-      <div class="daily-copy">
-        <p class="kicker">Günün tahtası</p>
-        <h2 id="daily-title">Herkes aynı blokları alır</h2>
-        <p id="daily-desc">Bugünün tohumuyla bota karşı oyna. Her gün bir tur, seriyi bozma.</p>
-        <span class="tiny" id="daily-state">Bugün henüz oynanmadı</span>
-      </div>
-      <div class="daily-side">
-        <div class="daily-streak"><b id="daily-streak">0</b><span>gün seri</span></div>
-        <button class="btn btn-coral" type="button" id="play-daily">Bugünü oyna</button>
-      </div>
-    </section>
-
     <details class="ach-card" id="ach-card">
-      <summary>Başarımlar <span class="ach-count" id="ach-count">0 / 12</span></summary>
+      <summary>Başarımlar <span class="ach-count" id="ach-count">0 / 10</span></summary>
       <div class="ach-list" id="ach-list"></div>
     </details>
+    </div>
 
     <footer class="site-foot">
-      <p>Blok İki — arkadaşlar arası bir blok oyunu.</p>
+      <p>Blokara 1v1 — arkadaşlar arası bir blok oyunu.</p>
+      <p><a href="privacy.html">Gizlilik politikası</a></p>
     </footer>
   </section>
 
@@ -277,6 +385,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="i18n-data.js"></script>
+<script src="i18n.js"></script>
 <script src="game-core.js"></script>
 <script src="progress.js"></script>
 <script src="fx.js"></script>

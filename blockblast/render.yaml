@@ -6,11 +6,10 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    branch: main
     autoDeploy: true
     healthCheckPath: /healthz
     buildCommand: "echo 'bagimlilik yok'"
-    startCommand: "node server.cjs"
+    startCommand: "node server-guard.cjs"
     envVars:
       - key: NODE_VERSION
         value: "20"

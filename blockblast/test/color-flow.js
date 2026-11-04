@@ -43,7 +43,7 @@
       else ov.hidden = true;
     }
     await wait(150);
-    dbg.start("versus", { bot: "easy", timeMode: "none" });
+    dbg.start("versus", { timeMode: "none" });
     await wait(500);
 
     var log = [];

@@ -1,6 +1,6 @@
 (function () {
   return (async function () {
-    document.getElementById("play-bot").click();
+    document.querySelector('[data-local="solo"]').click();
     await new Promise(function (r) { setTimeout(r, 800); });
     var board = document.querySelector(".board");
     var br = board.getBoundingClientRect();

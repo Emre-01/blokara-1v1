@@ -1,6 +1,6 @@
 (function () {
   return (async function () {
-    document.getElementById("play-bot").click();
+    document.querySelector('[data-local="solo"]').click();
     await new Promise(function (r) { setTimeout(r, 1400); });
     return {
       cards: Array.prototype.map.call(document.querySelectorAll(".score-card"), function (el) {

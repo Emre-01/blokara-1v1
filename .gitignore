@@ -1,0 +1,29 @@
+# Derleme çıktıları (APK, AAB, ara sınıflar, kopyalanan web varlıkları)
+blockblast/android/build/
+blockblast/android/build-aab/
+blockblast/android/dist/
+blockblast/android/res/mipmap-*/
+blockblast/android/debug.keystore
+blockblast/android/.gradle/
+blockblast/android/local.properties
+blockblast/android/app/build/
+
+# İmza anahtarları ve parolalar asla sürüm kontrolüne girmemeli
+*.keystore
+*.jks
+*.p12
+.env
+.env.*
+
+# Eski/kopya web kökü
+www/
+
+# Sunucu günlükleri ve servis sarmalayıcısı (install-service.ps1 üretir)
+blockblast/logs/
+blockblast/run-server.ps1
+
+# İşletim sistemi ve araç dosyaları
+.DS_Store
+Thumbs.db
+*.log
+node_modules/

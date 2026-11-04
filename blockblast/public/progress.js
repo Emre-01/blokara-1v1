@@ -1,4 +1,4 @@
-/* Blok İki — yerel ilerleme: XP, seviye, coin, rekorlar, başarımlar, günlük seri.
+/* Blokara 1v1 — yerel ilerleme: XP, seviye, coin, rekorlar, başarımlar, günlük seri.
    Tamamen localStorage üzerinde çalışır; APK çevrimdışıyken de işler. */
 (function (root) {
   "use strict";
@@ -25,10 +25,6 @@
       metric: function (p) { return p.bestAny; }, value: function (p) { return p.bestAny + " puan"; } },
     { id: "skor-3000", title: "Üç Bin", desc: "Bir turda 3000 puan topla.", goal: 3000, reward: 120,
       metric: function (p) { return p.bestAny; }, value: function (p) { return p.bestAny + " puan"; } },
-    { id: "gunluk-3", title: "Sadık Oyuncu", desc: "3 gün üst üste günün tahtasını oyna.", goal: 3, reward: 60,
-      metric: function (p) { return p.dailyStreak; }, value: function (p) { return p.dailyStreak + " gün"; } },
-    { id: "gunluk-7", title: "Haftalık Ritüel", desc: "7 gün üst üste günün tahtasını oyna.", goal: 7, reward: 150,
-      metric: function (p) { return p.dailyStreak; }, value: function (p) { return p.dailyStreak + " gün"; } },
     { id: "blok-500", title: "Blok Terzisi", desc: "Toplam 500 blok yerleştir.", goal: 500, reward: 100,
       metric: function (p) { return p.totalBlocks; }, value: function (p) { return p.totalBlocks + " blok"; } }
   ];
@@ -47,7 +43,7 @@
       totalScore: 0,
       maxCombo: 0,
       bestAny: 0,
-      best: { coop: 0, versus: 0, bot: 0, daily: 0 },
+      best: { solo: 0, coop: 0, versus: 0, daily: 0 },
       dailyStreak: 0,
       dailyLast: "",
       dailyBest: 0,
@@ -55,7 +51,6 @@
       muted: false,
       vibrate: true,
       timeMode: "shared",
-      botLevel: "normal",
       createdAt: Date.now()
     };
   }
@@ -168,7 +163,8 @@
   /* Oyun sonucunu işler. Aynı tur iki kez sayılmamalı; çağıran taraf garanti eder. */
   function recordGame(profile, result) {
     var mode = result.mode || "versus";
-    var key = mode === "daily" ? "daily" : (result.bot ? "bot" : (mode === "coop" ? "coop" : "versus"));
+    var key = mode === "daily" ? "daily"
+      : (mode === "solo" ? "solo" : (mode === "coop" ? "coop" : "versus"));
     var score = Math.max(0, Math.floor(result.score || 0));
     var lines = Math.max(0, Math.floor(result.lines || 0));
     var blocks = Math.max(0, Math.floor(result.blocks || 0));
@@ -196,7 +192,7 @@
     profile.maxCombo = Math.max(profile.maxCombo || 0, combo);
     profile.bestAny = Math.max(profile.bestAny || 0, score);
 
-    if (mode !== "coop" && mode !== "daily") {
+    if (mode !== "coop" && mode !== "daily" && mode !== "solo") {
       if (win) {
         profile.wins += 1;
         profile.winStreak = (profile.winStreak || 0) + 1;

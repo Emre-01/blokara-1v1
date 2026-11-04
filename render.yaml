@@ -1,0 +1,19 @@
+# Kök depo için Render Blueprint'i.
+# Render panelinde: New → Blueprint → bu depoyu seç → Apply.
+# Oyun sunucusu blockblast/ alt klasöründe; rootDir ile işaret edilir.
+services:
+  - type: web
+    name: blok-iki
+    runtime: node
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    rootDir: blockblast
+    healthCheckPath: /healthz
+    buildCommand: "echo 'bagimlilik yok'"
+    startCommand: "node server-guard.cjs"
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: HOST
+        value: "0.0.0.0"

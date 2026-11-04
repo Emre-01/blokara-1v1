@@ -1,4 +1,4 @@
-/* Blok İki sunucusu — bağımlılık yok.
+/* Blokara 1v1 sunucusu — bağımlılık yok.
    Statik dosyaları servis eder ve oda tabanlı WebSocket multiplayer sağlar.
    Çalıştırma: node server.cjs   (PORT=8080) */
 "use strict";
@@ -17,6 +17,28 @@ const MAX_MESSAGE = 64 * 1024;
 const ROOM_TTL = 20 * 60 * 1000;
 const DISCONNECT_FORFEIT = 90 * 1000;
 
+/* --- Kötüye kullanım sınırları -------------------------------------
+   Herkese açık bir sunucuda sınırsız bağlantı/oda bellek tüketimiyle
+   hizmeti düşürebilir. Bu değerler tek bir makinenin rahatça taşıdığı
+   yükün üstünde; gerekirse ortam değişkeniyle büyütülür. */
+const MAX_ROOMS = Number(process.env.MAX_ROOMS) || 400;
+const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS) || 600;
+const MAX_CONNECTIONS_PER_IP = Number(process.env.MAX_CONNECTIONS_PER_IP) || 6;
+const JOIN_FAIL_WINDOW = 60 * 1000;
+const JOIN_FAIL_LIMIT = Number(process.env.JOIN_FAIL_LIMIT) || 12;
+
+/* WebSocket kaynağı: tarayıcılar Origin gönderir, Android WebView
+   file:// için "null" gönderir. Listeye ek adresler ORIGINS ile verilir. */
+const EXTRA_ORIGINS = String(process.env.ORIGINS || "")
+  .split(",").map((value) => value.trim().replace(/\/+$/, "")).filter(Boolean);
+
+/* Google istemci kimlikleri virgülle çoklu verilebilir (web + Android).
+   Panelde tek bir web kimliği yeterliyse GOOGLE_CLIENT_ID kullanılır. */
+const GOOGLE_CLIENT_IDS = String(
+  process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || ""
+).split(",").map((value) => value.trim()).filter(Boolean);
+const GOOGLE_CLIENT_ID = GOOGLE_CLIENT_IDS[0] || "";
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -30,49 +52,295 @@ const MIME = {
   ".map": "application/json"
 };
 
+/* Beklenmeyen hata süreci yarı ölü bırakmasın: günlüğe yaz ve çık.
+   server-guard.cjs (ya da Render/Docker) temiz bir süreç başlatır. */
+process.on("uncaughtException", (error) => {
+  console.error("[kritik] yakalanmayan hata:", error && error.stack ? error.stack : error);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[kritik] işlenmeyen söz reddi:", reason);
+  process.exit(1);
+});
+
 /* ------------------------------------------------------------------ */
 /* HTTP                                                                */
 /* ------------------------------------------------------------------ */
 
-function serveStatic(req, res) {
-  if (req.url === "/healthz") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    return res.end("ok");
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "X-Permitted-Cross-Domain-Policies": "none",
+  "X-DNS-Prefetch-Control": "off",
+  "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), fullscreen=(self)",
+  /* Uygulama satır içi stil özniteliği kullanıyor; betikler ayrı dosyada. */
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    /* Google Identity Services betiği ve çerçevesi ayrı kökenden gelir. */
+    "script-src 'self' https://accounts.google.com",
+    "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+    "img-src 'self' data: https:",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' ws: wss: https:",
+    "frame-src https://accounts.google.com",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'"
+  ].join("; ")
+};
+
+function securityHeaders(secure) {
+  const headers = Object.assign({}, SECURITY_HEADERS);
+  if (secure) headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+  return headers;
+}
+
+/* Yalnızca herkese açık API uçları için CORS. APK file:// kaynağından
+   (Origin: null) yapılan istekler bu başlıklarla kabul edilir; çerez veya
+   kimlik bilgisi paylaşılmaz. */
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "600"
+  };
+}
+
+function isApiPath(url) {
+  return url === "/api/config" || url === "/api/auth/google";
+}
+
+/* Google oturum doğrulamasını kötüye kullanıma karşı sınırla.
+   Proxy arkasında tüm istekler aynı adresten gelebileceği için sınır
+   kullanıcı başına değil, sunucu genelinde yüksek tutulur. */
+const AUTH_WINDOW = 60 * 1000;
+const AUTH_LIMIT = 60;
+const authHits = new Map();
+
+function authRateLimited(key) {
+  const now = Date.now();
+  let entry = authHits.get(key);
+  if (!entry || now - entry.start > AUTH_WINDOW) {
+    entry = { start: now, count: 0 };
+    authHits.set(key, entry);
   }
+  entry.count += 1;
+  if (authHits.size > 2000) {
+    for (const [ip, hit] of authHits) {
+      if (now - hit.start > AUTH_WINDOW) authHits.delete(ip);
+    }
+  }
+  return entry.count > AUTH_LIMIT;
+}
+
+function sendText(res, status, contentType, body) {
+  res.writeHead(status, Object.assign({ "Content-Type": contentType }, securityHeaders(false)));
+  res.end(body);
+}
+
+function readJsonBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    let tooLarge = false;
+    const chunks = [];
+    req.on("data", (chunk) => {
+      if (tooLarge) return;
+      size += chunk.length;
+      if (size > limit) {
+        tooLarge = true;
+        chunks.length = 0;
+        reject(new Error("too-large"));
+        req.resume();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (tooLarge) return;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"));
+      } catch (error) {
+        reject(new Error("bad-json"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Google kimlik doğrulama                                             */
+/* ------------------------------------------------------------------ */
+
+/* Google'ın imza anahtarları önbelleklenir (1 saat). */
+let googleKeys = { fetchedAt: 0, keys: [] };
+
+async function getGoogleKeys() {
+  if (googleKeys.keys.length && Date.now() - googleKeys.fetchedAt < 60 * 60 * 1000) {
+    return googleKeys.keys;
+  }
+  const response = await fetch("https://www.googleapis.com/oauth2/v3/certs", {
+    headers: { "Accept": "application/json" },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) throw new Error("jwks");
+  const body = await response.json();
+  googleKeys = { fetchedAt: Date.now(), keys: Array.isArray(body.keys) ? body.keys : [] };
+  return googleKeys.keys;
+}
+
+function b64urlToBuffer(value) {
+  return Buffer.from(String(value).replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+/* id_token imzasını, verenini, kitlesini ve süresini doğrular. */
+async function verifyGoogleIdToken(idToken) {
+  const parts = String(idToken || "").split(".");
+  if (parts.length !== 3) throw new Error("malformed");
+  let header, payload;
+  try {
+    header = JSON.parse(b64urlToBuffer(parts[0]).toString("utf8"));
+    payload = JSON.parse(b64urlToBuffer(parts[1]).toString("utf8"));
+  } catch (error) {
+    throw new Error("malformed");
+  }
+  if (header.alg !== "RS256") throw new Error("alg");
+
+  const keys = await getGoogleKeys();
+  const jwk = keys.find((key) => key.kid === header.kid) || keys[0];
+  if (!jwk) throw new Error("kid");
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(parts[0] + "." + parts[1]);
+  verifier.end();
+  const key = crypto.createPublicKey({ key: jwk, format: "jwk" });
+  if (!verifier.verify(key, b64urlToBuffer(parts[2]))) throw new Error("signature");
+
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.iss !== "https://accounts.google.com" && payload.iss !== "accounts.google.com") {
+    throw new Error("issuer");
+  }
+  if (typeof payload.exp !== "number" || payload.exp < now - 60) throw new Error("expired");
+  if (typeof payload.iat === "number" && payload.iat > now + 300) throw new Error("iat");
+  if (!payload.sub) throw new Error("subject");
+  if (GOOGLE_CLIENT_IDS.length && GOOGLE_CLIENT_IDS.indexOf(payload.aud) < 0) throw new Error("audience");
+  return payload;
+}
+
+async function verifyGoogleToken(req, res) {
+  const secure = !!(req.socket && req.socket.encrypted);
+  const json = (status, body) => {
+    res.writeHead(status, Object.assign({ "Content-Type": "application/json; charset=utf-8" }, corsHeaders(), securityHeaders(secure)));
+    res.end(JSON.stringify(body));
+  };
+  if (!GOOGLE_CLIENT_ID) {
+    return json(503, { error: "not_configured", message: "Sunucuda GOOGLE_CLIENT_ID tanımlı değil." });
+  }
+  const clientKey = (req.socket && req.socket.remoteAddress) || "unknown";
+  if (authRateLimited(clientKey)) {
+    return json(429, { error: "rate_limited", message: "Çok fazla giriş denemesi. Biraz sonra tekrar dene." });
+  }
+  let body;
+  try {
+    body = await readJsonBody(req, 16 * 1024);
+  } catch (error) {
+    if (error.message === "too-large") {
+      return json(413, { error: "too_large", message: "İstek çok büyük." });
+    }
+    return json(400, { error: "body", message: "İstek okunamadı." });
+  }
+  try {
+    const claims = await verifyGoogleIdToken(body.credential || body.id_token);
+    return json(200, {
+      sub: claims.sub,
+      name: claims.name || claims.given_name || "",
+      given_name: claims.given_name || "",
+      picture: claims.picture || "",
+      email_verified: !!claims.email_verified
+    });
+  } catch (error) {
+    return json(401, { error: "invalid_token", message: "Google oturumu doğrulanamadı." });
+  }
+}
+
+async function handleRequest(req, res) {
+  const secure = !!(req.socket && req.socket.encrypted);
+  const method = String(req.method || "GET").toUpperCase();
+
+  /* Sorgu dizesi yolu etkilemez; API karşılaştırmaları için temizle. */
   let pathname;
   try {
     pathname = decodeURIComponent(new URL(req.url, "http://x").pathname);
   } catch (error) {
-    res.writeHead(400);
-    return res.end("Bad request");
+    return sendText(res, 400, "text/plain; charset=utf-8", "Bad request");
   }
+
+  /* API ön kontrolü (CORS preflight). */
+  if (method === "OPTIONS" && isApiPath(pathname)) {
+    res.writeHead(204, Object.assign({}, corsHeaders(), securityHeaders(secure)));
+    return res.end();
+  }
+
+  if (method !== "GET" && method !== "HEAD" && !(method === "POST" && pathname === "/api/auth/google")) {
+    res.writeHead(405, Object.assign({ "Allow": "GET, HEAD, POST, OPTIONS", "Content-Type": "text/plain" }, securityHeaders(secure)));
+    return res.end("Method not allowed");
+  }
+
+  if (pathname === "/healthz") {
+    res.writeHead(200, Object.assign({ "Content-Type": "text/plain" }, securityHeaders(secure)));
+    return res.end("ok");
+  }
+
+  /* İstemcinin Google düğmesini çizebilmesi için genel yapılandırma.
+     Gizli bilgi yok: istemci kimliği zaten herkese açıktır. */
+  if (method === "GET" && pathname === "/api/config") {
+    res.writeHead(200, Object.assign({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store"
+    }, corsHeaders(), securityHeaders(secure)));
+    return res.end(JSON.stringify({
+      googleClientId: GOOGLE_CLIENT_ID,
+      googleEnabled: !!GOOGLE_CLIENT_ID
+    }));
+  }
+
+  if (method === "POST" && pathname === "/api/auth/google") {
+    return verifyGoogleToken(req, res);
+  }
+
   if (pathname === "/") pathname = "/index.html";
   const file = path.normalize(path.join(PUBLIC_DIR, pathname));
   if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) {
-    res.writeHead(403);
-    return res.end("Forbidden");
+    return sendText(res, 403, "text/plain; charset=utf-8", "Forbidden");
   }
   fs.readFile(file, (error, data) => {
     if (error) {
-      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-      return res.end("<h1>404</h1><p><a href=\"/\">Blok İki</a></p>");
+      return sendText(res, 404, "text/html; charset=utf-8", "<h1>404</h1><p><a href=\"/\">Blokara 1v1</a></p>");
     }
-    res.writeHead(200, {
+    /* Sürüm çakışmasını önle: HTML/JS/CSS her açılışta doğrulanır.
+       Yalnızca içeriği hiç değişmeyen yazı tipi ve simgeler uzun süre
+       önbelleklenir. */
+    const longLived = pathname.startsWith("/fonts/") || pathname.startsWith("/icons/");
+    res.writeHead(200, Object.assign({
       "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream",
-      "Cache-Control": pathname === "/index.html" || pathname === "/sw.js" ? "no-cache" : "public, max-age=3600"
-    });
-    res.end(data);
+      "Cache-Control": longLived ? "public, max-age=31536000, immutable" : "no-cache"
+    }, securityHeaders(secure)));
+    res.end(method === "HEAD" ? undefined : data);
   });
 }
+
 
 let server;
 if (process.env.SSL_KEY && process.env.SSL_CERT) {
   server = https.createServer({
     key: fs.readFileSync(process.env.SSL_KEY),
     cert: fs.readFileSync(process.env.SSL_CERT)
-  }, serveStatic);
+  }, handleRequest);
 } else {
-  server = http.createServer(serveStatic);
+  server = http.createServer(handleRequest);
 }
 
 /* ------------------------------------------------------------------ */
@@ -209,12 +477,58 @@ Connection.prototype.close = function (code, reason) {
   if (this.onClose) this.onClose(this);
 };
 
+const ipConnections = new Map();
+const joinFailures = new Map();
+let activeConnections = 0;
+
+function clientIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return forwarded || (req.socket && req.socket.remoteAddress) || "?";
+}
+
+/* Tarayıcı kaynağı: aynı köken, file:// (Android WebView) ve ORIGINS listesi. */
+function originAllowed(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true; /* tarayıcı dışı istemciler (test/bot) */
+  if (origin === "null" || origin === "file://") return true; /* APK WebView */
+  let parsed;
+  try { parsed = new URL(origin); } catch (error) { return false; }
+  const host = String(req.headers.host || "").toLowerCase();
+  if (parsed.host.toLowerCase() === host) return true;
+  return EXTRA_ORIGINS.some((allowed) => {
+    try { return new URL(allowed).origin === parsed.origin; } catch (error) { return allowed === origin; }
+  });
+}
+
 server.on("upgrade", (req, socket) => {
   const key = req.headers["sec-websocket-key"];
   if (!key || String(req.headers.upgrade || "").toLowerCase() !== "websocket") {
     socket.destroy();
     return;
   }
+  if (!originAllowed(req)) {
+    socket.end("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
+    return;
+  }
+  if (activeConnections >= MAX_CONNECTIONS) {
+    socket.end("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+    return;
+  }
+  const ip = clientIp(req);
+  const count = ipConnections.get(ip) || 0;
+  if (count >= MAX_CONNECTIONS_PER_IP) {
+    socket.end("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n");
+    return;
+  }
+  activeConnections++;
+  ipConnections.set(ip, count + 1);
+  socket.once("close", () => {
+    activeConnections = Math.max(0, activeConnections - 1);
+    const left = (ipConnections.get(ip) || 1) - 1;
+    if (left <= 0) ipConnections.delete(ip);
+    else ipConnections.set(ip, left);
+  });
+
   const accept = crypto.createHash("sha1").update(key + GUID).digest("base64");
   socket.write(
     "HTTP/1.1 101 Switching Protocols\r\n" +
@@ -223,7 +537,9 @@ server.on("upgrade", (req, socket) => {
     "Sec-WebSocket-Accept: " + accept + "\r\n\r\n"
   );
   socket.setNoDelay(true);
+  socket.setKeepAlive(true, 30000);
   const conn = new Connection(socket, handleMessage, handleClose);
+  conn.ip = ip;
   socket.on("data", (chunk) => conn.receive(chunk));
   socket.on("close", () => conn.close(1001, "Bağlantı kapandı"));
   socket.on("error", () => conn.close(1011, "Bağlantı hatası"));
@@ -235,6 +551,37 @@ server.on("upgrade", (req, socket) => {
 /* ------------------------------------------------------------------ */
 
 const rooms = new Map();
+/* Rastgele eşleşme kuyruğu: bağlantı + ad + mod. Eşleşince oda kurulur. */
+const matchQueue = [];
+const MATCH_TTL = 2 * 60 * 1000;
+/* Arkadaş kodu → açık bağlantı. Yalnızca eşleşme/davet için tutulur,
+   diskte saklanmaz. */
+const presence = new Map();
+/* Arkadaş kodu → son bilinen ad. Çevrimdışı arkadaşın da güncel adı
+   görünsün diye bağlantı kapandıktan sonra kısa süre saklanır. */
+const friendNames = new Map();
+const FRIEND_NAMES_LIMIT = 5000;
+const FRIEND_CODE_RE = /^[A-Z0-9]{4,10}$/;
+
+function rememberFriendName(code, name) {
+  const key = normalizeFriendCode(code);
+  if (!key) return;
+  const clean = String(name || "").trim().slice(0, 16);
+  if (!clean) return;
+  friendNames.delete(key);
+  friendNames.set(key, clean);
+  while (friendNames.size > FRIEND_NAMES_LIMIT) {
+    const oldest = friendNames.keys().next().value;
+    if (!oldest) break;
+    friendNames.delete(oldest);
+  }
+}
+
+function normalizeFriendCode(value) {
+  const code = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+  return FRIEND_CODE_RE.test(code) ? code : "";
+}
+
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function makeCode() {
@@ -278,6 +625,9 @@ function addPlayer(room, name, conn) {
   };
   room.players.push(slot);
   conn.player = { code: room.code, index, token: slot.token };
+  /* Davetlerde oda adı görünsün; arkadaş kodu bildirilmemişse de kullanılır. */
+  if (!conn.friendName) conn.friendName = slot.name;
+  if (conn.friendCode) rememberFriendName(conn.friendCode, conn.friendName);
   room.lastActive = Date.now();
   return slot;
 }
@@ -296,6 +646,75 @@ function attach(room, index, conn) {
     previous.close(4001, "Yeni bağlantı");
   }
   return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* Rastgele eşleşme                                                    */
+/* ------------------------------------------------------------------ */
+
+function removeFromQueue(conn) {
+  const index = matchQueue.findIndex((entry) => entry.conn === conn);
+  if (index >= 0) matchQueue.splice(index, 1);
+  return index >= 0;
+}
+
+function startRoom(room) {
+  room.game = new GameCore.Game({
+    mode: room.mode,
+    names: room.players.map((player) => player.name),
+    seed: crypto.randomBytes(4).readUInt32BE(0),
+    turnBased: room.mode === "coop",
+    timeMode: room.timeMode
+  });
+  room.phase = "playing";
+  room.lastTick = Date.now();
+  room.lastSentSecond = -1;
+}
+
+/* Kuyruğa girer; aynı modda bekleyen varsa ikisini aynı odaya koyup başlatır. */
+function quickMatch(conn, message) {
+  removeFromQueue(conn);
+  if (conn.player) {
+    leaveRoom(conn, false);
+    if (conn.player) return conn.send({ t: "error", message: "Odadan ayrılamadın, tekrar dene." });
+  }
+  if (rooms.size >= MAX_ROOMS) {
+    return conn.send({ t: "error", message: "Sunucu şu anda dolu. Biraz sonra tekrar dene." });
+  }
+
+  const mode = message.mode === "coop" ? "coop" : "versus";
+  const waiterIndex = matchQueue.findIndex((entry) =>
+    entry.mode === mode &&
+    entry.conn &&
+    !entry.conn.closed &&
+    entry.conn !== conn
+  );
+
+  if (waiterIndex < 0) {
+    matchQueue.push({
+      conn,
+      name: GameCore.cleanName(message.name, "Oyuncu"),
+      mode,
+      at: Date.now()
+    });
+    return conn.send({ t: "queued", waiting: matchQueue.length });
+  }
+
+  const waiter = matchQueue.splice(waiterIndex, 1)[0];
+  const room = makeRoom(mode);
+  const first = addPlayer(room, waiter.name, waiter.conn);
+  const second = addPlayer(room, message.name, conn);
+  if (!first || !second) {
+    /* Bekleyen oyuncuyu kuyruğa geri koy, yeni geleni bilgilendir. */
+    if (first) leaveRoom(waiter.conn, false);
+    else matchQueue.unshift(waiter);
+    return conn.send({ t: "error", message: "Eşleşme kurulamadı, tekrar dene." });
+  }
+
+  startRoom(room);
+  sendWelcome(waiter.conn, room, 0);
+  sendWelcome(conn, room, 1);
+  broadcast(room);
 }
 
 function lobbyState(room) {
@@ -369,6 +788,7 @@ function sendWelcome(conn, room, index) {
 }
 
 function leaveRoom(conn, explicit) {
+  removeFromQueue(conn);
   const info = conn.player;
   if (!info) return;
   const room = rooms.get(info.code);
@@ -430,12 +850,39 @@ function leaveRoom(conn, explicit) {
   broadcast(room);
 }
 
+function noteJoinFailure(ip) {
+  if (!ip) return;
+  const now = Date.now();
+  const entry = joinFailures.get(ip);
+  if (!entry || now - entry.at > JOIN_FAIL_WINDOW) {
+    joinFailures.set(ip, { at: now, count: 1 });
+    return;
+  }
+  entry.count++;
+  entry.at = now;
+}
+
+function joinBlocked(ip) {
+  if (!ip) return false;
+  const entry = joinFailures.get(ip);
+  if (!entry) return false;
+  if (Date.now() - entry.at > JOIN_FAIL_WINDOW) {
+    joinFailures.delete(ip);
+    return false;
+  }
+  return entry.count >= JOIN_FAIL_LIMIT;
+}
+
 function handleMessage(conn, message) {
   const t = message.t;
 
   if (t === "create") {
+    removeFromQueue(conn);
     leaveRoom(conn, false);
     if (conn.player) return;
+    if (rooms.size >= MAX_ROOMS) {
+      return conn.send({ t: "error", message: "Sunucu şu anda dolu. Biraz sonra tekrar dene." });
+    }
     const room = makeRoom(message.mode);
     const slot = addPlayer(room, message.name, conn);
     if (!slot) return conn.send({ t: "error", message: "Oda kurulamadı." });
@@ -444,11 +891,24 @@ function handleMessage(conn, message) {
   }
 
   if (t === "join") {
+    removeFromQueue(conn);
+    if (joinBlocked(conn.ip)) {
+      return conn.send({ t: "error", message: "Çok fazla hatalı deneme. Bir dakika sonra tekrar dene." });
+    }
     const code = String(message.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
     const target = rooms.get(code);
-    if (!target) return conn.send({ t: "error", message: "Böyle bir oda yok. Kodu kontrol et." });
-    if (target.players.length >= 2) return conn.send({ t: "error", message: "Oda dolu." });
-    if (target.phase !== "lobby") return conn.send({ t: "error", message: "Bu odada oyun başlamış." });
+    if (!target) {
+      noteJoinFailure(conn.ip);
+      return conn.send({ t: "error", message: "Böyle bir oda yok. Kodu kontrol et." });
+    }
+    if (target.players.length >= 2) {
+      noteJoinFailure(conn.ip);
+      return conn.send({ t: "error", message: "Oda dolu." });
+    }
+    if (target.phase !== "lobby") {
+      noteJoinFailure(conn.ip);
+      return conn.send({ t: "error", message: "Bu odada oyun başlamış." });
+    }
     if (conn.player && conn.player.code === code) return conn.send({ t: "error", message: "Zaten bu odadasın." });
     leaveRoom(conn, false);
     if (conn.player) return;
@@ -472,14 +932,75 @@ function handleMessage(conn, message) {
     return;
   }
 
+  /* Kuyruktayken de kalp atışı yanıtlanmalı; oda şartı aranmaz. */
+  if (t === "ping") return conn.send({ t: "pong" });
+
+  if (t === "quickmatch") {
+    return quickMatch(conn, message);
+  }
+
+  if (t === "cancelmatch") {
+    removeFromQueue(conn);
+    return conn.send({ t: "matchcancel" });
+  }
+
+  /* Arkadaşlar oda şartı olmadan çalışır: ana menüde de durum bildirilir. */
+  if (t === "presence") {
+    const code = normalizeFriendCode(message.code);
+    if (!code) return conn.send({ t: "presence", ok: false });
+    if (conn.friendCode && presence.get(conn.friendCode) === conn) {
+      presence.delete(conn.friendCode);
+    }
+    conn.friendCode = code;
+    conn.friendName = String(message.name || "Oyuncu").slice(0, 16);
+    presence.set(code, conn);
+    rememberFriendName(code, conn.friendName);
+    return conn.send({ t: "presence", ok: true, code });
+  }
+
+  if (t === "lookup") {
+    const code = normalizeFriendCode(message.code);
+    if (!code) return conn.send({ t: "lookup", ok: false, message: "Kod 4-10 karakter olmalı." });
+    const target = presence.get(code);
+    const online = !!(target && !target.closed);
+    const name = online ? target.friendName : (friendNames.get(code) || "");
+    if (online) rememberFriendName(code, name);
+    return conn.send({
+      t: "lookup",
+      ok: true,
+      code,
+      name,
+      online
+    });
+  }
+
+  if (t === "invite") {
+    const code = normalizeFriendCode(message.to);
+    if (!code) return conn.send({ t: "invited", ok: false, message: "Arkadaş kodu geçersiz." });
+    const target = presence.get(code);
+    if (!target || target.closed) {
+      return conn.send({ t: "invited", ok: false, message: "Arkadaşın şu an çevrimiçi değil." });
+    }
+    const roomCode = String(message.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+    if (!rooms.has(roomCode)) {
+      return conn.send({ t: "invited", ok: false, message: "Oda bulunamadı." });
+    }
+    target.send({
+      t: "invite",
+      from: conn.friendName || "Arkadaşın",
+      fromCode: conn.friendCode || "",
+      code: roomCode,
+      mode: rooms.get(roomCode).mode
+    });
+    return conn.send({ t: "invited", ok: true, name: target.friendName || "" });
+  }
+
   const info = conn.player;
   if (!info) return conn.send({ t: "error", message: "Önce bir odaya gir." });
   const room = rooms.get(info.code);
   if (!room) return conn.send({ t: "error", message: "Oda kapandı." });
   const slot = room.players[info.index];
   if (!slot || slot.token !== info.token) return conn.send({ t: "error", message: "Oturum geçersiz." });
-
-  if (t === "ping") return conn.send({ t: "pong" });
 
   if (t === "mode") {
     if (room.phase !== "lobby") return;
@@ -560,6 +1081,8 @@ function handleMessage(conn, message) {
 }
 
 function handleClose(conn) {
+  removeFromQueue(conn);
+  if (conn.friendCode && presence.get(conn.friendCode) === conn) presence.delete(conn.friendCode);
   if (conn.player) leaveRoom(conn, false);
 }
 
@@ -569,6 +1092,20 @@ function handleClose(conn) {
 
 setInterval(() => {
   const now = Date.now();
+  joinFailures.forEach((entry, ip) => {
+    if (now - entry.at > JOIN_FAIL_WINDOW) joinFailures.delete(ip);
+  });
+  for (let i = matchQueue.length - 1; i >= 0; i--) {
+    const entry = matchQueue[i];
+    if (!entry.conn || entry.conn.closed) {
+      matchQueue.splice(i, 1);
+      continue;
+    }
+    if (now - entry.at > MATCH_TTL) {
+      matchQueue.splice(i, 1);
+      entry.conn.send({ t: "error", message: "Rakip bulunamadı. Tekrar dene." });
+    }
+  }
   rooms.forEach((room, code) => {
     const anyConnected = room.players.some((player) => player.connected);
     if (!anyConnected && now - room.lastActive > ROOM_TTL) {
@@ -625,15 +1162,20 @@ setInterval(() => {
 }, 1000).unref();
 
 server.listen(PORT, HOST, () => {
-  console.log("Blok İki hazır: http://localhost:" + PORT);
+  console.log("Blokara 1v1 hazır: http://localhost:" + PORT);
   if (HOST === "0.0.0.0") console.log("Telefondan aynı Wi-Fi üzerinden: http://<bilgisayar-ip>:" + PORT);
 });
 
-process.on("SIGTERM", () => {
+function gracefulShutdown() {
   rooms.forEach((room) => {
     room.players.forEach((slot) => {
       if (slot.conn) slot.conn.close(1001, "Sunucu kapanıyor");
     });
   });
   server.close(() => process.exit(0));
-});
+  /* Açık soketler kapanmayı geciktirirse 5 sn sonra çık. */
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);

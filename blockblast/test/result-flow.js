@@ -5,7 +5,7 @@
     var dbg = window.BlokDebug;
     if (!dbg) return "BlokDebug yok";
     localStorage.clear();
-    dbg.start("versus", { bot: "normal", timeMode: "shared" });
+    dbg.start("versus", { timeMode: "shared" });
     await wait(300);
     var game = dbg.game();
     game.players[0].score = 420;

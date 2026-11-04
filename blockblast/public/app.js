@@ -1,4 +1,4 @@
-/* Blok İki — arayüz ve oturumlar */
+/* Blokara 1v1 — arayüz ve oturumlar */
 (function () {
   "use strict";
 
@@ -12,6 +12,10 @@
   var LS_SOUND = "blokiki.sound";
   var LS_SERVER = "blokiki.server";
   var LS_SESSION_PREFIX = "blokiki.session.";
+  var LS_GOOGLE = "blokiki.google";
+  var LS_FRIEND_CODE = "blokara.friendCode";
+  var LS_FRIENDS = "blokara.friends";
+  var LS_ADS_FREE = "blokara.adsFree";
   var SS_ACTIVE = "blokiki.activeRoom";
   var MAX_RECONNECT = 6;
 
@@ -34,6 +38,10 @@
     selected: null,
     cursor: null,
     drag: null,
+    /* Sürükleme sürerken gelen durum güncellemeleri çizimi bekletir;
+       parmak kalkınca tek seferde uygulanır (rakip hamlesi taşı düşürmesin). */
+    dirty: false,
+    rendering: false,
     sound: true,
     audio: null,
     toastTimer: null,
@@ -41,10 +49,7 @@
     busy: false,
     profile: null,
     timeMode: "shared",
-    botLevel: null,
-    daily: false,
-    botThinking: false,
-    botTimer: null,
+    matching: false,
     clockTimer: null,
     lastClockAt: 0,
     onlineAt: 0,
@@ -55,7 +60,18 @@
     soundOn: true,
     vibrate: true,
     lastServerAt: 0,
-    backgrounded: false
+    backgrounded: false,
+    friendCode: "",
+    friends: [],
+    friendLookup: {},
+    pendingFriendAdd: "",
+    pendingInvite: null,
+    friendsTimer: null,
+    friendLookupSeq: 0,
+    inviteAfterCreate: "",
+    interstitialPending: false,
+    daily: false,
+    overlayReturnFocus: null
   };
 
   /* ------------------------------------------------------------------ */
@@ -80,7 +96,10 @@
   }
 
   function modeName(mode) {
-    return mode === "coop" ? "Ortak tahta" : "Rakip";
+    if (app.daily) return "Günün tahtası";
+    if (mode === "coop") return "Ortak tahta";
+    if (mode === "solo") return "Tek kişilik";
+    return "Rakip";
   }
 
   function playerColor(index) {
@@ -145,16 +164,85 @@
     osc.stop(now + duration + 0.03);
   }
 
+  /* Kısa gürültü patlaması: patlamaya gövde ve "moloz" hissi verir. */
+  function noiseBurst(duration, volume, cutoff) {
+    if (!app.sound) return;
+    var ctx = audio();
+    if (!ctx) return;
+    var length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    var buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < length; i++) {
+      var t = i / length;
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2);
+    }
+    var source = ctx.createBufferSource();
+    source.buffer = buffer;
+    var filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(cutoff || 1400, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + duration);
+    var gain = ctx.createGain();
+    var now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume || 0.05, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(now);
+    source.stop(now + duration + 0.02);
+  }
+
   function sfxPlace() { tone(240, 0.08, { type: "square", slide: -70, volume: 0.035 }); }
+  /* Puan kazanınca kısa, yükselen bir çınlama. Puan arttıkça tizleşir;
+     böylece her hamlenin karşılığı duyulur. */
+  function sfxPoints(points, combo, lines) {
+    var base = 587.33;
+    var step = Math.min(6, Math.floor((points || 0) / 25));
+    var freq = base * Math.pow(2, step / 12) * (combo > 1 ? 1.06 : 1);
+    var volume = lines > 0 ? 0.032 : 0.05;
+    tone(freq, 0.09, { type: "triangle", volume: volume });
+    setTimeout(function () {
+      tone(freq * 1.335, 0.13, { type: "sine", volume: volume * 0.9 });
+    }, 55);
+  }
+  function sfxPurchase() {
+    [659.25, 880, 1174.66].forEach(function (freq, index) {
+      setTimeout(function () { tone(freq, 0.16, { type: "triangle", volume: 0.055 }); }, index * 90);
+    });
+  }
   function sfxClear(lines) {
     var notes = [523.25, 659.25, 783.99, 1046.5];
-    var count = Math.min(4, 1 + lines);
+    var count = Math.min(4, 1 + (lines || 0));
     for (var i = 0; i < count; i++) {
       (function (index) {
         setTimeout(function () {
           tone(notes[index], 0.16, { type: "triangle", volume: 0.05 });
+          tone(notes[index] * 2, 0.1, { type: "sine", volume: 0.02 });
         }, index * 65);
       })(i);
+    }
+    /* Çizgi sayısı arttıkça tiz bir "parlama" katmanı eklenir. */
+    setTimeout(function () {
+      tone(1567.98, 0.22, { type: "sine", slide: 420, volume: 0.028 + count * 0.004 });
+    }, count * 60);
+  }
+  /* Kalın, tok vuruş: satır patlamasının gövdesini duyurur. */
+  function sfxBass(lines, cross) {
+    var power = cross ? 1.3 : (lines >= 3 ? 1.2 : 1);
+    noiseBurst(cross ? 0.34 : 0.24, 0.07 * power, cross ? 1900 : 1300);
+    tone(96, 0.2, { type: "sine", slide: -34, volume: 0.13 * power });
+    tone(58, 0.32, { type: "triangle", slide: -16, volume: 0.15 * power });
+    setTimeout(function () {
+      tone(72, 0.18, { type: "sine", slide: -24, volume: 0.09 * power });
+    }, 45);
+    if (cross) {
+      setTimeout(function () {
+        tone(130, 0.26, { type: "triangle", slide: -60, volume: 0.1 });
+        tone(65, 0.36, { type: "sine", slide: -20, volume: 0.13 });
+        noiseBurst(0.28, 0.055, 2200);
+      }, 110);
     }
   }
   function sfxStart() {
@@ -162,13 +250,33 @@
     setTimeout(function () { tone(523.25, 0.14, { volume: 0.05 }); }, 100);
   }
   function sfxLose() {
-    tone(330, 0.18, { slide: -120, volume: 0.05 });
-    setTimeout(function () { tone(220, 0.28, { slide: -100, volume: 0.05 }); }, 150);
+    /* Kısa, alçalan bir "hayal kırıklığı" motifi ve tok bir kapanış. */
+    [392, 349.23, 293.66, 220].forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.24, { type: "triangle", slide: -18, volume: 0.05 });
+      }, index * 130);
+    });
+    setTimeout(function () {
+      tone(110, 0.5, { type: "sine", slide: -40, volume: 0.12 });
+      tone(55, 0.55, { type: "triangle", slide: -12, volume: 0.1 });
+      noiseBurst(0.32, 0.035, 700);
+    }, 480);
   }
   function sfxWin() {
-    [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, index) {
-      setTimeout(function () { tone(freq, 0.18, { type: "triangle", volume: 0.055 }); }, index * 100);
+    /* Zafer fanfarı: yükselen arpej, ardından parlak bir akor. */
+    var arp = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    arp.forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.2, { type: "triangle", volume: 0.055 });
+        tone(freq * 1.5, 0.16, { type: "sine", volume: 0.022 });
+      }, index * 95);
     });
+    setTimeout(function () {
+      [523.25, 659.25, 783.99, 1046.5].forEach(function (freq) {
+        tone(freq, 0.55, { type: "triangle", volume: 0.04 });
+      });
+      tone(2093, 0.4, { type: "sine", volume: 0.025 });
+    }, 500);
   }
   function sfxPenalty() {
     tone(180, 0.16, { type: "sawtooth", slide: -60, volume: 0.04 });
@@ -178,6 +286,23 @@
     [783.99, 1046.5, 1318.5].forEach(function (freq, index) {
       setTimeout(function () { tone(freq, 0.12, { type: "triangle", volume: 0.05 }); }, index * 80);
     });
+  }
+
+  /* Kalın ve tok bir sesle "Perfect" / "Great" anonsu. Tarayıcı ses
+     sentezini desteklemiyorsa sessizce yok sayılır. */
+  function speakGrade(grade) {
+    if (!app.sound || !window.speechSynthesis) return;
+    try {
+      var text = String(grade || "").replace(/[!.]/g, "").trim();
+      if (!text) return;
+      var utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-US";
+      utterance.pitch = 0.25;
+      utterance.rate = 0.9;
+      utterance.volume = 0.85;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (error) { /* ses sentezi yoksa yoksay */ }
   }
 
   /* ------------------------------------------------------------------ */
@@ -240,6 +365,8 @@
 
     initServerField();
     initHomeControls();
+    initGoogleAccount();
+    initNativeIntegrations();
     buildHeroBoard();
     bindStaticEvents();
     bindLifecycle();
@@ -249,8 +376,7 @@
     attemptSessionRejoin();
     exposeDebug();
 
-    var onlineCard = $("#online-card");
-    if (onlineCard && window.matchMedia("(min-width: 721px)").matches) onlineCard.open = true;
+    bindPlayTabs();
     window.scrollTo(0, 0);
   }
 
@@ -259,6 +385,8 @@
     if (!/[?&]test=1/.test(location.search)) return;
     window.BlokDebug = {
       start: startLocal,
+      friendCode: friendCode,
+      setFriendCode: setFriendCode,
       game: function () { return app.game; },
       send: function (message) {
         if (app.ws && app.ws.readyState === WebSocket.OPEN) app.ws.send(JSON.stringify(message));
@@ -353,6 +481,7 @@
 
   function renderHomeMeta() {
     if (!PROGRESS || !app.profile) return;
+    updatePurchaseStrip();
     var p = app.profile;
     var info = PROGRESS.levelInfo(p.xp);
     var badge = $("#level-badge");
@@ -367,32 +496,10 @@
     if (coins) coins.textContent = fmt(p.coins);
     var best = $("#stat-best");
     if (best) best.textContent = fmt(p.bestAny || 0);
-    var streak = $("#stat-streak");
-    if (streak) streak.textContent = p.dailyStreak || 0;
 
-    renderDailyCard();
     renderAchievements();
     syncSetupButtons();
-  }
-
-  function renderDailyCard() {
-    if (!PROGRESS || !app.profile) return;
-    var p = app.profile;
-    var ready = PROGRESS.dailyReady(p);
-    var streak = $("#daily-streak");
-    if (streak) streak.textContent = p.dailyStreak || 0;
-    var state = $("#daily-state");
-    if (state) {
-      state.textContent = ready
-        ? "Bugün henüz oynanmadı"
-        : "Bugün oynandı · en iyi " + fmt(p.dailyBest || 0);
-    }
-    var button = $("#play-daily");
-    if (button) {
-      button.textContent = ready ? "Bugünü oyna" : "Tekrar oyna";
-      button.classList.toggle("btn-coral", ready);
-      button.classList.toggle("btn-outline", !ready);
-    }
+    updateMatchButton();
   }
 
   function renderAchievements() {
@@ -426,11 +533,6 @@
       button.classList.toggle("on", on);
       button.setAttribute("aria-pressed", on ? "true" : "false");
     });
-    $$("#bot-level button").forEach(function (button) {
-      var on = button.dataset.bot === (app.botLevel || "normal");
-      button.classList.toggle("on", on);
-      button.setAttribute("aria-pressed", on ? "true" : "false");
-    });
   }
 
   function initHomeControls() {
@@ -442,56 +544,68 @@
         sfxPlace();
       });
     });
-    $$("#bot-level button").forEach(function (button) {
-      button.addEventListener("click", function () {
-        app.botLevel = CORE.BOT_LEVELS.indexOf(button.dataset.bot) >= 0 ? button.dataset.bot : "normal";
-        if (app.profile) { app.profile.botLevel = app.botLevel; PROGRESS.save(app.profile); }
-        syncSetupButtons();
-        sfxPlace();
+  }
+
+  /* Arkadaşınla oyna panelindeki üç yol arasında geçiş.
+     Katlanan menü yok; seçim doğrudan yapılır. */
+  function selectPlayPane(pane) {
+    var name = pane === "join" ? "join" : (pane === "match" ? "match" : "create");
+    $$(".play-tab").forEach(function (tab) {
+      var active = tab.dataset.pane === name;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+      tab.tabIndex = active ? 0 : -1;
+    });
+    $$(".play-pane").forEach(function (panel) {
+      panel.hidden = panel.id !== "pane-" + name;
+    });
+    app.playPane = name;
+    if (name === "join") {
+      var code = $("#join-code");
+      if (code) setTimeout(function () { code.focus(); }, 30);
+    }
+    return name;
+  }
+
+  function bindPlayTabs() {
+    var tabs = $$(".play-tab");
+    if (!tabs.length) return;
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener("click", function () {
+        audio();
+        selectPlayPane(tab.dataset.pane);
+      });
+      tab.addEventListener("keydown", function (event) {
+        var step = event.key === "ArrowRight" ? 1
+          : (event.key === "ArrowLeft" ? -1
+            : (event.key === "Home" ? -index
+              : (event.key === "End" ? tabs.length - 1 - index : 0)));
+        if (!step) return;
+        event.preventDefault();
+        var next = tabs[(index + step + tabs.length) % tabs.length];
+        selectPlayPane(next.dataset.pane);
+        next.focus();
       });
     });
-    var playBot = $("#play-bot");
-    if (playBot) {
-      playBot.addEventListener("click", function () {
-        audio();
-        startLocal("versus", { bot: app.botLevel || "normal", timeMode: app.timeMode });
-      });
-    }
-    var playDaily = $("#play-daily");
-    if (playDaily) {
-      playDaily.addEventListener("click", function () {
-        audio();
-        startLocal("versus", {
-          bot: "normal",
-          timeMode: "shared",
-          daily: true,
-          seed: PROGRESS.dailySeed()
-        });
-      });
-    }
+    selectPlayPane(app.playPane || "create");
   }
 
   /* APK'da sayfa file:// üzerinden açılır; sunucu adresi derlemeye gömülür. */
   function initServerField() {
-    /* Sunucu adresi artık arayüzde sorulmuyor; ayar dosyasından/derlemeden gelir.
-       Adres gömülü değilse uzaktan oyun bölümünü kapatıp nedenini yazarız. */
+    /* Sunucu adresi arayüzde sorulmuyor; ayar dosyasından/derlemeden gelir.
+       Adres gömülü değilse arkadaşla oyun bölümünü kapatıp nedenini yazarız. */
     if (location.protocol !== "file:" || serverBase()) return;
     var card = $("#online-card");
     if (!card) return;
     card.classList.add("offline-only");
-    var sub = $(".online-summary-sub", card);
-    if (sub) sub.textContent = "Bu sürümde kapalı";
     $$("button, input", card).forEach(function (el) {
       el.disabled = true;
     });
-    var body = $(".online-body", card);
-    if (body) {
-      var note = document.createElement("p");
-      note.className = "online-note";
-      note.textContent = "Bu kurulumda çevrimiçi sunucu adresi tanımlı değil. " +
-        "Aynı cihazda ve bota karşı oynamak sorunsuz çalışır.";
-      body.insertBefore(note, body.firstChild);
-    }
+    var note = document.createElement("p");
+    note.className = "online-note";
+    note.textContent = "Bu kurulumda sunucu adresi tanımlı değil. " +
+      "Tek başına ya da aynı cihazda iki kişi oynamak sorunsuz çalışır.";
+    card.insertBefore(note, card.firstChild);
   }
 
   function buildHeroBoard() {
@@ -545,9 +659,9 @@
       startClock();
     } else {
       stopClock();
-      stopBot();
       if (name === "home") renderHomeMeta();
     }
+    syncBannerVisibility();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -566,30 +680,32 @@
     app.lastAnimated = -1;
     app.lastReward = null;
     app.recordedKey = null;
-    app.daily = !!options.daily;
-    app.botLevel = options.bot ? (CORE.BOT_LEVELS.indexOf(options.bot) >= 0 ? options.bot : "normal") : null;
-    app.timeMode = CORE.TIME_MODES.indexOf(options.timeMode) >= 0 ? options.timeMode : (app.timeMode || "shared");
-    app.botThinking = false;
-    stopBot();
-    var names = app.daily
-      ? ["Sen", "Günün Botu"]
-      : (app.botLevel ? ["Sen", "Bot"] : ["Oyuncu 1", "Oyuncu 2"]);
+    var daily = mode === "daily";
+    var solo = mode === "solo" || daily;
+    if (daily && PROGRESS && app.profile && !PROGRESS.dailyReady(app.profile)) {
+      toast("Bugünün tahtasını oynadın. Tekrar denemek seriyi etkilemez.");
+    }
+    app.daily = daily;
+    app.timeMode = solo ? "none"
+      : (CORE.TIME_MODES.indexOf(options.timeMode) >= 0 ? options.timeMode : (app.timeMode || "shared"));
+    var names = solo ? ["Sen"] : ["Oyuncu 1", "Oyuncu 2"];
     app.game = new CORE.Game({
-      mode: mode,
+      mode: solo ? "solo" : (mode === "coop" ? "coop" : "versus"),
       names: names,
-      seed: options.seed,
+      /* Günün tahtası: herkes aynı tohumla aynı blok dizisini oynar. */
+      seed: daily && PROGRESS ? PROGRESS.dailySeed() : options.seed,
       turnBased: true,
       timeMode: app.timeMode
     });
     app.state = app.game.snapshot();
     app.lastSignature = stateSignature(app.state);
+    app.dirty = false;
     app.onlineAt = 0;
     showScreen("game");
     renderGame();
     startClock();
     sfxStart();
     checkResult();
-    scheduleBot();
   }
 
   /* ------------------------------------------------------------------ */
@@ -723,48 +839,6 @@
     if (whole > 0 && whole <= 5) tone(620 + (5 - whole) * 60, 0.05, { type: "square", volume: 0.02 });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* bot                                                                */
-  /* ------------------------------------------------------------------ */
-
-  function scheduleBot() {
-    stopBot();
-    var s = app.state;
-    if (app.online || !s || !app.botLevel) return;
-    if (s.phase !== "playing" || s.mode !== "versus" || !s.turnBased) return;
-    if (s.turn !== 1) return;
-    app.botThinking = true;
-    updateHint();
-    app.botTimer = setTimeout(botPlay, 650 + Math.random() * 550);
-  }
-
-  function stopBot() {
-    if (app.botTimer) {
-      clearTimeout(app.botTimer);
-      app.botTimer = null;
-    }
-    app.botThinking = false;
-  }
-
-  function botPlay() {
-    app.botTimer = null;
-    var s = app.state;
-    app.botThinking = false;
-    if (!s || app.online || s.phase !== "playing" || !app.botLevel || s.turn !== 1) return;
-    if (localPaused()) return;
-    var player = s.players[1];
-    if (!player) return;
-    var move = CORE.botMove(player.board, player.tray, app.botLevel, Math.random);
-    if (!move) {
-      if (app.game) app.game.finish(0, "Bot sıkıştı. Kazandın!");
-      app.state = app.game.snapshot();
-      renderGame();
-      checkResult();
-      return;
-    }
-    performMove(move.piece, move.row, move.col);
-  }
-
   function actorIndex() {
     var s = app.state;
     if (!s) return 0;
@@ -772,13 +846,13 @@
     return s.turn;
   }
 
-  /* Yerel bot oyununda ekran hep oyuncunun tahtasında kalır; bot kendi
-     tahtasında oynar. İki insan aynı cihazda oynarken tahta sırayla döner. */
+  /* İki insan aynı cihazda oynarken tahta sırayla döner. Tek kişilikte
+     her zaman tek tahta vardır. */
   function displayIndex() {
     var s = app.state;
     if (!s) return 0;
     if (app.online) return app.me;
-    if (s.mode === "versus" && app.botLevel) return 0;
+    if (s.mode === "solo") return 0;
     return s.turn;
   }
 
@@ -789,7 +863,7 @@
     return s.turnBased ? s.turn : (app.online ? app.me : 0);
   }
 
-  /* Hamle yapılabilir mi? (bot hamlesi de bu kapıdan geçer) */
+  /* Hamle yapılabilir mi? */
   function canAct() {
     var s = app.state;
     if (!s || s.phase !== "playing" || app.pending) return false;
@@ -798,12 +872,8 @@
     return !!s.players[app.me] && s.players[app.me].alive;
   }
 
-  /* Kullanıcı ekrana dokunabilir mi? Bot düşünürken eli tahtadan çekeriz. */
   function canPlay() {
-    if (!canAct()) return false;
-    var s = app.state;
-    if (!app.online && app.botLevel && s.mode === "versus" && s.turn !== 0) return false;
-    return true;
+    return canAct();
   }
 
   function performMove(pieceIndex, row, col) {
@@ -844,7 +914,6 @@
     app.lastSignature = stateSignature(app.state);
     renderGame();
     checkResult();
-    scheduleBot();
   }
 
   /* ------------------------------------------------------------------ */
@@ -900,7 +969,7 @@
         return reject(new Error("İnternet bağlantısı yok. Bağlanınca tekrar dene."));
       }
       if (location.protocol === "file:" && !serverBase()) {
-        return reject(new Error("Bu sürümde çevrimiçi sunucu tanımlı değil."));
+        return reject(new Error("Bu sürümde sunucu adresi tanımlı değil."));
       }
       var socket;
       try {
@@ -930,6 +999,7 @@
         clearTimeout(slowToast);
         app.reconnectAttempts = 0;
         resolve(socket);
+        syncPresence();
       });
 
       socket.addEventListener("message", handleSocketMessage);
@@ -975,6 +1045,8 @@
 
     if (message.t === "welcome") {
       app.online = true;
+      app.matching = false;
+      updateMatchButton();
       app.me = message.you;
       app.room = message.code;
       app.intentionalClose = false;
@@ -983,17 +1055,68 @@
       saveSession(message.code, message.token);
       startHeartbeat();
       applyState(message.state);
+      syncPresence();
+      if (app.inviteAfterCreate) {
+        var inviteTo = app.inviteAfterCreate;
+        app.inviteAfterCreate = null;
+        wsSend({ t: "invite", to: inviteTo, code: app.room });
+        toast("Oda kuruldu, davet gönderildi.");
+      }
+      return;
+    }
+
+    if (message.t === "presence") {
+      if (!message.ok) toast("Arkadaş kodu kaydedilemedi.");
+      return;
+    }
+
+    if (message.t === "lookup") {
+      var lookedUp = findFriend(message.code);
+      if (lookedUp) {
+        if (message.name) lookedUp.name = String(message.name).slice(0, 16);
+        lookedUp.online = !!message.online;
+        saveFriends();
+      }
+      renderFriendsSheet();
+      return;
+    }
+
+    if (message.t === "invited") {
+      toast(message.ok
+        ? (message.name ? message.name + " davet edildi." : "Davet gönderildi.")
+        : (message.message || "Davet gönderilemedi."));
+      return;
+    }
+
+    if (message.t === "invite") {
+      showInviteBanner(message);
       return;
     }
 
     if (message.t === "state") {
       app.pending = false;
+      app.matching = false;
+      updateMatchButton();
       applyState(message.state);
+      return;
+    }
+
+    if (message.t === "queued") {
+      app.matching = true;
+      updateMatchButton();
+      return;
+    }
+
+    if (message.t === "matchcancel") {
+      app.matching = false;
+      updateMatchButton();
       return;
     }
 
     if (message.t === "error") {
       app.pending = false;
+      app.matching = false;
+      updateMatchButton();
       toast(message.message || "Bir şeyler ters gitti.");
       if (/Oda kapandı|Oturum bulunamadı|Oturum geçersiz/.test(message.message || "")) {
         leaveLocalRoomState();
@@ -1028,6 +1151,11 @@
       app.heartbeat = null;
     }
     app.pending = false;
+    if (app.matching) {
+      app.matching = false;
+      updateMatchButton();
+      toast("Eşleşme bağlantısı koptu. Tekrar dene.");
+    }
     if (app.online && !app.intentionalClose) {
       if (app.screen === "lobby" || app.screen === "game") {
         toast("Bağlantı koptu. Yeniden bağlanılıyor…");
@@ -1133,6 +1261,8 @@
     app.room = null;
     app.me = 0;
     app.pending = false;
+    app.matching = false;
+    updateMatchButton();
     if (app.reconnectTimer) {
       clearTimeout(app.reconnectTimer);
       app.reconnectTimer = null;
@@ -1169,6 +1299,7 @@
     if (!code) return;
     var input = $("#join-code");
     if (input) input.value = code;
+    if (typeof selectPlayPane === "function") selectPlayPane("join");
     var panel = $(".online-card");
     if (panel && panel.scrollIntoView) {
       setTimeout(function () { panel.scrollIntoView({ behavior: "smooth", block: "center" }); }, 500);
@@ -1187,10 +1318,26 @@
       state.turn,
       state.mode,
       state.players.map(function (p) {
-        return [p.score, p.alive ? 1 : 0, p.connected ? 1 : 0, p.penalties || 0].join(":");
+        return [p.score, p.alive ? 1 : 0, p.connected ? 1 : 0, p.penalties || 0,
+          traySignature(p.tray), boardSignature(p.board)].join(":");
       }).join("|"),
-      state.shared ? state.shared.score + ":" + state.shared.combo : ""
+      state.shared ? state.shared.score + ":" + state.shared.combo + ":" +
+        traySignature(state.shared.tray) : ""
     ].join("~");
+  }
+
+  /* Tepsideki parçaların kimliği; elle değişen bir tepsi de yeniden çizilsin. */
+  function traySignature(tray) {
+    if (!tray) return "-";
+    return tray.map(function (piece) { return piece ? piece.name : "."; }).join(",");
+  }
+
+  /* Rakip tahtasındaki değişimi (rakip hamlesi, çöp satır) yakalar. */
+  function boardSignature(board) {
+    if (!board) return "-";
+    return board.map(function (row) {
+      return row.map(function (cell) { return cell ? String(cell).charAt(0) : "."; }).join("");
+    }).join("");
   }
 
   function applyState(state) {
@@ -1210,7 +1357,6 @@
       app.lastAnimated = -1;
     }
     if (app.lastAnimated > state.seq) app.lastAnimated = -1;
-    app.daily = false;
 
     var signature = stateSignature(state);
     if (signature === app.lastSignature && app.screen === "game") {
@@ -1220,6 +1366,14 @@
     }
     app.lastSignature = signature;
     app.recordedKey = null;
+    /* Parmak ekrandayken gelen güncelleme (rakip hamlesi ya da çöp satır)
+       eldeki taşı düşürmesin: yeni durumu parmak kalkınca çiz. */
+    if (app.drag) {
+      app.dirty = true;
+      updateClock();
+      updateHint();
+      return;
+    }
     renderGame();
     if (state.phase === "over") {
       checkResult();
@@ -1251,19 +1405,29 @@
         lines: s.shared ? s.shared.lines : 0,
         blocks: (s.players[0].blocks || 0) + (s.players[1].blocks || 0),
         combo: s.shared ? s.shared.combo : 0,
-        win: false, bot: false
+        win: false
       };
     }
     var human = app.online ? app.me : 0;
     var player = s.players[human] || s.players[0];
+    var solo = s.mode === "solo";
+    if (app.daily) {
+      return {
+        mode: "daily",
+        score: player.score,
+        lines: player.lines,
+        blocks: player.blocks,
+        combo: player.combo,
+        win: false
+      };
+    }
     return {
-      mode: app.daily ? "daily" : (app.botLevel ? "bot" : "versus"),
+      mode: solo ? "solo" : "versus",
       score: player.score,
       lines: player.lines,
       blocks: player.blocks,
       combo: player.combo,
-      win: s.winner === human,
-      bot: !!app.botLevel
+      win: !solo && s.winner === human
     };
   }
 
@@ -1331,6 +1495,10 @@
       top = s.phase === "over" ? "tur bitti" : "ortak skor";
       main = fmt(s.shared ? s.shared.score : 0);
       cls = s.phase === "over" ? "over" : "";
+    } else if (s.mode === "solo") {
+      top = s.phase === "over" ? "tur bitti" : "tek kişilik";
+      main = s.phase === "over" ? "skor" : "sen";
+      cls = s.phase === "over" ? "over" : "";
     } else if (s.phase === "over") {
       var tied = s.winner == null || !s.players[s.winner];
       top = tied ? "berabere" : "kazanan";
@@ -1342,10 +1510,6 @@
       top = "canlı";
       main = "ikisi de";
       cls = "live";
-    } else if (app.botLevel) {
-      top = s.turn === 1 ? "bot" : "sıra";
-      main = s.turn === 1 ? "düşünüyor" : "Sen";
-      cls = s.turn === 1 ? "thinking" : "";
     } else {
       top = "sıra";
       main = s.players[s.turn] ? s.players[s.turn].name : "—";
@@ -1355,22 +1519,24 @@
 
   function renderScoreboard() {
     var s = app.state;
-    $("#scoreboard").innerHTML =
-      scoreCardHTML(0, s) +
-      turnPillHTML(s) +
-      scoreCardHTML(1, s);
+    var board = $("#scoreboard");
+    var solo = s.mode === "solo";
+    board.classList.toggle("solo", solo);
+    board.innerHTML = solo
+      ? (scoreCardHTML(0, s) + turnPillHTML(s))
+      : (scoreCardHTML(0, s) + turnPillHTML(s) + scoreCardHTML(1, s));
   }
 
   /* ------------------------------------------------------------------ */
   /* render: tahta / tray                                                */
   /* ------------------------------------------------------------------ */
 
-  function boardHTML(board, id, owner, label) {
-    var html = '<div class="board-shell">';
+  function boardHTML(board, id, owner, label, extraClass) {
+    var html = '<div class="board-shell' + (extraClass ? " " + extraClass : "") + '">';
     if (label) {
       html += '<div class="board-label">' + label + '</div>';
     }
-    html += '<div class="board" id="' + id + '" data-board="' + owner + '" role="grid" aria-label="8 çarpı 8 oyun tahtası">';
+    html += '<div class="board' + (extraClass ? " " + extraClass : "") + '" id="' + id + '" data-board="' + owner + '" role="grid" aria-label="8 çarpı 8 oyun tahtası">';
     for (var r = 0; r < SIZE; r++) {
       for (var c = 0; c < SIZE; c++) {
         var color = board[r][c];
@@ -1402,11 +1568,81 @@
   }
 
   function trayHTML(tray, interactive, dim) {
-    var html = '<div class="tray" id="tray" aria-label="Blok seçimi">';
+    return '<div class="tray" id="tray" aria-label="Blok seçimi">' +
+      trayPiecesHTML(tray, interactive, dim) + "</div>";
+  }
+
+  function trayPiecesHTML(tray, interactive, dim) {
+    var html = "";
     for (var i = 0; i < tray.length; i++) {
       html += pieceHTML(tray[i], i, interactive, dim);
     }
-    return html + "</div>";
+    return html;
+  }
+
+  /* Tepsi yalnızca içeriği değiştiğinde yeniden kurulur. */
+  function syncTray(trayEl, tray, interactive) {
+    if (!trayEl) return;
+    var sig = traySignature(tray) + "|" + (interactive ? 1 : 0) + "|" + app.selected;
+    if (trayEl.dataset.sig === sig) return;
+    trayEl.innerHTML = trayPiecesHTML(tray, interactive);
+    trayEl.dataset.sig = sig;
+  }
+
+  /* Tahta hücrelerini yerinde boyar; 64 hücreyi her hamlede yeniden
+     oluşturmak yerine sadece rengi değişenlere dokunur. */
+  function paintBoard(boardEl, board) {
+    if (!boardEl || !board) return;
+    var cells = boardEl.children;
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        var cell = cells[r * SIZE + c];
+        if (!cell) continue;
+        var color = board[r][c];
+        var want = "cell" + (color ? " on " + colorClass(color) : "");
+        if (cell.className !== want) cell.className = want;
+      }
+    }
+  }
+
+  /* Aynı düzen korunurken yalnızca değişenleri tazeler. */
+  function syncGameLayout(s, layout, interactive) {
+    if (s.mode === "coop") {
+      paintBoard($("#board-shared"), s.shared.board);
+      var note = $("#turn-note");
+      if (note) {
+        note.innerHTML = s.phase === "over" ? '<span class="dot"></span>Tur bitti'
+          : '<span class="dot"></span>Sıra: <b>' +
+            esc(s.players[s.turn] ? s.players[s.turn].name : "—") + '</b>' +
+            (s.shared.combo > 1 ? ' · combo ×' + s.shared.combo : "");
+      }
+      syncTray($("#tray"), s.shared.tray, interactive);
+      return;
+    }
+    if (layout.indexOf("online-") === 0) {
+      var me = s.players[app.me];
+      var rival = s.players[1 - app.me];
+      paintBoard($("#board-me"), me.board);
+      if (rival) paintBoard($("#board-rival"), rival.board);
+      var onlineNote = $("#turn-note");
+      if (onlineNote) {
+        onlineNote.innerHTML = s.phase === "over" ? '<span class="dot"></span>Tur bitti'
+          : '<span class="dot"></span>İkiniz de aynı anda oynuyorsunuz' +
+            (me.combo > 1 ? ' · combo ×' + me.combo : "");
+      }
+      syncTray($("#tray"), me.tray, interactive);
+      var peerStats = $(".peer-stats");
+      if (peerStats && rival) {
+        peerStats.innerHTML = '<b>' + fmt(rival.score) + '</b> puan<span>' + rival.lines + ' satır</span>';
+      }
+      return;
+    }
+    var activeIndex = displayIndex();
+    var activePlayer = s.players[activeIndex];
+    if (activePlayer) {
+      paintBoard($("#board-" + activeIndex), activePlayer.board);
+      syncTray($("#tray"), activePlayer.tray, interactive);
+    }
   }
 
   function renderGame() {
@@ -1417,12 +1653,17 @@
       app.selected = null;
       app.cursor = null;
     }
+    app.rendering = true;
     cancelDrag();
+    app.rendering = false;
     hidePreview();
     renderScoreboard();
-
     var table = $("#table-area");
     var interactive = canPlay();
+    var layout = s.mode === "coop"
+      ? "coop"
+      : (app.online ? "online-" + app.me
+        : "local-" + displayIndex() + "-" + (s.mode === "solo" ? "solo" : "versus"));
     var html = "";
 
     if (s.mode === "coop") {
@@ -1430,7 +1671,7 @@
       var turnPlayer = s.players[s.turn];
       html += boardHTML(shared.board, "board-shared", "shared", 'Ortak tahta <span class="you">paylaşımlı</span>');
       html += '<div class="tray-wrap">';
-      html += '<div class="turn-note">' +
+      html += '<div class="turn-note" id="turn-note">' +
         (s.phase === "over" ? '<span class="dot"></span>Tur bitti' :
           '<span class="dot"></span>Sıra: <b>' + esc(turnPlayer ? turnPlayer.name : "—") + '</b>' +
           (shared.combo > 1 ? ' · combo ×' + shared.combo : "")) +
@@ -1441,15 +1682,15 @@
       var activeIndex = displayIndex();
       var activePlayer = s.players[activeIndex];
       var activeColor = activeIndex === 0 ? "var(--coral)" : "var(--cobalt)";
-      var waitingBot = app.botLevel && s.turn !== activeIndex;
+      var statusText = s.phase === "over" ? "tur bitti"
+        : (s.mode === "solo" ? "tek kişilik" : "sıra sende");
       html += '<div class="vs-local">';
       html += boardHTML(
         activePlayer.board,
         "board-" + activeIndex,
         "active",
         '<span class="score-dot" style="background:' + activeColor + '"></span>' +
-        esc(activePlayer.name) + ' <span class="you">' +
-          (s.phase === "over" ? "tur bitti" : (waitingBot ? "bot oynuyor" : "sıra sende")) + '</span>'
+        esc(activePlayer.name) + ' <span class="you">' + statusText + '</span>'
       );
       html += '<div class="tray-wrap">';
       html += trayHTML(activePlayer ? activePlayer.tray : [], interactive);
@@ -1457,24 +1698,58 @@
       html += '</div>';
     } else {
       var me = s.players[app.me];
+      var rivalIndex = 1 - app.me;
+      var rival = s.players[rivalIndex];
+      html += '<div class="online-versus">';
+      html += '<div class="versus-main">';
       html += boardHTML(me.board, "board-me", String(app.me), 'Senin tahtan <span class="you">sen</span>');
       html += '<div class="tray-wrap">';
-      html += '<div class="turn-note">' +
+      html += '<div class="turn-note" id="turn-note">' +
         (s.phase === "over" ? '<span class="dot"></span>Tur bitti' :
           '<span class="dot"></span>İkiniz de aynı anda oynuyorsunuz' +
           (me.combo > 1 ? ' · combo ×' + me.combo : "")) +
         '</div>';
       html += trayHTML(me.tray, interactive);
       html += '</div>';
+      html += '</div>';
+      if (rival) {
+        html += '<aside class="peer-panel" aria-label="Rakip tahtası">';
+        html += '<div class="peer-head"><span class="score-dot"></span><span>' + esc(rival.name) + '</span></div>';
+        html += boardHTML(rival.board, "board-rival", String(rivalIndex), "", "peer readonly");
+        html += '<div class="peer-stats"><b>' + fmt(rival.score) + '</b> puan<span>' +
+          rival.lines + ' satır</span></div>';
+        html += '</aside>';
+      }
+      html += '</div>';
     }
 
-    table.innerHTML = html;
-    bindGameEvents();
+    if (table.dataset.layout !== layout) {
+      table.dataset.layout = layout;
+      table.innerHTML = html;
+      bindGameEvents();
+    } else {
+      syncGameLayout(s, layout, interactive);
+    }
     updateHint();
     animateLastMove();
     updateClock();
     updateRoomChrome();
-    scheduleBot();
+  }
+
+  /* Oyun sonu açıklamasını, kazanan sensen ikinci kişiye çevirir:
+     "Ada kazandı" yerine "Kazandın". */
+  function personalReason(s) {
+    var reason = String((s && s.reason) || "");
+    if (!reason || !s || s.mode !== "versus" || s.winner == null) return reason;
+    var human = app.online ? app.me : 0;
+    if (s.winner !== human) return reason;
+    var player = s.players && s.players[human];
+    var name = player ? String(player.name || "") : "";
+    if (!name) return reason;
+    var text = reason.split(name + " kazandı").join("Kazandın");
+    if (text === reason && name === "Sen") text = reason.split("Sen kazandı").join("Kazandın");
+    if (text !== reason && !/[.!]$/.test(text)) text += "!";
+    return text;
   }
 
   function updateHint() {
@@ -1488,15 +1763,11 @@
     restart.textContent = app.online ? "Yeniden başlat" : "Yeniden oyna";
 
     if (s.phase === "over") {
-      hint.textContent = s.reason || "Tur bitti.";
+      hint.textContent = personalReason(s) || "Tur bitti.";
       return;
     }
-    if (app.daily) {
-      hint.textContent = app.botThinking ? "Günün botu oynuyor…" : "Günün tahtası · satırları patlat, süre kazan.";
-      return;
-    }
-    if (app.botThinking) {
-      hint.textContent = "Bot düşünüyor…";
+    if (s.mode === "solo") {
+      hint.textContent = "Tek kişilik · satırları patlat, tahta dolana kadar dayan.";
       return;
     }
     if (s.mode === "coop") {
@@ -1524,6 +1795,7 @@
       tray.addEventListener("keydown", onTrayKeyDown);
     }
     $$(".board").forEach(function (boardEl) {
+      if (boardEl.classList.contains("readonly")) return;
       boardEl.addEventListener("pointermove", onBoardPointerMove);
       boardEl.addEventListener("pointerleave", function () {
         if (!app.drag) hidePreview();
@@ -1608,6 +1880,9 @@
 
   function onTrayPointerDown(event) {
     if (!canPlay()) return;
+    /* Aynı anda iki parmak: süren sürüklemeyi ikinci parmak ele geçirmesin.
+       Bu, aynı cihazda iki kişi oynarken ikinci oyuncunun hamlesini yutuyordu. */
+    if (app.drag) return;
     var pieceEl = event.target.closest(".piece");
     if (!pieceEl || pieceEl.classList.contains("empty") || pieceEl.classList.contains("dead")) return;
     event.preventDefault();
@@ -1721,6 +1996,7 @@
   function onDragMove(event) {
     var drag = app.drag;
     if (!drag) return;
+    if (event.pointerId !== drag.pointerId) return;
     if (event.cancelable) event.preventDefault();
     if (drag.moved && drag.lastX === event.clientX && drag.lastY === event.clientY) return;
     drag.lastX = event.clientX;
@@ -1780,8 +2056,9 @@
     }
   }
 
-  function onDragEnd() {
+  function onDragEnd(event) {
     var drag = app.drag;
+    if (drag && event && event.pointerId != null && event.pointerId !== drag.pointerId) return;
     window.removeEventListener("pointermove", onDragMove);
     window.removeEventListener("pointerup", onDragEnd);
     window.removeEventListener("pointercancel", onDragEnd);
@@ -1790,6 +2067,7 @@
     hidePreview();
     var target = drag.target;
     app.drag = null;
+    flushDirty();
     if (drag.moved && target && target.valid) {
       performMove(drag.index, target.row, target.col);
     } else if (!drag.moved) {
@@ -1801,6 +2079,15 @@
     }
   }
 
+  /* Sürükleme sırasında ertelenen durum çizimini şimdi uygula. */
+  function flushDirty() {
+    if (!app.dirty || app.rendering) return;
+    app.dirty = false;
+    if (app.screen !== "game") return;
+    renderGame();
+    if (app.state && app.state.phase === "over") checkResult();
+  }
+
   function cancelDrag() {
     if (!app.drag) return;
     window.removeEventListener("pointermove", onDragMove);
@@ -1810,6 +2097,7 @@
     if (app.drag.ghost && app.drag.ghost.parentNode) app.drag.ghost.parentNode.removeChild(app.drag.ghost);
     app.drag = null;
     hidePreview();
+    flushDirty();
   }
 
   function activeBoardEl() {
@@ -1934,10 +2222,12 @@
     if (s.seq <= app.lastAnimated) return;
     app.lastAnimated = s.seq;
     var last = s.lastMove;
+    if (last.points > 0) sfxPoints(last.points, last.combo || 0, last.lines || 0);
     var owner = s.mode === "coop" ? "shared" : (app.online ? String(last.by) : "active");
     var boardEl = document.querySelector('[data-board="' + owner + '"]');
-    /* Botun hamlesi oyuncunun tahtasında oynatılmasın. */
-    if (boardEl && s.mode === "versus" && !app.online && last.by !== displayIndex()) boardEl = null;
+    /* Aynı cihazdaki iki insan oyununda sıra döndüğü için önceki tahta artık
+       çizili değil; tek kişilikte her zaman aynı tahta ekranda. */
+    if (boardEl && !app.online && s.mode === "versus" && last.by !== s.turn) boardEl = null;
     if (boardEl) {
       last.placed.forEach(function (cell) {
         var el = boardEl.children[cell[0] * SIZE + cell[1]];
@@ -1958,35 +2248,71 @@
     }
 
     if (last.lines > 0) {
+      var cross = (last.rows && last.rows.length) && (last.cols && last.cols.length);
+      var grade = cross || last.lines >= 3 ? "PERFECT!"
+        : (last.lines === 2 ? "GREAT!" : "GOOD!");
+      var gradeClass = cross || last.lines >= 3 ? "perfect"
+        : (last.lines === 2 ? "great" : "good");
       sfxClear(last.lines);
-      if (app.vibrate && FX) FX.vibrate(last.lines > 1 ? [18, 35, 18] : 14);
+      sfxBass(last.lines, !!cross);
+      if (app.vibrate && FX) {
+        FX.vibrate(cross ? [22, 30, 22, 30, 34] : (last.lines > 1 ? [18, 35, 18] : 14));
+      }
+      if (FX) {
+        FX.screenShake(cross ? 3 : (last.lines >= 2 ? 2 : 1));
+        FX.flash(cross ? "cross" : (last.lines >= 2 ? "great" : "good"));
+        FX.pulse($("#scoreboard"));
+      }
+      if (gradeClass === "perfect" || gradeClass === "great") speakGrade(grade);
       if (FX && boardEl) {
         var rect = boardEl.getBoundingClientRect();
         var pitch = rect.width / SIZE;
         var cells = last.cleared && last.cleared.length ? last.cleared : [];
-        if (cells.length > 18) cells = cells.slice(0, 18);
-        cells.forEach(function (cell) {
+        var cellColors = last.clearedColors || [];
+        /* Patlama merkezden dışa doğru yayılsın: hücrenin merkeze uzaklığı
+           gecikmeyi belirler. Böylece satır/sütun bir dalga gibi dağılır. */
+        var midRow = (SIZE - 1) / 2;
+        var midCol = (SIZE - 1) / 2;
+        cells.forEach(function (cell, index) {
           var cx = rect.left + (cell[1] + 0.5) * pitch;
           var cy = rect.top + (cell[0] + 0.5) * pitch;
-          FX.burst(cx, cy, last.piece.color, 5, 0.7);
-          if (Math.random() < 0.3) FX.burst(cx, cy, "mustard", 2, 0.9);
+          var colorName = cellColors[index] || last.piece.color || "coral";
+          var distance = Math.sqrt(Math.pow(cell[0] - midRow, 2) + Math.pow(cell[1] - midCol, 2));
+          var delay = Math.min(240, distance * 22);
+          FX.ghostCell(cx, cy, pitch * 1.02, colorName, delay);
+          FX.debris(cx, cy, [colorName, "paper"], cross ? 9 : 6,
+            cross ? 1.1 : 0.8, pitch * 0.52, delay / 1000);
+          if (Math.random() < 0.35) FX.burst(cx, cy, "mustard", 2, 0.9);
         });
-        FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.38,
+        /* Patlama merkezine (kesişim varsa oraya) geniş şok dalgası. */
+        if (last.rows && last.rows.length && last.cols && last.cols.length) {
+          var hitX = rect.left + (last.cols[0] + 0.5) * pitch;
+          var hitY = rect.top + (last.rows[0] + 0.5) * pitch;
+          FX.shockwave(hitX, hitY, "mustard", pitch * 0.4, pitch * 3.2, 0.55);
+          FX.shockwave(hitX, hitY, "coral", pitch * 0.2, pitch * 2.2, 0.42);
+        } else if (cells.length) {
+          var first = cells[0];
+          FX.shockwave(rect.left + (first[1] + 0.5) * pitch,
+            rect.top + (first[0] + 0.5) * pitch, "paper", pitch * 0.5, pitch * 2.4, 0.45);
+        }
+        FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.28,
+          grade, gradeClass);
+        FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.42,
           "+" + last.points, "points");
         if (last.timeBonus) {
-          FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.5,
+          FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.55,
             "+" + last.timeBonus + " sn", "time");
         }
-        if (last.lines >= 2) FX.shake(boardEl);
-        if (last.lines >= 3) FX.confetti();
         if (last.combo > 1) {
-          FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.62,
+          FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.67,
             "COMBO ×" + last.combo, "combo");
         }
+        if (last.lines >= 2) FX.shake(boardEl);
+        if (cross || last.lines >= 3) FX.confetti();
       }
-      if (last.lines > 1 || last.combo > 1) {
-        toast("+" + last.points + " · " + last.lines + " satır" + (last.combo > 1 ? " · combo ×" + last.combo : ""));
-      }
+      toast(grade + " +" + last.points + " · " + last.lines + " çizgi" +
+        (cross ? " · satır + sütun" : "") +
+        (last.combo > 1 ? " · combo ×" + last.combo : ""));
     } else {
       sfxPlace();
       if (app.vibrate && FX) FX.vibrate(5);
@@ -2067,14 +2393,26 @@
   /* modallar                                                            */
   /* ------------------------------------------------------------------ */
 
-  function openOverlay(innerHTML, closable) {
+  function openOverlay(innerHTML, closable, variant) {
     var overlay = $("#overlay");
     var sheet = $(".sheet", overlay);
+    sheet.className = "sheet" + (variant ? " " + variant : "");
     sheet.innerHTML = innerHTML;
+    /* iletişim kutusu başlığı aria-labelledby ile eşleşsin */
+    var heading = sheet.querySelector("h2");
+    if (heading) {
+      if (!heading.id) heading.id = "overlay-title";
+      sheet.setAttribute("aria-labelledby", heading.id);
+    } else {
+      sheet.removeAttribute("aria-labelledby");
+      sheet.setAttribute("aria-label", "Oyun penceresi");
+    }
     overlay.hidden = false;
     app.overlayClosable = closable !== false;
+    app.overlayReturnFocus = document.activeElement;
     document.body.style.overflow = "hidden";
     hideToast();
+    syncBannerVisibility();
     var first = sheet.querySelector("[data-autofocus]") || sheet.querySelector("button");
     if (first) setTimeout(function () { first.focus(); }, 30);
   }
@@ -2084,24 +2422,79 @@
     overlay.hidden = true;
     $(".sheet", overlay).innerHTML = "";
     document.body.style.overflow = "";
+    /* Pencereyi açan öğeye odağı geri ver: klavye kullanıcısı kaybolmasın. */
+    var back = app.overlayReturnFocus;
+    app.overlayReturnFocus = null;
+    if (back && back.focus && document.contains(back)) {
+      try { back.focus(); } catch (error) { /* yoksay */ }
+    }
     resumeLocal();
+    flushPendingInterstitial();
+    syncBannerVisibility();
   }
 
   function showHelp() {
     openOverlay(
       '<span class="result-badge">Kurallar</span>' +
-      '<h2>İki kişilik blok</h2>' +
+      '<h2>Blok oyunu</h2>' +
       '<p class="sheet-sub">Her turda üç blok gelir. Blokları 8×8 tahtaya sürükle; satır ya da sütun tamamlanınca patlar. Üç blok bitmeden yenisi gelmez.</p>' +
       '<ul class="help-list">' +
+        '<li><b>Tek kişilik</b><span>Kendi tahtanda oynarsın. Tahta tıkanana kadar dayan ve rekorunu yükselt.</span></li>' +
         '<li><b>Ortak tahta</b><span>Tek tahta, tek skor. Sırayla oynarsınız; herkesin katkısı ayrı sayılır. Tahta tıkanınca tur biter.</span></li>' +
         '<li><b>Rakip</b><span>Herkesin kendi tahtası, aynı blok sırası. Tahtası dolan oyuncu kaybeder. İki satır birden patlatırsan rakibin tahtasına çöp satır itersin.</span></li>' +
         '<li><b>Süre</b><span>Ortak sayaçta süre bitince yüksek skor kazanır. Sıra sayacında süre dolarsa −15 puan ceza alır ve sıra geçer. Satır patlatmak süre kazandırır.</span></li>' +
         '<li><b>Combo</b><span>Üst üste satır patlatırsan puan çarpanı yükselir; üçlü patlatma daha çok süre verir.</span></li>' +
-        '<li><b>Günün tahtası</b><span>Her gün aynı blok dizisi. Bir tur oyna, seriyi sürdür, bonus coin kazan.</span></li>' +
-        '<li><b>Uzaktan</b><span>Oda kur, 5 haneli kodu paylaş. İki oyuncu da aynı sunucuya bağlanır.</span></li>' +
+        '<li><b>Arkadaşınla</b><span>Oda kurup 5 haneli kodu paylaş ya da <b>Rastgele eşleş</b> ile aynı anda bekleyen biriyle hemen oyna.</span></li>' +
+        '<li><b>Klavye</b><span><b>Enter</b> ya da <b>Boşluk</b> ile blok seç; <b>ok tuşlarıyla</b> tahtada gez ve <b>Enter</b> ile bırak. <b>Esc</b> seçimi iptal eder.</span></li>' +
       '</ul>' +
       '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Anladım</button></div>'
     );
+  }
+
+  /* Dil seçici: cihaz dili otomatik seçilir; buradaki seçim kalıcıdır. */
+  function showLanguageSheet() {
+    var i18n = window.BlokI18n;
+    if (!i18n) {
+      toast("Dil desteği yüklenemedi.");
+      return;
+    }
+    var current = i18n.getLang();
+    var manual = false;
+    try { manual = !!localStorage.getItem("blokara.lang.manual") && !!localStorage.getItem("blokara.lang"); } catch (error) { manual = false; }
+    var html = '<span class="result-badge">Dil</span>' +
+      '<h2>Dil seç</h2>' +
+      '<p class="sheet-sub">Oyun cihazının dilini otomatik kullanır. Buradan istediğin dili seçebilirsin.</p>' +
+      '<div class="lang-grid" role="listbox" aria-label="Diller">' +
+      '<button class="lang-pick' + (manual ? "" : " is-active") + '" type="button" role="option"' +
+      ' aria-selected="' + (manual ? "false" : "true") + '" data-lang-auto data-autofocus>Otomatik (cihaz dili)</button>';
+    i18n.LANGS.forEach(function (item) {
+      var active = manual && item.code === current;
+      html += '<button class="lang-pick' + (active ? " is-active" : "") + '" type="button" role="option"' +
+        ' aria-selected="' + (active ? "true" : "false") + '" data-lang="' + item.code + '"' +
+        ' lang="' + item.code + '">' + esc(item.native) + '</button>';
+    });
+    html += '</div>' +
+      '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Kapat</button></div>';
+    openOverlay(html, true, "langs");
+    var autoBtn = $("[data-lang-auto]", $("#overlay"));
+    if (autoBtn) autoBtn.addEventListener("click", function () {
+      i18n.auto();
+      finishLanguageChange();
+    });
+    $$("[data-lang]", $("#overlay")).forEach(function (button) {
+      button.addEventListener("click", function () {
+        i18n.setLang(button.dataset.lang);
+        finishLanguageChange();
+      });
+    });
+  }
+
+  /* Dil değişince üretilen dinamik metinleri tazele. */
+  function finishLanguageChange() {
+    closeOverlay();
+    renderHomeMeta();
+    updateSoundButton();
+    if (app.state && app.screen === "game") renderGame();
   }
 
   function timeModeLabel(mode) {
@@ -2113,26 +2506,37 @@
   function showResult(reward) {
     var s = app.state;
     if (!s) return;
+    refreshAdsState();
     var coop = s.mode === "coop";
+    var solo = s.mode === "solo";
+    var daily = !!app.daily;
+    var localVersus = !app.online && !coop && !solo;
     var winner = s.winner;
     var human = app.online ? app.me : 0;
-    var won = winner === human;
+    var won = !solo && winner === human;
     var badge;
     var title;
     if (coop) {
       badge = "ortak tur";
       title = "Tur bitti";
+    } else if (daily) {
+      badge = "günün tahtası";
+      title = reward && reward.newRecord ? "Yeni rekor!" : "Günün tahtası bitti";
+    } else if (solo) {
+      badge = "tek kişilik";
+      title = reward && reward.newRecord ? "Yeni rekor!" : "Tur bitti";
     } else if (winner != null && s.players[winner]) {
-      badge = won ? "kazandın" : "kaybettin";
-      title = s.players[winner].name + " kazandı";
+      /* Aynı cihazda iki insan oynarken kazanan her zaman "sen" değildir;
+         o yüzden "kaybettin" yerine kazananın adı gösterilir. */
+      badge = localVersus ? (won ? "kazandın" : "tur bitti") : (won ? "kazandın" : "kaybettin");
+      title = won ? "Kazandın!" : s.players[winner].name + " kazandı";
     } else {
       badge = "tur bitti";
       title = "Berabere";
     }
-    if (app.daily) badge = "günün tahtası";
 
     var rows = s.players.map(function (player, index) {
-      var isWinner = !coop && winner === index;
+      var isWinner = !coop && !solo && winner === index;
       return '<div class="result-row' + (isWinner ? " win" : "") + '">' +
         '<span class="rname"><span class="score-dot" style="background:' +
           (index === 0 ? "var(--coral)" : "var(--cobalt)") + '"></span><span>' + esc(player.name) + '</span></span>' +
@@ -2146,6 +2550,19 @@
       meta += '<span>' + s.shared.lines + ' satır</span>';
       meta += '<span>' + s.shared.blocks + ' blok tahtada</span>';
       if (s.shared.combo > 1) meta += '<span>Son combo ×' + s.shared.combo + '</span>';
+    } else if (daily) {
+      var today = s.players[0] || { lines: 0, moves: 0 };
+      meta += '<span>' + today.lines + ' satır</span>';
+      meta += '<span>' + (today.moves || 0) + ' hamle</span>';
+      if (app.profile) {
+        meta += '<span>' + (app.profile.dailyStreak || 0) + ' günlük seri</span>';
+        meta += '<span>En iyi ' + fmt(app.profile.dailyBest || 0) + '</span>';
+      }
+    } else if (solo) {
+      var only = s.players[0] || { lines: 0, moves: 0 };
+      meta += '<span>' + only.lines + ' satır</span>';
+      meta += '<span>' + (only.moves || 0) + ' hamle</span>';
+      meta += '<span>Tek kişilik</span>';
     } else {
       meta += '<span>' + s.players[0].lines + ' + ' + s.players[1].lines + ' satır</span>';
       meta += '<span>' + ((s.players[0].moves || 0) + (s.players[1].moves || 0)) + ' hamle</span>';
@@ -2160,11 +2577,6 @@
       if (reward.newRecord) rewardHTML += '<span class="reward-badge">yeni rekor</span>';
       if (reward.levelUp) rewardHTML += '<span class="reward-badge level">seviye ' + reward.levelAfter + '</span>';
       rewardHTML += '</div>';
-      if (reward.daily && reward.daily.newDay) {
-        rewardHTML += '<p class="result-note daily-note">Günün tahtası tamam · ' +
-          reward.daily.streak + ' günlük seri' +
-          (reward.daily.bonus ? " · +" + reward.daily.bonus + " bonus coin" : "") + '</p>';
-      }
       if (reward.unlocked && reward.unlocked.length) {
         rewardHTML += '<div class="reward-unlock"><span class="tiny">Yeni başarım</span>' +
           reward.unlocked.map(function (item) {
@@ -2175,24 +2587,44 @@
 
     var canRematch = !app.online || app.me === s.host;
     var action = canRematch
-      ? '<button class="btn btn-coral" type="button" data-rematch data-autofocus>' +
-        (app.daily ? "Yeniden oyna" : "Yeniden oyna") + '</button>'
+      ? '<button class="btn btn-coral" type="button" data-rematch data-autofocus>Yeniden oyna</button>'
       : '<p class="result-note">Yeniden başlatmayı oda sahibi yapar.</p>';
+    var doubleCoins = "";
+    if (ads.rewarded && reward && reward.coins > 0) {
+      doubleCoins = '<button class="btn btn-outline" type="button" data-double-coins>' +
+        'Reklam izle, 2× coin</button>';
+    }
 
     var rejoinNote = app.online && s.players.some(function (p) { return !p.connected; })
       ? '<p class="result-note">Bir oyuncunun bağlantısı yok. Yeniden başlatmak için iki oyuncu da bağlı olmalı.</p>'
       : "";
 
-    var tie = !coop && (winner == null || !s.players[winner]);
+    var tie = !coop && !solo && (winner == null || !s.players[winner]);
     var sub = coop
       ? '<p class="sheet-sub">Birlikte ' + fmt(s.shared.score) + ' puana ulaştınız.</p>'
-      : (app.botLevel
-        ? '<p class="sheet-sub">' + (tie ? "Skorlar eşit; tur berabere bitti." : (won ? "Botu geçtin." : "Bot bu turu aldı.")) +
-          (app.daily ? " Günün tahtası sayıldı." : "") + '</p>'
-        : '<p class="sheet-sub">' + (tie ? "Skorlar eşit; tur berabere bitti." : (won ? "Rakibinin tahtası doldu." : "Tahtan doldu.")) + '</p>');
+      : (solo
+        ? (daily
+          ? '<p class="sheet-sub"><span>Günün tahtasında ' + fmt(s.players[0] ? s.players[0].score : 0) + ' puan topladın.</span> ' +
+            (reward && reward.daily && reward.daily.newDay
+              ? '<span>Serin ' + reward.daily.streak + ' gün oldu.</span>'
+              : '<span>Yarın yeni tahta seni bekliyor.</span>') + '</p>'
+          : '<p class="sheet-sub"><span>' + fmt(s.players[0] ? s.players[0].score : 0) + ' puan topladın.</span> ' +
+            (reward && reward.newRecord ? '<span>Bu senin yeni rekorun.</span>' : '<span>Tekrar dene, daha yükseğe çık.</span>') + '</p>')
+        : '<p class="sheet-sub">' + (tie
+          ? "Skorlar eşit; tur berabere bitti."
+          : (localVersus
+            ? (won ? "Rakibinin tahtası doldu." : s.players[winner].name + " tahtası daha uzun dayandı.")
+            : (won ? "Rakibinin tahtası doldu." : "Tahtan doldu."))) + '</p>');
+
+    var isWin = coop || (solo
+      ? !!(reward && reward.newRecord)
+      : (winner != null && won));
+    var isLose = !isWin && !tie && !localVersus && (solo || winner != null);
+    var variant = isWin ? "win" : (isLose ? "lose" : "");
 
     openOverlay(
-      '<span class="result-badge' + (coop ? "" : (won ? "" : " lost")) + '">' + badge + '</span>' +
+      (isWin ? '<span class="result-rays" aria-hidden="true"></span>' : "") +
+      '<span class="result-badge' + ((coop || solo || localVersus) ? "" : (won ? "" : " lost")) + '">' + badge + '</span>' +
       '<h2>' + esc(title) + '</h2>' +
       sub +
       '<div class="result-scores">' + rows + '</div>' +
@@ -2201,14 +2633,26 @@
       (s.reason ? '<p class="result-note">' + esc(s.reason) + '</p>' : "") +
       rejoinNote +
       '<div class="sheet-actions">' +
+        doubleCoins +
         action +
         '<button class="btn btn-outline" type="button" data-close>Tahtaya bak</button>' +
         '<button class="btn btn-ghost" type="button" data-home>Ana menü</button>' +
       '</div>',
-      true
+      true,
+      variant
     );
+    app.interstitialPending = true;
     if (s.phase === "over") {
-      if (won || coop) sfxWin(); else sfxLose();
+      if (isWin) {
+        if (FX) FX.victory();
+        sfxWin();
+        if (app.vibrate && FX) FX.vibrate([0, 28, 40, 32, 70]);
+        setTimeout(function () { if (app.sound && isWin) sfxReward(); }, 620);
+      } else if (isLose) {
+        if (FX) FX.defeat();
+        sfxLose();
+        if (app.vibrate && FX) FX.vibrate([0, 45, 70, 45]);
+      }
     }
   }
 
@@ -2222,14 +2666,18 @@
     openOverlay(
       '<span class="result-badge">Duraklat</span>' +
       '<h2>Oyun menüsü</h2>' +
-      '<p class="sheet-sub">' + (online ? 'Oda <b>' + esc(app.room || "") + '</b> · ' + modeName(s.mode) + ' · Online' : modeName(s.mode) + ' · Aynı cihaz') + '</p>' +
+      '<p class="sheet-sub">' + (online
+        ? 'Oda <b>' + esc(app.room || "") + '</b> · <span>' + modeName(s.mode) + '</span> · <span>Arkadaşınla</span>'
+        : '<span>' + modeName(s.mode) + '</span> · <span>Aynı cihaz</span>') + '</p>' +
       (info ? '<p class="result-note">Seviye ' + info.level + ' · ' + fmt(app.profile.coins) + ' coin · ' + fmt(app.profile.bestAny || 0) + ' rekor</p>' : '') +
       (online && s.timeMode && s.timeMode !== "none"
-        ? '<p class="result-note">Çevrimiçi oyunda süre menü açıkken de işler.</p>'
+        ? '<p class="result-note">Oda oyununda süre menü açıkken de işler.</p>'
         : '') +
       '<div class="sheet-actions">' +
         (canRestart ? '<button class="btn btn-coral" type="button" data-restart>' + restartLabel + '</button>' : '') +
+        '<button class="btn btn-outline" type="button" data-lang-sheet>Dil değiştir</button>' +
         '<button class="btn btn-outline" type="button" data-help>Nasıl oynanır?</button>' +
+        '<button class="btn btn-outline" type="button" data-rename>Adı değiştir</button>' +
         '<button class="btn btn-outline" type="button" data-sound>' + (app.sound ? "Sesi kapat" : "Sesi aç") + '</button>' +
         '<button class="btn btn-outline" type="button" data-vibrate>' + (app.vibrate ? "Titreşimi kapat" : "Titreşimi aç") + '</button>' +
         '<button class="btn btn-ghost" type="button" data-reset-progress>İlerlemeyi sıfırla</button>' +
@@ -2265,6 +2713,27 @@
     if (app.overlayClosable) closeOverlay();
   }
 
+  /* Açık pencerede Tab odağını pencerenin içinde tutar. */
+  function trapOverlayFocus(event) {
+    var sheet = $(".sheet", $("#overlay"));
+    if (!sheet) return;
+    var items = $$("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])", sheet)
+      .filter(function (el) {
+        return !el.disabled && el.offsetParent !== null && el.getAttribute("aria-hidden") !== "true";
+      });
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    var active = document.activeElement;
+    if (event.shiftKey && (active === first || !sheet.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !sheet.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   /* ------------------------------------------------------------------ */
   /* toast                                                              */
   /* ------------------------------------------------------------------ */
@@ -2296,15 +2765,718 @@
   function playerName() {
     var input = $("#player-name");
     var value = input ? input.value.trim() : "";
+    /* Hesap bağlıysa ad alanı gizli olabilir; hesap adına düş. */
+    if (!value && googleAccount.profile) value = googleAccount.profile.name.slice(0, 16);
     if (value) save(LS_NAME, value);
     return value;
   }
 
-  /* Sunucu sorununda uzaktan oyun bölümünü açar (adres alanı yok; adres gömülü). */
+  /* ------------------------------------------------------------------ */
+  /* Google hesabı                                                       */
+  /* ------------------------------------------------------------------ */
+
+  var googleAccount = {
+    clientId: "",
+    ready: false,
+    configured: false,
+    attempted: false,
+    profile: null,
+    native: false
+  };
+
+  /* Android yerel köprüleri (Play Games + AdMob). Web'de boş kalır. */
+  var playGames = { available: false, player: null };
+  var ads = {
+    available: false,
+    rewarded: false,
+    banner: false,
+    shown: 0,
+    pendingCoins: 0,
+    pendingKey: null,
+    grantedKey: null,
+    free: read(LS_ADS_FREE) === "1",
+    billing: false,
+    bannerShown: false
+  };
+
+  /* Sunucu adresini (APK'da gömülü adres, webde aynı köken) koruyarak yol üretir. */
+  function apiUrl(pathname) {
+    var base = serverBase();
+    return (base || "") + pathname;
+  }
+
+  /* Yalnızca çevrimdışı yedek için: jetonun okunabilir alanları.
+     Asıl doğrulama sunucuda imza kontrolüyle yapılır. */
+  function decodeIdToken(token) {
+    try {
+      var part = String(token).split(".")[1] || "";
+      var binary = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+      var escaped = "";
+      for (var i = 0; i < binary.length; i++) {
+        escaped += "%" + ("00" + binary.charCodeAt(i).toString(16)).slice(-2);
+      }
+      return JSON.parse(decodeURIComponent(escaped));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function loadSavedAccount() {
+    var raw = read(LS_GOOGLE);
+    if (!raw) return null;
+    try {
+      var data = JSON.parse(raw);
+      if (data && data.name) return data;
+    } catch (error) { /* bozuk kayıt: yoksay */ }
+    return null;
+  }
+
+  function accountInitial(name) {
+    var text = String(name || "").trim();
+    return text ? text.charAt(0).toUpperCase() : "?";
+  }
+
+  /* Misafir ad alanının yanındaki "Giriş yap" düğmesi. Oturum açıkken
+     gizlenir; giriş yolu yoksa dokununca bilgi verir. */
+  function applyNameSignInButton() {
+    var button = $("#name-signin");
+    if (!button) return;
+    button.hidden = !!googleAccount.profile;
+    button.textContent = "Giriş yap";
+    button.setAttribute("aria-label", playGames.available
+      ? "Play Games ile giriş yap"
+      : "Google ile giriş yap");
+  }
+
+  /* Hesap bağlıysa ad alanını gizle: ad otomatik gelir, isteyen "Adı
+     değiştir" ile açar. Misafirde alan her zaman görünür. */
+  function applyAccountNameField() {
+    var field = document.querySelector(".play-name");
+    var editBtn = $("#name-edit");
+    var signedIn = !!googleAccount.profile;
+    if (field) field.hidden = signedIn && !app.nameEditing;
+    if (editBtn) {
+      editBtn.hidden = !signedIn;
+      editBtn.textContent = app.nameEditing ? "Adı kaydet" : "Adı değiştir";
+      if (!signedIn) app.nameEditing = false;
+    }
+    applyNameSignInButton();
+  }
+
+  /* Ad düzenlemeyi açar: hesap bağlıysa gizli alanı gösterir, misafirde
+     mevcut alana odaklanır. */
+  function startNameEdit() {
+    app.nameEditing = true;
+    applyAccountNameField();
+    var field = $("#player-name");
+    if (!field) return;
+    var card = $("#online-card");
+    if (card && card.scrollIntoView) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    setTimeout(function () {
+      var input = $("#player-name");
+      if (!input) return;
+      input.focus();
+      try { input.select(); } catch (error) { /* yoksay */ }
+    }, 250);
+  }
+
+  function finishNameEdit(silent) {
+    app.nameEditing = false;
+    applyAccountNameField();
+    var field = $("#player-name");
+    if (field) field.blur();
+    if (!silent) toast("Adın güncellendi.");
+  }
+
+  /* Adı her yerden (oyun içi menü dâhil) düzenlemek için pencere. */
+  function showNameEditor() {
+    var current = playerName() || "Misafir oyuncu";
+    openOverlay(
+      '<span class="result-badge">Ad</span>' +
+      '<h2>Adın</h2>' +
+      '<p class="sheet-sub">Oda oyunlarında ve skor tablosunda bu ad görünür. En fazla 16 karakter.</p>' +
+      '<div class="field"><label for="name-edit-input">Adın</label>' +
+        '<input id="name-edit-input" type="text" maxlength="16" autocomplete="nickname" ' +
+        'value="' + esc(current) + '" data-autofocus></div>' +
+      '<div class="sheet-actions">' +
+        '<button class="btn btn-coral" type="button" data-save-name>Kaydet</button>' +
+        '<button class="btn btn-outline" type="button" data-close>Vazgeç</button>' +
+      '</div>',
+      true
+    );
+    var input = $("#name-edit-input");
+    if (input) {
+      input.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        saveNameFromEditor();
+      });
+    }
+  }
+
+  function saveNameFromEditor() {
+    var input = $("#name-edit-input");
+    var value = input ? input.value.trim().slice(0, 16) : "";
+    if (!value) {
+      toast("Bir ad yaz.");
+      if (input) input.focus();
+      return;
+    }
+    save(LS_NAME, value);
+    var field = $("#player-name");
+    if (field) field.value = value;
+    app.nameEditing = false;
+    applyAccountNameField();
+    closeOverlay();
+    toast("Adın güncellendi.");
+  }
+
+  function renderAccount() {
+    var profile = googleAccount.profile;
+    var avatar = $("#account-avatar");
+    var nameEl = $("#account-name");
+    var note = $("#account-note");
+    var signout = $("#google-signout");
+    var slot = $("#google-slot");
+    var nativeBtn = $("#google-native");
+    if (!avatar || !nameEl) return;
+    applyAccountNameField();
+    if (profile) {
+      nameEl.textContent = profile.name;
+      if (note) {
+        note.textContent = profile.source === "playgames"
+          ? "Play Games hesabı bağlı"
+          : "Google hesabı bağlı";
+      }
+      avatar.textContent = accountInitial(profile.name);
+      if (profile.picture) {
+        avatar.textContent = "";
+        avatar.style.backgroundImage = 'url("' + String(profile.picture).replace(/["\\]/g, "") + '")';
+      } else {
+        avatar.style.backgroundImage = "";
+      }
+      if (signout) signout.hidden = false;
+      if (slot) slot.hidden = true;
+      if (nativeBtn) nativeBtn.hidden = true;
+      return;
+    }
+    nameEl.textContent = "Misafir oyuncu";
+    if (note) {
+      if (playGames.available) {
+        note.textContent = "Play Games ile giriş yap, adın hazır olsun";
+      } else if (googleAccount.native || googleAccount.configured) {
+        note.textContent = "Google ile giriş yap, adın hazır olsun";
+      } else if (location.protocol === "file:") {
+        note.textContent = "Google girişi bu sürümde kapalı";
+      } else if (!googleAccount.attempted) {
+        note.textContent = "Google girişi yükleniyor…";
+      } else {
+        note.textContent = "Google girişi bu sunucuda tanımlı değil";
+      }
+    }
+    avatar.textContent = "?";
+    avatar.style.backgroundImage = "";
+    if (signout) signout.hidden = true;
+    if (slot) slot.hidden = googleAccount.native || !googleAccount.ready;
+    if (nativeBtn) nativeBtn.hidden = !googleAccount.native;
+  }
+
+  function applyGoogleProfile(profile, options) {
+    if (!profile || !profile.name) return false;
+    var previous = googleAccount.profile;
+    var clean = {
+      sub: String(profile.sub || ""),
+      name: String(profile.name).slice(0, 40),
+      picture: String(profile.picture || ""),
+      source: profile.source === "playgames" ? "playgames" : "google"
+    };
+    googleAccount.profile = clean;
+    save(LS_GOOGLE, JSON.stringify(clean));
+    var input = $("#player-name");
+    var forceName = !!(options && options.forceName);
+    if (input) {
+      var current = input.value.trim();
+      /* Kullanıcı kendi adını yazdıysa hesap adı onu ezmesin. Yalnızca alan
+         boşsa ya da hâlâ önceki hesap adını gösteriyorsa güncelle. */
+      var custom = current && previous && current !== String(previous.name || "").slice(0, 16);
+      if (!custom && (forceName || !current)) input.value = clean.name.slice(0, 16);
+    }
+    save(LS_NAME, input ? input.value.trim() : clean.name);
+    renderAccount();
+    if (!options || !options.silent) toast("Giriş yapıldı: " + clean.name);
+    return true;
+  }
+
+  function signOutGoogle() {
+    googleAccount.profile = null;
+    remove(LS_GOOGLE);
+    try {
+      if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
+    } catch (error) { /* yoksay */ }
+    try {
+      if (playGames.available && window.BlokIkiPlayGames) window.BlokIkiPlayGames.signOut();
+    } catch (error) { /* yoksay */ }
+    renderAccount();
+    toast("Hesabından çıkış yapıldı.");
+  }
+
+  function verifyGoogleCredential(credential) {
+    return fetch(apiUrl("/api/auth/google"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: credential })
+    }).then(function (response) {
+      return response.text().then(function (text) {
+        var body = {};
+        try { body = JSON.parse(text) || {}; } catch (error) { body = {}; }
+        if (!response.ok) {
+          var failure = new Error(body.message || "Google oturumu doğrulanamadı.");
+          failure.status = response.status;
+          throw failure;
+        }
+        return body;
+      });
+    });
+  }
+
+  function handleGoogleCredential(credential) {
+    if (!credential) {
+      toast("Google oturumu alınamadı.");
+      return;
+    }
+    verifyGoogleCredential(credential).then(function (profile) {
+      applyGoogleProfile(profile, { forceName: true });
+    }).catch(function (error) {
+      if (error && error.status === 401) {
+        toast(error.message || "Google oturumu doğrulanamadı.");
+        return;
+      }
+      /* Sunucuya ulaşılamıyorsa jetonun adını kullan; jeton doğrudan
+         Google'dan geldiği için yalnızca görünen ad için yeterli. */
+      var claims = decodeIdToken(credential);
+      if (claims && claims.name) {
+        applyGoogleProfile({ sub: claims.sub, name: claims.name, picture: claims.picture }, { forceName: true });
+      } else {
+        toast(error && error.message ? error.message : "Google oturumu doğrulanamadı.");
+      }
+    });
+  }
+
+  function loadScriptOnce(src) {
+    return new Promise(function (resolve, reject) {
+      var existing = document.querySelector('script[data-src="' + src + '"]');
+      if (existing) {
+        if (existing.dataset.loaded === "1") resolve();
+        else existing.addEventListener("load", function () { resolve(); });
+        return;
+      }
+      var script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.dataset.src = src;
+      script.addEventListener("load", function () {
+        script.dataset.loaded = "1";
+        resolve();
+      });
+      script.addEventListener("error", function () {
+        reject(new Error("Google betiği yüklenemedi."));
+      });
+      document.head.appendChild(script);
+    });
+  }
+
+  /* Web: Google Identity Services düğmesi. */
+  function startWebGoogle(clientId) {
+    if (!clientId || location.protocol === "file:") return;
+    loadScriptOnce("https://accounts.google.com/gsi/client").then(function () {
+      if (!window.google || !google.accounts || !google.accounts.id) {
+        throw new Error("Google betiği hazır değil.");
+      }
+      google.accounts.id.initialize({
+        client_id: clientId,
+        ux_mode: "popup",
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        callback: function (response) {
+          handleGoogleCredential(response && response.credential);
+        }
+      });
+      var slot = $("#google-slot");
+      if (slot) {
+        slot.hidden = false;
+        slot.innerHTML = "";
+        google.accounts.id.renderButton(slot, {
+          type: "standard",
+          theme: "outline",
+          size: "medium",
+          shape: "pill",
+          text: "signin_with",
+          locale: "tr",
+          width: 190
+        });
+      }
+      googleAccount.ready = true;
+      renderAccount();
+    }).catch(function () {
+      googleAccount.ready = false;
+      renderAccount();
+    });
+  }
+
+  function initGoogleAccount() {
+    googleAccount.profile = loadSavedAccount();
+
+    var bridge = window.BlokIkiGoogle;
+    if (bridge && typeof bridge.isAvailable === "function") {
+      try { googleAccount.native = !!bridge.isAvailable(); } catch (error) { googleAccount.native = false; }
+    }
+
+    /* Play Games varsa birincil giriş odur; yoksa Google OAuth'a düşer. */
+    var gamesBridge = window.BlokIkiPlayGames;
+    if (gamesBridge && typeof gamesBridge.available === "function") {
+      try { playGames.available = !!gamesBridge.available(); } catch (error) { playGames.available = false; }
+    }
+    if (playGames.available) googleAccount.native = true;
+
+    var saved = googleAccount.profile;
+    var input = $("#player-name");
+    if (saved && input && !input.value.trim()) input.value = saved.name.slice(0, 16);
+
+    renderAccount();
+
+    var signout = $("#google-signout");
+    if (signout) signout.addEventListener("click", signOutGoogle);
+
+    var nameEdit = $("#name-edit");
+    if (nameEdit) {
+      nameEdit.addEventListener("click", function () {
+        if (app.nameEditing) {
+          finishNameEdit(false);
+          return;
+        }
+        startNameEdit();
+      });
+    }
+
+    var nameField = $("#player-name");
+    if (nameField) {
+      nameField.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" || !app.nameEditing) return;
+        event.preventDefault();
+        finishNameEdit(false);
+      });
+    }
+
+    var nativeBtn = $("#google-native");
+    function startGoogleSignInFlow() {
+      if (playGames.available) {
+        try {
+          window.BlokIkiPlayGames.signIn();
+        } catch (error) {
+          toast("Play Games girişi başlatılamadı.");
+        }
+        return;
+      }
+      if (googleAccount.native) {
+        try {
+          window.BlokIkiGoogle.signIn();
+        } catch (error) {
+          toast("Google girişi başlatılamadı.");
+        }
+        return;
+      }
+      if (googleAccount.ready && window.google && google.accounts && google.accounts.id) {
+        /* Web: Google'ın kendi düğmesi zaten görünür; kullanıcıyı ona yönlendir. */
+        var slot = $("#google-slot");
+        if (slot && slot.scrollIntoView) slot.scrollIntoView({ behavior: "smooth", block: "center" });
+        toast("Google ile giriş için aşağıdaki düğmeyi kullan.");
+        return;
+      }
+      toast("Giriş bu sürümde kullanılamıyor.");
+    }
+
+    if (nativeBtn) {
+      if (playGames.available) nativeBtn.textContent = "Play Games ile giriş";
+      nativeBtn.addEventListener("click", startGoogleSignInFlow);
+    }
+
+    var nameSignIn = $("#name-signin");
+    if (nameSignIn) nameSignIn.addEventListener("click", startGoogleSignInFlow);
+
+    if (googleAccount.native || location.protocol === "file:") return;
+
+    fetch(apiUrl("/api/config")).then(function (response) {
+      return response.json();
+    }).then(function (config) {
+      googleAccount.attempted = true;
+      googleAccount.clientId = config && config.googleClientId ? String(config.googleClientId) : "";
+      googleAccount.configured = !!googleAccount.clientId;
+      renderAccount();
+      startWebGoogle(googleAccount.clientId);
+    }).catch(function () {
+      googleAccount.attempted = true;
+      googleAccount.configured = false;
+      renderAccount();
+    });
+  }
+
+  /* Android yerel Google akışı sonucu buraya yazar. */
+  window.BlokGoogleResult = function (payload) {
+    var data = payload;
+    if (typeof payload === "string") {
+      try { data = JSON.parse(payload); } catch (error) { data = null; }
+    }
+    if (!data) {
+      toast("Google oturumu alınamadı.");
+      return;
+    }
+    if (data.error) {
+      toast(String(data.error));
+      return;
+    }
+    if (data.credential) {
+      handleGoogleCredential(data.credential);
+      return;
+    }
+    if (data.name) applyGoogleProfile(data, { forceName: true });
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* Play Games ve reklamlar (yalnızca Android köprüsü varsa)            */
+  /* ------------------------------------------------------------------ */
+
+  function readBridgeJson(payload) {
+    if (!payload) return null;
+    if (typeof payload === "object") return payload;
+    try { return JSON.parse(String(payload)); } catch (error) { return null; }
+  }
+
+  function applyPlayGamesPlayer(payload) {
+    var player = readBridgeJson(payload);
+    if (!player || !player.name) return;
+    playGames.player = player;
+    /* Sessiz oturumda kullanıcının kendi yazdığı adı ezme. */
+    applyGoogleProfile({
+      sub: player.id,
+      name: player.name,
+      picture: player.icon,
+      source: "playgames"
+    }, { forceName: false, silent: true });
+  }
+
+  /* Yerel taraftan gelen Play Games olayları. */
+  window.BlokPlayGamesEvent = function (type, payload) {
+    if (type === "player") {
+      applyPlayGamesPlayer(payload);
+      return;
+    }
+    if (type === "error" && payload) toast(String(payload));
+  };
+
+  /* Reklam hazırlığını tazele (yükleme birkaç saniye sürebilir). */
+  function refreshAdsState() {
+    var bridge = window.BlokAds;
+    if (!bridge) return;
+    try {
+      if (typeof bridge.available === "function") ads.available = !!bridge.available();
+      if (typeof bridge.hasRewarded === "function") ads.rewarded = !!bridge.hasRewarded();
+      if (typeof bridge.hasBanner === "function") ads.banner = !!bridge.hasBanner();
+    } catch (error) { /* köprü yoksa yoksay */ }
+  }
+
+  /* Banner yalnızca oyun ekranında, sonuç/menü penceresi kapalıyken ve
+     "Reklamları kaldır" satın alınmadıysa görünür. */
+  function syncBannerVisibility() {
+    var bridge = window.BlokAds;
+    if (!bridge || typeof bridge.showBanner !== "function" ||
+        typeof bridge.hideBanner !== "function") return;
+    var overlayOpen = $("#overlay") && !$("#overlay").hidden;
+    var show = !!ads.banner && !ads.free && app.screen === "game" && !overlayOpen;
+    if (show === ads.bannerShown) return;
+    ads.bannerShown = show;
+    try {
+      if (show) bridge.showBanner();
+      else bridge.hideBanner();
+    } catch (error) { /* yoksay */ }
+  }
+
+  function grantPendingCoins() {
+    if (!ads.pendingCoins || !app.profile || !PROGRESS) return;
+    var key = ads.pendingKey;
+    if (key && ads.grantedKey === key) return;
+    var amount = ads.pendingCoins;
+    PROGRESS.addCoins(app.profile, amount);
+    PROGRESS.save(app.profile);
+    ads.grantedKey = key;
+    ads.pendingCoins = 0;
+    ads.pendingKey = null;
+    renderHomeMeta();
+    toast("+" + fmt(amount) + " coin eklendi (2×).");
+    var button = document.querySelector("[data-double-coins]");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Coinler eklendi";
+    }
+  }
+
+  function handleAdsEvent(event) {
+    var name = String(event || "");
+    if (name.indexOf("banner:") === 0) {
+      var height = parseInt(name.slice(7), 10);
+      if (!isNaN(height) && height > 0) {
+        document.documentElement.style.setProperty("--ad-b", height + "px");
+      }
+      return;
+    }
+    if (name === "banner-loaded") {
+      refreshAdsState();
+      syncBannerVisibility();
+      return;
+    }
+    if (name === "banner-hidden") {
+      document.documentElement.style.setProperty("--ad-b", "0px");
+      return;
+    }
+    if (name.indexOf("rewarded:") === 0) {
+      grantPendingCoins();
+    } else if (name === "rewarded-closed" || name === "rewarded-failed") {
+      if (ads.pendingCoins) {
+        ads.pendingCoins = 0;
+        ads.pendingKey = null;
+        toast("Reklam tamamlanmadı; coin eklenmedi.");
+      }
+    }
+    refreshAdsState();
+  }
+
+  window.BlokAdsEvent = function (event) {
+    handleAdsEvent(event);
+  };
+
+  /* Oyun sonucu kapandıktan sonra her turda bir geçiş reklamı.
+     "Reklamları kaldır" satın alındıysa hiç gösterilmez. */
+  function flushPendingInterstitial() {
+    if (!app.interstitialPending) return;
+    app.interstitialPending = false;
+    refreshAdsState();
+    if (!ads.available || ads.free) return;
+    ads.shown += 1;
+    setTimeout(function () {
+      try {
+        if (window.BlokAds && typeof window.BlokAds.showInterstitial === "function") {
+          window.BlokAds.showInterstitial();
+        }
+      } catch (error) { /* reklam gösterilemedi */ }
+    }, 350);
+  }
+
+  function watchRewardedCoins(key, coins) {
+    if (!ads.rewarded || !coins) {
+      toast("Reklam şu an hazır değil.");
+      return;
+    }
+    ads.pendingCoins = coins;
+    ads.pendingKey = key || null;
+    try {
+      window.BlokAds.showRewarded();
+    } catch (error) {
+      ads.pendingCoins = 0;
+      ads.pendingKey = null;
+      toast("Reklam açılamadı.");
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* reklamları kaldırma (Google Play Billing)                           */
+  /* ------------------------------------------------------------------ */
+
+  function refreshBillingState() {
+    var bridge = window.BlokBilling;
+    if (!bridge) {
+      ads.billing = false;
+      updatePurchaseStrip();
+      return;
+    }
+    try {
+      ads.billing = typeof bridge.available === "function" && !!bridge.available();
+      if (typeof bridge.owned === "function" && bridge.owned()) setAdsFree(true, { silent: true });
+    } catch (error) { ads.billing = false; }
+    updatePurchaseStrip();
+  }
+
+  function setAdsFree(free, options) {
+    ads.free = !!free;
+    save(LS_ADS_FREE, ads.free ? "1" : "0");
+    updatePurchaseStrip();
+    syncBannerVisibility();
+    if (ads.free && (!options || !options.silent)) toast("Reklamlar kaldırıldı. Teşekkürler!");
+  }
+
+  function updatePurchaseStrip() {
+    var button = $("#buy-remove-ads");
+    if (!button) return;
+    button.hidden = !ads.billing || ads.free;
+    button.classList.toggle("is-owned", !!ads.free);
+  }
+
+  function startRemoveAdsPurchase() {
+    if (ads.free) {
+      toast("Reklamlar zaten kaldırılmış.");
+      return;
+    }
+    if (!window.BlokBilling || typeof window.BlokBilling.purchase !== "function") {
+      toast("Satın alma bu sürümde kullanılamıyor.");
+      return;
+    }
+    toast("Ödeme ekranı açılıyor…");
+    try {
+      window.BlokBilling.purchase();
+    } catch (error) {
+      toast("Ödeme başlatılamadı.");
+    }
+  }
+
+  /* Yerel taraftan gelen satın alma olayları. Yerel taraf tek parametre
+     gönderir: "owned", "canceled", "unavailable" ya da "error:<mesaj>". */
+  window.BlokBillingEvent = function (event) {
+    var text = String(event || "");
+    var split = text.indexOf(":");
+    var type = split < 0 ? text : text.slice(0, split);
+    var payload = split < 0 ? "" : text.slice(split + 1);
+    if (type === "owned") {
+      setAdsFree(true);
+      sfxPurchase();
+      return;
+    }
+    if (type === "unavailable") {
+      ads.billing = false;
+      updatePurchaseStrip();
+      return;
+    }
+    if (type === "error" && payload) toast(payload);
+    refreshBillingState();
+  };
+
+  function initNativeIntegrations() {
+    refreshAdsState();
+    refreshBillingState();
+    syncBannerVisibility();
+    /* Sessiz Play Games oturumu yerel tarafta zaten başlatıldı; sonuç
+       geldiğinde yukarıdaki olay dinleyicisi hesabı günceller. */
+    if (playGames.available && window.BlokIkiPlayGames &&
+        typeof window.BlokIkiPlayGames.autoSignIn === "function") {
+      try { window.BlokIkiPlayGames.autoSignIn(); } catch (error) { /* yoksay */ }
+    }
+  }
+
+  /* Sunucu sorununda arkadaşla oyun bölümüne kaydırır (adres gömülü). */
   function askServer(message) {
-    toast(message || "Uzaktan oyun için sunucu ayarlı değil.");
+    toast(message || "Arkadaşınla oynamak için sunucu ayarlı değil.");
     var online = $("#online-card");
-    if (online && !online.open) online.open = true;
+    if (online && online.scrollIntoView) online.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function createRoom(mode) {
@@ -2343,8 +3515,368 @@
     });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* rastgele eşleşme                                                    */
+  /* ------------------------------------------------------------------ */
+
+  function updateMatchButton() {
+    var button = $("#quick-match");
+    if (!button) return;
+    button.textContent = app.matching ? "Eşleşmeyi iptal et" : "Rakip bul";
+    button.setAttribute("aria-pressed", app.matching ? "true" : "false");
+    var note = $("#match-note");
+    if (note) {
+      note.textContent = app.matching
+        ? "Rakip aranıyor… Aynı anda bekleyen biriyle eşleşeceksin."
+        : "Adını yaz, aynı anda bekleyen biriyle hemen eşleş.";
+    }
+  }
+
+  function startMatchmaking() {
+    if (app.busy) return;
+    if (app.matching) {
+      cancelMatchmaking();
+      return;
+    }
+    app.busy = true;
+    var name = playerName();
+    ensureSocket().then(function () {
+      app.matching = true;
+      updateMatchButton();
+      startHeartbeat();
+      wsSend({ t: "quickmatch", name: name, mode: "versus" });
+      toast("Rakip aranıyor…");
+      setTimeout(function () { app.busy = false; }, 500);
+    }).catch(function (error) {
+      app.busy = false;
+      app.matching = false;
+      updateMatchButton();
+      var message = error.message || "Sunucuya bağlanılamadı.";
+      if (/sunucu/i.test(message)) askServer(message);
+      else toast(message);
+    });
+  }
+
+  function cancelMatchmaking() {
+    if (app.ws && app.ws.readyState === WebSocket.OPEN) {
+      wsSend({ t: "cancelmatch" });
+    }
+    app.matching = false;
+    updateMatchButton();
+    toast("Eşleşme iptal edildi.");
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* arkadaşlar                                                          */
+  /* ------------------------------------------------------------------ */
+
+  var FRIEND_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  /* Cihazda kalıcı arkadaş kodu; hesap gerekmez. Aynı tarayıcıda açılan
+     sekmeler aynı kaydı paylaşsa da her oturum kendi kodunu korur. */
+  function friendCode() {
+    if (app.friendCode && /^[A-Z0-9]{4,10}$/.test(app.friendCode)) return app.friendCode;
+    var code = read(LS_FRIEND_CODE);
+    if (code && /^[A-Z0-9]{4,10}$/.test(code)) {
+      app.friendCode = code;
+      return code;
+    }
+    code = "";
+    for (var i = 0; i < 6; i++) {
+      code += FRIEND_CHARS.charAt(Math.floor(Math.random() * FRIEND_CHARS.length));
+    }
+    app.friendCode = code;
+    save(LS_FRIEND_CODE, code);
+    return code;
+  }
+
+  /* Test/otomasyon: bu sekmenin kodunu değiştirip sunucuya bildirir. */
+  function setFriendCode(code) {
+    var clean = friendKey(code);
+    if (clean.length < 4) return false;
+    app.friendCode = clean;
+    save(LS_FRIEND_CODE, clean);
+    syncPresence();
+    return true;
+  }
+
+  function friendKey(code) {
+    return String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+  }
+
+  function loadFriends() {
+    var raw = read(LS_FRIENDS);
+    var list = [];
+    if (raw) {
+      try {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.length) {
+          list = parsed.filter(function (item) {
+            return item && /^[A-Z0-9]{4,10}$/.test(item.code || "");
+          }).map(function (item) {
+            return { code: friendKey(item.code), name: String(item.name || "").slice(0, 16) };
+          });
+        }
+      } catch (error) { /* bozuk kayıt */ }
+    }
+    var seen = {};
+    app.friends = list.filter(function (item) {
+      if (seen[item.code]) return false;
+      seen[item.code] = true;
+      return true;
+    });
+    return app.friends;
+  }
+
+  function saveFriends() {
+    save(LS_FRIENDS, JSON.stringify(app.friends.map(function (item) {
+      return { code: item.code, name: item.name };
+    })));
+  }
+
+  function addFriend(code, name) {
+    var key = friendKey(code);
+    if (!key || key.length < 4) {
+      toast("Arkadaş kodu 4-10 karakter olmalı.");
+      return false;
+    }
+    if (key === friendCode()) {
+      toast("Bu senin kendi kodun.");
+      return false;
+    }
+    var found = app.friends.filter(function (item) { return item.code === key; })[0];
+    if (found) {
+      if (name) found.name = name;
+      saveFriends();
+      toast("Arkadaş listende zaten var.");
+      return true;
+    }
+    app.friends.push({ code: key, name: name || "" });
+    saveFriends();
+    return true;
+  }
+
+  function removeFriend(code) {
+    app.friends = app.friends.filter(function (item) { return item.code !== code; });
+    saveFriends();
+  }
+
+  /* Bağlantı açıkken çevrimiçi durum bilgisini sunucuya bildirir. */
+  function syncPresence() {
+    if (!app.ws || app.ws.readyState !== WebSocket.OPEN) return;
+    wsSend({ t: "presence", code: friendCode(), name: playerName() || "Oyuncu" });
+  }
+
+  function refreshFriendsOnline() {
+    if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
+      app.friends.forEach(function (item) { item.online = false; });
+      renderFriendsSheet();
+      return;
+    }
+    app.friends.forEach(function (item) {
+      wsSend({ t: "lookup", code: item.code });
+    });
+    renderFriendsSheet();
+  }
+
+  /* Arkadaşın sunucudaki güncel adını ve çevrimiçi durumunu sorar.
+     Bağlantı yoksa sessizce kurup tekrar dener. */
+  function lookupFriend(code) {
+    var key = friendKey(code);
+    if (!key) return;
+    if (app.ws && app.ws.readyState === WebSocket.OPEN) {
+      wsSend({ t: "lookup", code: key });
+      return;
+    }
+    ensureSocket({ quiet: true }).then(function () {
+      syncPresence();
+      wsSend({ t: "lookup", code: key });
+    }).catch(function () { /* sunucu yoksa yerel ad yeter */ });
+  }
+
+  function findFriend(code) {
+    var key = friendKey(code);
+    return app.friends.filter(function (item) { return item.code === key; })[0] || null;
+  }
+
+  function showFriends() {
+    if (!app.friends.length) loadFriends();
+    openOverlay(friendsSheetHTML(), true);
+    refreshFriendsOnline();
+    if (app.friendsTimer) clearInterval(app.friendsTimer);
+    app.friendsTimer = setInterval(function () {
+      if ($("#overlay").hidden) {
+        clearInterval(app.friendsTimer);
+        app.friendsTimer = null;
+        return;
+      }
+      refreshFriendsOnline();
+    }, 15000);
+    if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
+      ensureSocket({ quiet: true }).then(function () {
+        syncPresence();
+        refreshFriendsOnline();
+      }).catch(function () { /* sunucu yoksa yerel liste yeter */ });
+    }
+    var form = $("#friend-add-form");
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        addFriendFromSheet($("#friend-code-input").value);
+        var field = $("#friend-code-input");
+        if (field) field.focus();
+      });
+    }
+    var input = $("#friend-code-input");
+    if (input) input.focus();
+  }
+
+  function friendsSheetHTML() {
+    var list = app.friends.map(function (item) {
+      var label = item.name ? esc(item.name) : esc(item.code);
+      var online = item.online ? "çevrimiçi" : "çevrimdışı";
+      return '<li class="friend-row' + (item.online ? " online" : "") + '">' +
+        '<span class="friend-dot" aria-hidden="true"></span>' +
+        '<span class="friend-meta"><b>' + label + '</b><span class="tiny">' +
+          esc(item.code) + " · " + online + "</span></span>" +
+        '<button class="btn btn-coral btn-sm" type="button" data-friend-invite="' +
+          esc(item.code) + '">Davet et</button>' +
+        '<button class="friend-remove" type="button" aria-label="Arkadaşı kaldır" data-friend-remove="' +
+          esc(item.code) + '">×</button>' +
+        "</li>";
+    }).join("");
+    return '<span class="result-badge">Arkadaşlar</span>' +
+      '<h2>Arkadaşlar</h2>' +
+      '<p class="sheet-sub">Kendi kodunu paylaş; arkadaşın bu kodu ekleyince onu davet edebilirsin.</p>' +
+      '<div class="friend-code-box">' +
+        '<span class="tiny">Arkadaş kodun</span>' +
+        '<strong id="my-friend-code">' + esc(friendCode()) + "</strong>" +
+        '<button class="btn btn-outline btn-sm" type="button" data-friend-copy data-autofocus>Kopyala</button>' +
+      "</div>" +
+      '<form class="friend-add" id="friend-add-form">' +
+        '<label class="tiny" for="friend-code-input">Arkadaş kodu ekle</label>' +
+        '<div class="friend-add-row">' +
+          '<input id="friend-code-input" type="text" maxlength="10" autocomplete="off" ' +
+            'placeholder="Örn. K7M2QX" enterkeyhint="done">' +
+          '<button class="btn btn-ink btn-sm" type="submit">Ekle</button>' +
+        "</div>" +
+      "</form>" +
+      '<ul class="friend-list" id="friend-list">' +
+        (list || '<li class="friend-empty">Henüz arkadaş eklemedin.</li>') +
+      "</ul>" +
+      '<p class="result-note" id="friends-note">Davet göndermek için önce bir oda kur ya da odaya katıl.</p>' +
+      '<div class="sheet-actions"><button class="btn btn-outline" type="button" data-close>Kapat</button></div>';
+  }
+
+  function renderFriendsSheet() {
+    var list = $("#friend-list");
+    if (!list) return;
+    if (!app.friends.length) {
+      list.innerHTML = '<li class="friend-empty">Henüz arkadaş eklemedin.</li>';
+      return;
+    }
+    list.innerHTML = app.friends.map(function (item) {
+      var label = item.name ? esc(item.name) : esc(item.code);
+      var online = item.online ? "çevrimiçi" : "çevrimdışı";
+      return '<li class="friend-row' + (item.online ? " online" : "") + '">' +
+        '<span class="friend-dot" aria-hidden="true"></span>' +
+        '<span class="friend-meta"><b>' + label + '</b><span class="tiny">' +
+          esc(item.code) + " · " + online + "</span></span>" +
+        '<button class="btn btn-coral btn-sm" type="button" data-friend-invite="' +
+          esc(item.code) + '">Davet et</button>' +
+        '<button class="friend-remove" type="button" aria-label="Arkadaşı kaldır" data-friend-remove="' +
+          esc(item.code) + '">×</button>' +
+        "</li>";
+    }).join("");
+  }
+
+  function addFriendFromSheet(input) {
+    var code = friendKey(input);
+    if (code.length < 4) {
+      toast("Arkadaş kodu 4-10 karakter olmalı.");
+      return;
+    }
+    if (code === friendCode()) {
+      toast("Bu senin kendi kodun.");
+      return;
+    }
+    app.pendingFriendAdd = code;
+    addFriend(code);
+    renderFriendsSheet();
+    lookupFriend(code);
+    toast("Arkadaş eklendi. Güncel adı alınıyor…");
+    var field = $("#friend-code-input");
+    if (field) field.value = "";
+  }
+
+  function inviteFriend(code) {
+    var key = friendKey(code);
+    var friend = findFriend(key);
+    var label = friend && friend.name ? friend.name : key;
+    var send = function () {
+      if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
+        toast("Davet için bağlantı kurulamadı.");
+        return;
+      }
+      wsSend({ t: "invite", to: key, code: app.room });
+      toast(label + " davet ediliyor…");
+    };
+    if (app.online && app.room && app.screen === "lobby") {
+      send();
+      return;
+    }
+    /* Oda yoksa önce rakip odası kur, hoş geldin mesajında davet gönder. */
+    app.inviteAfterCreate = key;
+    closeOverlay();
+    toast("Oda kuruluyor, davet hemen ardından gidecek…");
+    createRoom("versus");
+  }
+
+  function showInviteBanner(message) {
+    app.pendingInvite = {
+      code: String(message.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5),
+      from: String(message.from || "Arkadaşın").slice(0, 16)
+    };
+    if (!app.pendingInvite.code) return;
+    /* Davet eden arkadaşsa adını sunucudan gelen güncel değerle tazele. */
+    var fromKey = friendKey(message.fromCode || "");
+    var friend = fromKey ? findFriend(fromKey) : null;
+    if (friend && app.pendingInvite.from) {
+      friend.name = app.pendingInvite.from;
+      friend.online = true;
+      saveFriends();
+      renderFriendsSheet();
+    }
+    var banner = $("#invite-banner");
+    if (!banner) return;
+    $("#invite-from").textContent = app.pendingInvite.from;
+    $("#invite-code").textContent = app.pendingInvite.code;
+    banner.hidden = false;
+  }
+
+  function hideInviteBanner() {
+    var banner = $("#invite-banner");
+    if (banner) banner.hidden = true;
+    app.pendingInvite = null;
+  }
+
+  function acceptInvite() {
+    var invite = app.pendingInvite;
+    hideInviteBanner();
+    if (!invite) return;
+    if (app.screen === "game" || app.screen === "lobby") {
+      leaveToHome(false);
+    }
+    setTimeout(function () { joinRoom(invite.code); }, 220);
+  }
+
   function leaveToHome(confirmFirst) {
     var doLeave = function () {
+      if (app.matching) {
+        if (app.ws && app.ws.readyState === WebSocket.OPEN) wsSend({ t: "cancelmatch" });
+        app.matching = false;
+        updateMatchButton();
+      }
       if (app.online) {
         wsSend({ t: "leave" });
         setTimeout(function () {
@@ -2384,6 +3916,27 @@
 
     $("#help-btn").addEventListener("click", showHelp);
 
+    var langBtn = $("#lang-btn");
+    if (langBtn) langBtn.addEventListener("click", function () {
+      audio();
+      showLanguageSheet();
+    });
+
+    $("#friends-btn").addEventListener("click", function () {
+      audio();
+      showFriends();
+    });
+
+    $("#invite-accept").addEventListener("click", acceptInvite);
+    $("#invite-dismiss").addEventListener("click", hideInviteBanner);
+
+    var buyRemoveAds = $("#buy-remove-ads");
+    if (buyRemoveAds) {
+      buyRemoveAds.addEventListener("click", function () {
+        startRemoveAdsPurchase();
+      });
+    }
+
     $("#sound-btn").addEventListener("click", function () {
       app.sound = !app.sound;
       save(LS_SOUND, app.sound ? "1" : "0");
@@ -2394,7 +3947,10 @@
     $$("[data-local]").forEach(function (button) {
       button.addEventListener("click", function () {
         audio();
-        startLocal(button.dataset.local === "coop" ? "coop" : "versus", { timeMode: app.timeMode });
+        var value = button.dataset.local;
+        var mode = value === "daily" ? "daily"
+          : (value === "coop" ? "coop" : (value === "solo" ? "solo" : "versus"));
+        startLocal(mode, { timeMode: mode === "solo" || mode === "daily" ? "none" : app.timeMode });
       });
     });
 
@@ -2404,6 +3960,14 @@
         createRoom(button.dataset.host === "coop" ? "coop" : "versus");
       });
     });
+
+    var quickMatch = $("#quick-match");
+    if (quickMatch) {
+      quickMatch.addEventListener("click", function () {
+        audio();
+        startMatchmaking();
+      });
+    }
 
     $("#join-form").addEventListener("submit", function (event) {
       event.preventDefault();
@@ -2417,6 +3981,13 @@
 
     $("#player-name").addEventListener("input", function (event) {
       save(LS_NAME, event.target.value.trim());
+      /* Arkadaş listesindeki adın canlı kalsın: kısa bir gecikmeyle
+         sunucuya yeni adı bildir. */
+      if (app.presenceTimer) clearTimeout(app.presenceTimer);
+      app.presenceTimer = setTimeout(function () {
+        app.presenceTimer = null;
+        syncPresence();
+      }, 500);
     });
 
     $("#copy-code").addEventListener("click", function () {
@@ -2468,8 +4039,34 @@
         leaveToHome(false);
         return;
       }
+      if (target.hasAttribute("data-lang-sheet")) {
+        showLanguageSheet();
+        return;
+      }
       if (target.hasAttribute("data-help")) {
         showHelp();
+        return;
+      }
+      if (target.hasAttribute("data-rename")) {
+        showNameEditor();
+        return;
+      }
+      if (target.hasAttribute("data-friend-copy")) {
+        copyText(friendCode(), "Arkadaş kodu kopyalandı.");
+        return;
+      }
+      if (target.hasAttribute("data-friend-invite")) {
+        inviteFriend(target.dataset.friendInvite);
+        return;
+      }
+      if (target.hasAttribute("data-friend-remove")) {
+        removeFriend(friendKey(target.dataset.friendRemove));
+        renderFriendsSheet();
+        toast("Arkadaş kaldırıldı.");
+        return;
+      }
+      if (target.hasAttribute("data-save-name")) {
+        saveNameFromEditor();
         return;
       }
       if (target.hasAttribute("data-sound")) {
@@ -2498,6 +4095,11 @@
           });
         return;
       }
+      if (target.hasAttribute("data-double-coins")) {
+        app.interstitialPending = false;
+        watchRewardedCoins(app.shownResultKey, app.lastReward ? app.lastReward.coins : 0);
+        return;
+      }
       if (target.hasAttribute("data-restart") || target.hasAttribute("data-rematch")) {
         closeOverlay();
         restartGame();
@@ -2512,6 +4114,7 @@
     document.addEventListener("keydown", function (event) {
       if (!$("#overlay").hidden) {
         if (event.key === "Escape") closeOverlayHandler();
+        else if (event.key === "Tab") trapOverlayFocus(event);
         return;
       }
       if (event.defaultPrevented) return;
@@ -2544,12 +4147,9 @@
       wsSend({ t: "rematch" });
       return;
     }
-    startLocal(app.state.mode, {
-      timeMode: app.timeMode,
-      bot: app.botLevel,
-      daily: app.daily,
-      seed: app.daily ? PROGRESS.dailySeed() : undefined
-    });
+    var mode = app.daily ? "daily"
+      : (app.state.mode === "coop" ? "coop" : (app.state.mode === "solo" ? "solo" : "versus"));
+    startLocal(mode, { timeMode: mode === "solo" || mode === "daily" ? "none" : app.timeMode });
   }
 
   function copyText(text, message) {
@@ -2581,8 +4181,8 @@
     var url = location.origin + location.pathname + "?oda=" + encodeURIComponent(code);
     if (navigator.share) {
       navigator.share({
-        title: "Blok İki",
-        text: "Blok İki oynayalım mı? Oda kodu: " + code,
+        title: "Blokara 1v1",
+        text: "Blokara 1v1 oynayalım mı? Oda kodu: " + code,
         url: url
       }).catch(function () { /* kullanıcı iptal etti */ });
     } else {
@@ -2604,10 +4204,7 @@
     if (!app.state || app.screen !== "game") return;
     app.lastClockAt = performance.now();
     if (localPaused()) return;
-    if (app.state.phase === "playing") {
-      scheduleBot();
-      updateClock();
-    }
+    if (app.state.phase === "playing") updateClock();
   }
 
   function setBackgrounded(value) {
@@ -2619,7 +4216,7 @@
     resumeOnline();
   }
 
-  /* Uygulama öne döndüğünde kopmuş çevrimiçi bağlantıyı tazele. */
+  /* Uygulama öne döndüğünde kopmuş online bağlantıyı tazele. */
   function resumeOnline() {
     if (!app.online) {
       /* Oyun ortasında uygulamadan çıkıldıysa öne dönünce oturumu geri al. */

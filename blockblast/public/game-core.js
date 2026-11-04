@@ -1,4 +1,4 @@
-/* Blok İki — ortak oyun çekirdeği.
+/* Blokara 1v1 — ortak oyun çekirdeği.
    Tarayıcıda window.BlokIki, Node'da module.exports olarak çalışır. */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -8,7 +8,10 @@
 
   var SIZE = 8;
 
-  var PALETTE = ["coral", "cobalt", "mustard", "mint", "grape", "sky"];
+  var PALETTE = [
+    "coral", "cobalt", "mustard", "mint", "grape", "sky",
+    "lime", "rose", "teal"
+  ];
 
   // rows: "X" dolu hücre, "." boş. weight: torbaya girme ağırlığı.
   var RAW_SHAPES = [
@@ -44,14 +47,11 @@
     { name: "kose-3x3-b", rows: ["..X", "..X", "XXX"], weight: 1.4 },
     { name: "kose-3x3-c", rows: ["XXX", "X..", "X.."], weight: 1.4 },
     { name: "kose-3x3-d", rows: ["XXX", "..X", "..X"], weight: 1.4 },
-    { name: "U-a", rows: ["X.X", "XXX"], weight: 1.2 },
-    { name: "U-b", rows: ["XXX", "X.X"], weight: 1.2 },
-    { name: "U-c", rows: ["XX", "X.", "XX"], weight: 1.2 },
-    { name: "U-d", rows: ["XX", ".X", "XX"], weight: 1.2 },
     { name: "arti", rows: [".X.", "XXX", ".X."], weight: 0.8 },
     { name: "dikdortgen-2x3", rows: ["XXX", "XXX"], weight: 1.1 },
     { name: "dikdortgen-3x2", rows: ["XX", "XX", "XX"], weight: 1.1 },
-    { name: "kare-3", rows: ["XXX", "XXX", "XXX"], weight: 0.35 },
+    /* 9 blokluk tam kare. */
+    { name: "kare-3", rows: ["XXX", "XXX", "XXX"], weight: 0.9 },
     { name: "capraz-2-a", rows: ["X.", ".X"], weight: 1.1 },
     { name: "capraz-2-b", rows: [".X", "X."], weight: 1.1 },
     { name: "capraz-3", rows: ["X..", ".X.", "..X"], weight: 0.45 }
@@ -266,8 +266,8 @@
 
   function Game(options) {
     options = options || {};
-    this.mode = options.mode === "coop" ? "coop" : "versus";
-    this.turnBased = this.mode === "coop" ? true : !!options.turnBased;
+    this.mode = options.mode === "coop" ? "coop" : (options.mode === "solo" ? "solo" : "versus");
+    this.turnBased = this.mode === "coop" ? true : (this.mode === "solo" ? false : !!options.turnBased);
     this.seed = (options.seed == null ? Date.now() ^ (Math.random() * 1e9) : options.seed) >>> 0;
     this.rng = mulberry32(this.seed);
     this.groups = [];
@@ -277,16 +277,18 @@
     this.reason = "";
     this.lastMove = null;
     this.seq = 0;
-    this.timeMode = normalizeTimeMode(options.timeMode);
+    this.timeMode = this.mode === "solo" ? "none" : normalizeTimeMode(options.timeMode);
     this.timeLimit = options.timeLimit > 0 ? options.timeLimit : DEFAULT_TIME;
     this.turnLimit = options.turnLimit > 0 ? options.turnLimit : DEFAULT_TURN;
     this.turnPenalty = options.turnPenalty > 0 ? options.turnPenalty : TURN_PENALTY;
     this.timeLeft = this.timeMode === "shared" ? this.timeLimit : null;
     this.turnLeft = this.timeMode === "turn" && this.turnBased ? this.turnLimit : null;
     this.timeouts = { 0: 0, 1: 0 };
-    var names = options.names || ["Oyuncu 1", "Oyuncu 2"];
-    var withBoard = this.mode === "versus";
-    this.players = [newPlayer(names[0], 0, withBoard), newPlayer(names[1], 1, withBoard)];
+    var names = options.names || (this.mode === "solo" ? ["Sen"] : ["Oyuncu 1", "Oyuncu 2"]);
+    var withBoard = this.mode !== "coop";
+    var playerCount = this.mode === "solo" ? 1 : 2;
+    this.players = [];
+    for (var p = 0; p < playerCount; p++) this.players.push(newPlayer(names[p], p, withBoard));
     var self = this;
     this.players.forEach(function (player) {
       player.timeLeft = self.timeMode === "turn" && !self.turnBased ? self.turnLimit : null;
@@ -350,16 +352,25 @@
     var lines = fullLines(holder.board);
     var lineCount = lines.rows.length + lines.cols.length;
     var cleared = [];
+    var clearedColors = [];
     if (lineCount) {
+      /* Patlayan hücrelerin rengini tahtadan silmeden önce sakla; arayüz
+         parçacıkları ve uçan blok kalıntılarını bu renklerle çizer. */
       lines.rows.forEach(function (r) {
         for (var c = 0; c < SIZE; c++) {
-          if (holder.board[r][c]) cleared.push([r, c]);
+          if (holder.board[r][c]) {
+            cleared.push([r, c]);
+            clearedColors.push(holder.board[r][c]);
+          }
           holder.board[r][c] = null;
         }
       });
       lines.cols.forEach(function (c) {
         for (var r = 0; r < SIZE; r++) {
-          if (holder.board[r][c]) cleared.push([r, c]);
+          if (holder.board[r][c]) {
+            cleared.push([r, c]);
+            clearedColors.push(holder.board[r][c]);
+          }
           holder.board[r][c] = null;
         }
       });
@@ -426,6 +437,7 @@
       rows: lines.rows,
       cols: lines.cols,
       cleared: cleared,
+      clearedColors: clearedColors,
       lines: lineCount,
       points: points,
       combo: holder.combo,
@@ -440,6 +452,10 @@
         this.finish(null, "Tahta tıkandı. Takım " + this.shared.score + " puanda kaldı.");
       } else if (this.turnBased) {
         this.advanceTurn();
+      }
+    } else if (this.mode === "solo") {
+      if (!hasAnyMove(player.board, player.tray)) {
+        this.finish(null, "Tahta tıkandı. " + player.score + " puanda kaldın.");
       }
     } else if (this.phase === "playing") {
       if (!hasAnyMove(player.board, player.tray)) {
@@ -543,6 +559,10 @@
       this.finish(null, "Süre doldu. Takım " + this.shared.score + " puanda kaldı.");
       return;
     }
+    if (this.mode === "solo") {
+      this.finish(null, "Süre doldu. " + this.players[0].score + " puan topladın.");
+      return;
+    }
     var a = this.players[0];
     var b = this.players[1];
     if (a.score === b.score) {
@@ -590,8 +610,8 @@
           alive: player.alive,
           connected: player.connected,
           timeLeft: player.timeLeft,
-          board: mode === "versus" ? player.board : null,
-          tray: mode === "versus" ? player.tray : null
+          board: mode !== "coop" ? player.board : null,
+          tray: mode !== "coop" ? player.tray : null
         };
       }),
       shared: mode === "coop" ? {
@@ -605,118 +625,6 @@
       } : null
     };
   };
-
-  /* ------------------------------------------------------------------ */
-  /* bot                                                                */
-  /* ------------------------------------------------------------------ */
-
-  var BOT_LEVELS = ["easy", "normal", "hard"];
-
-  function normalizeBotLevel(value) {
-    return BOT_LEVELS.indexOf(value) >= 0 ? value : "normal";
-  }
-
-  /* Tahtayı kopyalayıp hamleyi dener, sonucu puanlar. */
-  function scorePlacement(board, piece, row, col) {
-    if (!canPlace(board, piece, row, col)) return null;
-    var next = cloneBoard(board);
-    piece.cells.forEach(function (cell) {
-      next[row + cell[0]][col + cell[1]] = piece.color || "mint";
-    });
-    var lines = fullLines(next);
-    var cleared = lines.rows.length + lines.cols.length;
-    if (cleared) {
-      lines.rows.forEach(function (r) {
-        for (var c = 0; c < SIZE; c++) next[r][c] = null;
-      });
-      lines.cols.forEach(function (c) {
-        for (var r = 0; r < SIZE; r++) next[r][c] = null;
-      });
-    }
-
-    var lineClear = linePoints(lines, 1) * 10;
-    var score = lineClear + piece.cells.length * 1.2;
-
-    // Komşuluk: yerleşen taşların dolu komşusu olması iyi.
-    var neighbours = 0;
-    piece.cells.forEach(function (cell) {
-      var r = row + cell[0];
-      var c = col + cell[1];
-      [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(function (pair) {
-        if (pair[0] < 0 || pair[1] < 0 || pair[0] >= SIZE || pair[1] >= SIZE) return;
-        if (next[pair[0]][pair[1]]) neighbours++;
-      });
-    });
-    score += neighbours * 2.2;
-
-    // Delik: üstü dolu olan boş hücre cezalı.
-    var holes = 0;
-    var height = new Array(SIZE).fill(0);
-    for (var c = 0; c < SIZE; c++) {
-      var seen = false;
-      for (var r = 0; r < SIZE; r++) {
-        if (next[r][c]) {
-          if (!seen) height[c] = SIZE - r;
-          seen = true;
-        } else if (seen) {
-          holes++;
-        }
-      }
-    }
-    score -= holes * 6;
-
-    // Pürüzlülük: sütun yükseklikleri arasındaki fark.
-    var roughness = 0;
-    for (var i = 0; i < SIZE; i++) {
-      var diff = Math.abs(height[i] - height[(i + 1) % SIZE]);
-      roughness += diff;
-    }
-    score -= roughness * 0.5;
-
-    // Tahtayı doldurma cezası (sonraki hamle alanı).
-    var filled = countCells(next);
-    score -= filled * 0.35;
-
-    return { score: score, piece: piece, row: row, col: col, cleared: cleared };
-  }
-
-  function botMove(board, tray, level, rng) {
-    level = normalizeBotLevel(level);
-    var random = rng || Math.random;
-    var options = [];
-    for (var p = 0; p < (tray || []).length; p++) {
-      var piece = tray[p];
-      if (!piece) continue;
-      for (var r = 0; r < SIZE; r++) {
-        for (var c = 0; c < SIZE; c++) {
-          var result = scorePlacement(board, piece, r, c);
-          if (result) {
-            result.pieceIndex = p;
-            options.push(result);
-          }
-        }
-      }
-    }
-    if (!options.length) return null;
-    options.sort(function (a, b) { return b.score - a.score; });
-
-    var pick;
-    if (level === "easy") {
-      pick = options[Math.floor(random() * Math.min(options.length, Math.max(1, Math.ceil(options.length * 0.6))))];
-    } else if (level === "normal") {
-      var pool = options.slice(0, Math.min(4, options.length));
-      pick = pool[Math.floor(random() * pool.length)];
-    } else {
-      pick = options[0];
-    }
-    return {
-      piece: pick.pieceIndex,
-      row: pick.row,
-      col: pick.col,
-      cleared: pick.cleared,
-      rank: options.indexOf(pick)
-    };
-  }
 
   return {
     SIZE: SIZE,
@@ -737,8 +645,6 @@
     countCells: countCells,
     cleanName: cleanName,
     addGarbage: addGarbage,
-    botMove: botMove,
-    BOT_LEVELS: BOT_LEVELS,
     TIME_MODES: TIME_MODES,
     DEFAULT_TIME: DEFAULT_TIME,
     DEFAULT_TURN: DEFAULT_TURN,

@@ -4,7 +4,7 @@
   return (async function () {
     var dbg = window.BlokDebug;
     if (!dbg) return "BlokDebug yok";
-    dbg.start("versus", { bot: "normal", timeMode: "none" });
+    dbg.start("versus", { timeMode: "none" });
     await wait(400);
     var game = dbg.game();
     var dot = { shape: 0, name: "nokta", cells: [[0, 0]], w: 1, h: 1, color: "coral" };

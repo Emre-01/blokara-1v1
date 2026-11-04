@@ -1,7 +1,7 @@
 (function () {
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   return (async function () {
-    var btn = document.getElementById("play-bot");
+    var btn = document.querySelector('[data-local="solo"]');
     if (!btn) return "buton yok";
     btn.click();
     await wait(1200);

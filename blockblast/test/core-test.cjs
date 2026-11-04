@@ -21,6 +21,19 @@ function fillRow(board, row, except) {
   }
 }
 
+/* Testlerde rastgele geçerli bir hamle bulmak için; oyunda bot yok. */
+function findAnyMove(board, tray) {
+  for (let piece = 0; piece < (tray || []).length; piece++) {
+    if (!tray[piece]) continue;
+    for (let row = 0; row < Core.SIZE; row++) {
+      for (let col = 0; col < Core.SIZE; col++) {
+        if (Core.canPlace(board, tray[piece], row, col)) return { piece, row, col };
+      }
+    }
+  }
+  return null;
+}
+
 test("blok şekilleri 8x8 içinde kalıyor", () => {
   Core.SHAPES.forEach((shape) => {
     assert.ok(shape.w >= 1 && shape.w <= Core.SIZE, shape.name);
@@ -303,9 +316,9 @@ test("çöp satır rakibin tahtasını aşağıdan itiyor", () => {
   assert.strictEqual(Core.addGarbage(crowded, 1, rng), true);
 });
 
-test("bot her zaman geçerli bir hamle buluyor", () => {
+test("boş tahtada her zaman geçerli bir hamle bulunuyor", () => {
   const game = new Core.Game({ mode: "versus", seed: 51 });
-  const move = Core.botMove(game.players[0].board, game.players[0].tray, "hard");
+  const move = findAnyMove(game.players[0].board, game.players[0].tray);
   assert.ok(move, "boş tahtada hamle bulunmalı");
   assert.ok(Core.canPlace(game.players[0].board, game.players[0].tray[move.piece], move.row, move.col));
   const result = game.move(0, move.piece, move.row, move.col);
@@ -358,6 +371,56 @@ test("tek hamlede hem satır hem sütun patlayınca skor sıçrıyor", () => {
   assert.strictEqual(result.lastMove.lines, 2);
   assert.strictEqual(result.lastMove.points, Core.linePoints({ rows: [7], cols: [3] }, 1));
   assert.ok(game.shared.score >= 100, "haç vuruşu en az 100 puan getirmeli");
+});
+
+test("tek kişilik modda tek oyuncu ve zamanlayıcısız oyun", () => {
+  const game = new Core.Game({ mode: "solo", seed: 101, timeMode: "shared" });
+  assert.strictEqual(game.mode, "solo");
+  assert.strictEqual(game.players.length, 1);
+  assert.strictEqual(game.turnBased, false);
+  assert.strictEqual(game.players[0].name, "Sen");
+  assert.ok(Array.isArray(game.players[0].board));
+  assert.ok(!game.shared);
+  // Tek kişilikte sayaç işlemez; süre ayarı verilse bile oyun sürer.
+  assert.strictEqual(game.timeMode, "none");
+  const snapshot = game.snapshot();
+  assert.ok(Array.isArray(snapshot.players[0].board), "tek kişilik anlık görüntüde tahta olmalı");
+  assert.ok(Array.isArray(snapshot.players[0].tray), "tek kişilik anlık görüntüde tepsi olmalı");
+  game.tick(999);
+  assert.strictEqual(game.phase, "playing");
+});
+
+test("tek kişilik modda tahta tıkanınca tur bitiyor", () => {
+  const game = new Core.Game({ mode: "solo", seed: 102 });
+  const player = game.players[0];
+  // Her satır ve sütunda en az bir boşluk kalsın diye köşegeni boşalt.
+  for (let r = 0; r < Core.SIZE; r++) {
+    for (let c = 0; c < Core.SIZE; c++) player.board[r][c] = "mint";
+  }
+  for (let r = 0; r < Core.SIZE; r++) player.board[r][r] = null;
+  // (0,0) yerleşince satır ve sütun tamamlanmasın: iki ek boşluk.
+  player.board[0][2] = null;
+  player.board[2][0] = null;
+  player.tray = [{ shape: 0, name: "nokta", cells: [[0, 0]], w: 1, h: 1, color: "coral" }];
+  // Yeni tepsiye sığmayan 3×3 blok koy: hamle sonrası tahta kilitlenmeli.
+  const nine = Core.SHAPES.find((shape) => shape.name === "kare-3");
+  game.refill = function (holder) { holder.tray = [nine, nine, nine]; };
+  const result = game.move(0, 0, 0, 0);
+  assert.ok(result.ok, result.reason);
+  assert.strictEqual(game.phase, "over");
+  assert.strictEqual(game.winner, null);
+  assert.ok(/puan/.test(game.reason));
+});
+
+test("C biçimli bloklar kaldırıldı, 9 blokluk kare var", () => {
+  assert.ok(!Core.SHAPES.some((shape) => /^U-/.test(shape.name)), "U biçimli blok kalmamalı");
+  const nine = Core.SHAPES.find((shape) => shape.name === "kare-3");
+  assert.ok(nine, "9 blokluk kare bulunmalı");
+  assert.strictEqual(nine.cells.length, 9);
+  // L/J dört yönde de bulunur; iki yönlü uçlar kapsanır.
+  ["L-a", "L-b", "L-c", "L-d", "J-a", "J-b", "J-c", "J-d"].forEach((name) => {
+    assert.ok(Core.SHAPES.some((shape) => shape.name === name), name + " eksik");
+  });
 });
 
 console.log("Çekirdek testleri geçti (" + passed + " test).");
