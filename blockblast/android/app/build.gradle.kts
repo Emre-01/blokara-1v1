@@ -46,8 +46,8 @@ val googleClientId = setting("blokiki.googleAndroidClientId", "")
 /* "Reklamları kaldır" ürün kimliği (Play Console → Uygulama içi ürünler). */
 val removeAdsProduct = setting("blokiki.removeAdsProduct", "remove_ads")
 
-val appVersionCode = setting("blokiki.versionCode", "17").toIntOrNull() ?: 17
-val appVersionName = setting("blokiki.versionName", "2.0.5")
+val appVersionCode = setting("blokiki.versionCode", "18").toIntOrNull() ?: 18
+val appVersionName = setting("blokiki.versionName", "2.0.6")
 
 android {
     namespace = "tr.blokiki.app"
