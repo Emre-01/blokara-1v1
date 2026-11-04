@@ -1,7 +1,7 @@
 # Google Play Console — hazır bilgiler (Blokara 1v1)
 
 Bu dosya Play Console'a **kopyala-yapıştır** yapılacak metinleri ve form
-cevaplarını içerir. Sürüm: `2.0.5` (`versionCode 17`).
+cevaplarını içerir. Sürüm: `2.0.8` (`versionCode 20`).
 
 | Alan | Değer |
 |---|---|
@@ -150,19 +150,23 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 
 ---
 
-## 5. Sürüm notları (2.0.5)
+## 5. Sürüm notları (2.0.8)
 
 ```
-• Ana ekran sadeleşti: "Aynı cihaz" ve "Çevrimiçi" bölümleri ayrıldı.
-• Oynat düğmeleri yenilendi, dokunma alanı büyüdü.
-• Arkadaşınla oyna paneli açık temaya kavuştu; yazılar daha okunur.
-• Küçük ekranlarda taşma giderildi.
-• "Çevrimiçi" rozeti 74 dilde çevrildi.
+• Oda kodu artık kalıcı sunucuda çalışıyor: arkadaşınla aynı anda, farklı
+  cihazlardan, kayıt olmadan oynayabilirsin.
+• Paylaş düğmesi telefonun paylaşım menüsünü açıyor; Kopyala yalnızca oda
+  kodunu panoya yazıyor.
+• Paylaşılan oda bağlantısı arkadaşının cihazında açılabilecek adresi taşıyor.
+• Ekran oranları yenilendi: küçük ve dar telefonlarda sağa/sola kaydırma
+  oluşmuyor; skor kartları ve üst bar taşmıyor.
+• Oyun menüsü ve sonuç penceresi her ekrana sığıyor (yatay mod dahil).
+• Ortak tahtada arkadaşının sürüklemesi canlı görünüyor.
+• Mod kartlarındaki tahta görselleri büyütüldü; oynat düğmesi taşmıyor.
 • Kazanma efekti zenginleşti: ışık huzmeleri, altın kıvılcımlar, geniş fanfar.
-• Satır ve sütun patlamaları artık ayrı seslerle duyuluyor; ikisi birden
-  patlarsa özel "perfect" sesi çalıyor.
-• Mod kartlarındaki tahta görselleri büyütüldü; oynat düğmesi artık taşmıyor.
-• Oyuncu adı doğrudan "Misafir oyuncu" şeridine taşındı; ayrı giriş adımı yok.
+• Satır ve sütun patlamaları ayrı seslerle duyuluyor; ikisi birden patlarsa
+  özel "perfect" sesi çalıyor.
+• Oyuncu adı doğrudan "Misafir oyuncu" şeridinde; ayrı giriş adımı yok.
 ```
 
 ---
@@ -179,7 +183,7 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 - [ ] İçerik derecelendirmesi anketi (bölüm 3).
 - [ ] Reklam beyanı: "Reklam içeriyor" işaretle.
 - [ ] Uygulama içi ürün `remove_ads` oluştur ve etkinleştir.
-- [ ] AAB yükle: `android/dist/Blokara-1v1-2.0.5.aab`.
+- [ ] AAB yükle: `android/dist/Blokara-1v1-2.0.8.aab`.
 - [ ] Kapalı test → 12 test kullanıcısı → 14 gün → üretime geçiş.
 - [ ] Üretim öncesi `assets/server.txt` kalıcı sunucu adresini gösteriyor mu
       kontrol et (tünel adresi kalıcı değildir).

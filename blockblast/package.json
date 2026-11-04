@@ -1,6 +1,6 @@
 {
   "name": "blok-iki",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "private": true,
   "description": "Blokara 1v1 — iki kişilik Block Blast ve oda kodlu online multiplayer",
   "main": "server.cjs",

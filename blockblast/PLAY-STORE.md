@@ -17,7 +17,7 @@ depodaki hazırlıkları özetler.
 | Gereksinim | Durum |
 |---|---|
 | Paket adı | `tr.blokiki.app` (değiştirilmemeli) |
-| Sürüm | `versionName 2.0.5`, `versionCode 17` |
+| Sürüm | `versionName 2.0.8`, `versionCode 20` |
 | Hedef API | 36 (Android 16) — Play’in 2026 gereksinimi |
 | Min API | 23 (Android 6.0) |
 | Derleme | Gradle 8.14.3 + Android Gradle Plugin 8.12.3, JDK 17 |
@@ -364,10 +364,10 @@ powershell -ExecutionPolicy Bypass -File android\build-aab.ps1 `
   -ServerUrl "https://SUNUCU-ADRESI" `
   -GoogleAndroidClientId "ANDROID_ID.apps.googleusercontent.com" `
   -GamesAppId 123456789 `
-  -VersionName "2.0.5" -VersionCode 17
+  -VersionName "2.0.8" -VersionCode 20
 ```
 
-Çıktı: `android/dist/Blokara-1v1-2.0.5.aab` (Gradle `bundleRelease`, release
+Çıktı: `android/dist/Blokara-1v1-2.0.8.aab` (Gradle `bundleRelease`, release
 anahtarıyla imzalı). Google Play yeni uygulamalarda **AAB** ister.
 
 ### b) Doğrudan kurulacak APK (arkadaş/test)
@@ -383,10 +383,10 @@ powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
   -ServerUrl "https://SUNUCU-ADRESI" `
   -GoogleAndroidClientId "ANDROID_ID.apps.googleusercontent.com" `
   -GamesAppId 123456789 `
-  -VersionName "2.0.5" -VersionCode 17
+  -VersionName "2.0.8" -VersionCode 20
 ```
 
-Çıktı: `android/dist/Blokara-1v1-2.0.5.apk`
+Çıktı: `android/dist/Blokara-1v1-2.0.8.apk`
 
 ### c) Doğrudan Gradle
 
@@ -407,7 +407,7 @@ Gradle çıktıları:
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
-& "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\apksigner.bat" verify --print-certs android\dist\Blokara-1v1-2.0.5.apk
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\apksigner.bat" verify --print-certs android\dist\Blokara-1v1-2.0.8.apk
 ```
 
 AAB içindeki manifesti görmek için Android Studio’nun **Build → Analyze APK**
