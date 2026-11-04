@@ -181,8 +181,24 @@
     }
   }
 
-  /* Zafer şöleni: üç dalga konfeti, alt köşelerden altın kıvılcımlar ve
-     merkezden yayılan halkalar. Sonuç ekranı açılırken çalışır. */
+  /* Merkezden yayılan altın ışık huzmeleri (DOM katmanı). Zafer anında
+     sonuç kartının arkasında döner; bir buçuk saniyede söner. */
+  function rays(x, y) {
+    if (!document.body || reducedMotion()) return;
+    var el = document.createElement("div");
+    el.className = "fx-rays";
+    el.setAttribute("aria-hidden", "true");
+    el.style.left = (x == null ? window.innerWidth / 2 : x) + "px";
+    el.style.top = (y == null ? window.innerHeight * 0.42 : y) + "px";
+    document.body.appendChild(el);
+    setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 1900);
+  }
+
+  /* Zafer şöleni: dört dalga konfeti, alt köşelerden altın kıvılcımlar,
+     merkezden yayılan halkalar, ışık huzmeleri ve yıldız parıltıları.
+     Sonuç ekranı açılırken çalışır. */
   function victory() {
     init();
     if (reducedMotion()) {
@@ -195,15 +211,16 @@
       COLORS.coral, COLORS.cobalt, COLORS.mustard, COLORS.mint, COLORS.grape, COLORS.sky,
       COLORS.lime, COLORS.rose, COLORS.teal
     ];
-    [0, 260, 560].forEach(function (delay, wave) {
+    [0, 240, 520, 820].forEach(function (delay, wave) {
       setTimeout(function () {
-        for (var i = 0; i < 70; i++) {
-          var life = 1.4 + Math.random() * 1.2;
+        var count = wave === 3 ? 46 : 70;
+        for (var i = 0; i < count; i++) {
+          var life = 1.4 + Math.random() * 1.4;
           spawn({
-            x: width * (0.05 + Math.random() * 0.9),
+            x: width * (0.03 + Math.random() * 0.94),
             y: -30 - Math.random() * 160,
-            vx: (Math.random() - 0.5) * (150 + wave * 40),
-            vy: 90 + Math.random() * 240,
+            vx: (Math.random() - 0.5) * (150 + wave * 55),
+            vy: 90 + Math.random() * 250,
             gravity: 300,
             size: 4 + Math.random() * 6,
             color: palette[Math.floor(Math.random() * palette.length)],
@@ -219,25 +236,54 @@
     /* Alt köşelerden yukarı fışkıran altın kıvılcımlar. */
     [[0.04, 0.98], [0.96, 0.98]].forEach(function (corner, index) {
       setTimeout(function () {
-        for (var i = 0; i < 26; i++) {
-          var life = 0.9 + Math.random() * 0.6;
+        for (var i = 0; i < 30; i++) {
+          var life = 0.9 + Math.random() * 0.7;
           spawn({
             x: width * corner[0],
             y: height * corner[1],
-            vx: (corner[0] < 0.5 ? 1 : -1) * (60 + Math.random() * 230),
-            vy: -(260 + Math.random() * 360),
-            gravity: 720,
+            vx: (corner[0] < 0.5 ? 1 : -1) * (60 + Math.random() * 250),
+            vy: -(260 + Math.random() * 380),
+            gravity: 700,
             size: 3 + Math.random() * 4,
             color: Math.random() < 0.5 ? COLORS.mustard : COLORS.paper,
             life: life, maxLife: life,
             round: true,
+            glow: true,
             drag: 0.99
           });
         }
       }, 120 + index * 90);
     });
+    /* Merkezde patlayan yıldız parıltısı: iki tur, hafif gecikmeli. */
+    [0, 300].forEach(function (delay, round) {
+      setTimeout(function () {
+        var cx = width * (round ? 0.5 : 0.5);
+        var cy = height * (round ? 0.34 : 0.4);
+        for (var i = 0; i < 26; i++) {
+          var angle = (Math.PI * 2 * i) / 26 + Math.random() * 0.16;
+          var speed = 120 + Math.random() * 260;
+          var life = 0.7 + Math.random() * 0.6;
+          spawn({
+            x: cx, y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            gravity: 180,
+            size: 4 + Math.random() * 5,
+            color: Math.random() < 0.65 ? COLORS.mustard : COLORS.paper,
+            life: life, maxLife: life,
+            round: true,
+            glow: true,
+            drag: 0.96
+          });
+        }
+      }, delay);
+    });
     shockwave(width / 2, height * 0.38, "mustard", 24, Math.min(width, height) * 0.7, 0.85);
     shockwave(width / 2, height * 0.38, "coral", 10, Math.min(width, height) * 0.5, 0.7);
+    setTimeout(function () {
+      shockwave(width / 2, height * 0.36, "paper", 8, Math.min(width, height) * 0.55, 0.75);
+    }, 260);
+    rays(width / 2, height * 0.4);
     flash("cross");
   }
 
@@ -332,9 +378,19 @@
       }
       ctx.fillStyle = p.color;
       if (p.round) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
-        ctx.fill();
+        if (p.glow) {
+          ctx.save();
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = Math.min(26, p.size * 2.6);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else {
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -422,6 +478,7 @@
     ghostCell: ghostCell,
     confetti: confetti,
     victory: victory,
+    rays: rays,
     defeat: defeat,
     floatText: floatText,
     flash: flash,

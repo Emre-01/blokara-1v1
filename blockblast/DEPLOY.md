@@ -1,5 +1,11 @@
 # Sunucuyu yayına alma (ücretsiz)
 
+> **En kısa yol:** `powershell -ExecutionPolicy Bypass -File deploy-render.ps1`
+> Depoyu kontrol eder, Render Blueprint bağlantısını panoya kopyalar.
+> Tek gereken: ücretsiz bir GitHub deposu + ücretsiz Render hesabı
+> (kart istemez). Adres kalıcıdır: `https://blok-iki.onrender.com`.
+
+
 Oyunun tek cihaz modları (tek kişilik, aynı telefon) internetsiz çalışır. Yalnızca
 **arkadaşınla oyna** (oda kodu veya rastgele eşleşme) modu için bir sunucu gerekir. Sunucu
 tek dosya Node uygulamasıdır, npm bağımlılığı yoktur, WebSocket'i kendi içinde

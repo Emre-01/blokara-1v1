@@ -143,6 +143,13 @@
     return app.audio;
   }
 
+  function clampPan(value) {
+    return Math.max(-1, Math.min(1, Number(value) || 0));
+  }
+
+  /* Tek nota. options: type, volume, slide (Hz cinsinden bağıl kayma),
+     to (mutlak hedef frekans), pan (-1 sol … 1 sağ), attack (saniye),
+     delay (saniye, sesi ileri planlar). */
   function tone(freq, duration, options) {
     if (!app.sound) return;
     var ctx = audio();
@@ -150,16 +157,31 @@
     options = options || {};
     var osc = ctx.createOscillator();
     var gain = ctx.createGain();
-    var now = ctx.currentTime;
+    var now = ctx.currentTime + (options.delay || 0);
+    var attack = options.attack == null ? 0.012 : Math.max(0.004, options.attack);
     osc.type = options.type || "triangle";
     osc.frequency.setValueAtTime(freq, now);
-    if (options.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq + options.slide), now + duration);
+    if (options.to) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(30, options.to), now + duration);
+    } else if (options.slide) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq + options.slide), now + duration);
+    }
     var volume = options.volume == null ? 0.06 : options.volume;
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(volume, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(volume, now + attack);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    var out = gain;
+    if (options.pan != null && ctx.createStereoPanner) {
+      var panner = ctx.createStereoPanner();
+      panner.pan.setValueAtTime(clampPan(options.pan), now);
+      if (options.panTo != null) {
+        panner.pan.linearRampToValueAtTime(clampPan(options.panTo), now + duration);
+      }
+      gain.connect(panner);
+      out = panner;
+    }
+    out.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + duration + 0.03);
   }
@@ -194,6 +216,46 @@
     source.stop(now + duration + 0.02);
   }
 
+  /* Süzgeçli gürültü "vınlaması". Satır patlamasında soldan sağa, sütun
+     patlamasında yukarıdan aşağı akan bir doku verir. */
+  function noiseSweep(duration, volume, fromHz, toHz, panFrom, panTo, delay) {
+    if (!app.sound) return;
+    var ctx = audio();
+    if (!ctx) return;
+    var length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    var buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < length; i++) {
+      var t = i / length;
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.5);
+    }
+    var source = ctx.createBufferSource();
+    source.buffer = buffer;
+    var filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = 1.2;
+    var now = ctx.currentTime + (delay || 0);
+    filter.frequency.setValueAtTime(Math.max(80, fromHz), now);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(80, toHz), now + duration);
+    var gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + duration * 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    var out = gain;
+    if (ctx.createStereoPanner) {
+      var panner = ctx.createStereoPanner();
+      panner.pan.setValueAtTime(clampPan(panFrom), now);
+      panner.pan.linearRampToValueAtTime(clampPan(panTo), now + duration);
+      gain.connect(panner);
+      out = panner;
+    }
+    out.connect(ctx.destination);
+    source.start(now);
+    source.stop(now + duration + 0.02);
+  }
+
   function sfxPlace() { tone(240, 0.08, { type: "square", slide: -70, volume: 0.035 }); }
   /* Puan kazanınca kısa, yükselen bir çınlama. Puan arttıkça tizleşir;
      böylece her hamlenin karşılığı duyulur. */
@@ -212,23 +274,58 @@
       setTimeout(function () { tone(freq, 0.16, { type: "triangle", volume: 0.055 }); }, index * 90);
     });
   }
-  function sfxClear(lines) {
-    var notes = [523.25, 659.25, 783.99, 1046.5];
-    var count = Math.min(4, 1 + (lines || 0));
-    for (var i = 0; i < count; i++) {
+  /* --- Satır (yatay) patlaması: soldan sağa akan parlak bir "şşşt" ve
+     dört notalı yükselen çınlama. Çizgi sayısı arttıkça nota eklenir. --- */
+  function sfxRowClear(count) {
+    var n = Math.max(1, Math.min(4, count || 1));
+    noiseSweep(0.24, 0.07, 720, 5400, -0.9, 0.9);
+    var notes = [659.25, 830.61, 987.77, 1318.51];
+    for (var i = 0; i < n; i++) {
       (function (index) {
+        var pan = -0.6 + index * 0.4;
         setTimeout(function () {
-          tone(notes[index], 0.16, { type: "triangle", volume: 0.05 });
-          tone(notes[index] * 2, 0.1, { type: "sine", volume: 0.02 });
-        }, index * 65);
+          tone(notes[index], 0.15, { type: "triangle", volume: 0.055, pan: pan });
+          tone(notes[index] * 2, 0.09, { type: "sine", volume: 0.018, pan: pan });
+        }, index * 42);
       })(i);
     }
-    /* Çizgi sayısı arttıkça tiz bir "parlama" katmanı eklenir. */
-    setTimeout(function () {
-      tone(1567.98, 0.22, { type: "sine", slide: 420, volume: 0.028 + count * 0.004 });
-    }, count * 60);
   }
-  /* Kalın, tok vuruş: satır patlamasının gövdesini duyurur. */
+
+  /* --- Sütun (dikey) patlaması: yukarıdan aşağı inen tok bir vuruş,
+     derin bas ve alçalan çan sesleri. Satırdan belirgin biçimde farklı. --- */
+  function sfxColClear(count) {
+    var n = Math.max(1, Math.min(4, count || 1));
+    noiseSweep(0.22, 0.06, 3400, 480, 0.15, -0.15);
+    tone(104, 0.2, { type: "sine", to: 76, volume: 0.11 });
+    tone(156, 0.16, { type: "triangle", to: 108, volume: 0.05 });
+    var notes = [987.77, 830.61, 659.25, 523.25];
+    for (var i = 0; i < n; i++) {
+      (function (index) {
+        setTimeout(function () {
+          tone(notes[index], 0.18, { type: "sine", volume: 0.05, pan: 0.2 - index * 0.12 });
+          tone(notes[index] * 0.5, 0.22, { type: "triangle", volume: 0.025 });
+        }, 60 + index * 55);
+      })(i);
+    }
+  }
+
+  /* --- Satır + sütun aynı anda (PERFECT): iki ses üst üste + altın vuruş. --- */
+  function sfxCrossClear(count) {
+    noiseSweep(0.38, 0.085, 620, 6200, -0.85, 0.85);
+    sfxRowClear(Math.min(4, (count || 2) - 1));
+    sfxColClear(Math.min(4, (count || 2) - 1));
+    tone(65, 0.42, { type: "sine", to: 48, volume: 0.17 });
+    [1046.5, 1318.51, 1567.98, 2093].forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.3, { type: "sine", volume: 0.035, pan: -0.5 + index * 0.33 });
+      }, 90 + index * 55);
+    });
+  }
+
+  /* Eski çağrılar için güvenli geri dönüş: yön bilinmiyorsa satır sesi. */
+  function sfxClear(lines) { sfxRowClear(lines); }
+
+  /* Kalın, tok vuruş: patlamanın gövdesini duyurur. */
   function sfxBass(lines, cross) {
     var power = cross ? 1.3 : (lines >= 3 ? 1.2 : 1);
     noiseBurst(cross ? 0.34 : 0.24, 0.07 * power, cross ? 1900 : 1300);
@@ -263,20 +360,52 @@
     }, 480);
   }
   function sfxWin() {
-    /* Zafer fanfarı: yükselen arpej, ardından parlak bir akor. */
-    var arp = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    /* Zafer: yükselen fanfar, altında büyüyen bas, ardından geniş bir
+       majör akor ve tiz kıvılcımlar. Kısa bir yankı katmanı sahneyi
+       büyütür; hepsi WebAudio ile üretilir (dosya yok). */
+    var arp = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
     arp.forEach(function (freq, index) {
       setTimeout(function () {
-        tone(freq, 0.2, { type: "triangle", volume: 0.055 });
-        tone(freq * 1.5, 0.16, { type: "sine", volume: 0.022 });
-      }, index * 95);
+        tone(freq, 0.22, { type: "triangle", volume: 0.058, attack: 0.006 });
+        tone(freq * 2, 0.14, { type: "sine", volume: 0.02 });
+        tone(freq * 1.5, 0.16, { type: "sine", volume: 0.016, pan: index % 2 ? 0.4 : -0.4 });
+      }, index * 82);
     });
+
+    /* Altında yükselen bas: fanfara ağırlık katar. */
+    tone(130.81, 0.7, { type: "triangle", to: 196, volume: 0.07, attack: 0.05 });
     setTimeout(function () {
-      [523.25, 659.25, 783.99, 1046.5].forEach(function (freq) {
-        tone(freq, 0.55, { type: "triangle", volume: 0.04 });
+      tone(196, 0.5, { type: "sine", to: 261.63, volume: 0.05, attack: 0.05 });
+    }, 210);
+
+    /* Final akoru: kök + üçlü + beşli + oktav, hafif detune ile geniş. */
+    setTimeout(function () {
+      [261.63, 329.63, 392, 523.25].forEach(function (freq, index) {
+        tone(freq, 0.9, { type: "triangle", volume: 0.036, attack: 0.04, pan: -0.3 + index * 0.2 });
+        tone(freq * 1.003, 0.9, { type: "sine", volume: 0.018, attack: 0.05 });
       });
-      tone(2093, 0.4, { type: "sine", volume: 0.025 });
-    }, 500);
+      tone(1046.5, 0.55, { type: "sine", volume: 0.028 });
+      tone(2093, 0.42, { type: "sine", volume: 0.018 });
+    }, 540);
+
+    /* Tiz kıvılcım yağmuru: yukarı doğru kayan parlak notalar. */
+    [1567.98, 1975.53, 2349.32, 2637.02].forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.18, { type: "sine", volume: 0.018, pan: -0.6 + index * 0.4 });
+      }, 760 + index * 70);
+    });
+
+    /* Kısa yankı: aynı akoru daha kısık ve gecikmeli tekrar eder. */
+    setTimeout(function () {
+      [523.25, 659.25, 783.99].forEach(function (freq) {
+        tone(freq, 0.5, { type: "sine", volume: 0.012 });
+      });
+    }, 1040);
+    setTimeout(function () {
+      [523.25, 783.99].forEach(function (freq) {
+        tone(freq, 0.4, { type: "sine", volume: 0.006 });
+      });
+    }, 1320);
   }
   function sfxPenalty() {
     tone(180, 0.16, { type: "sawtooth", slide: -60, volume: 0.04 });
@@ -456,7 +585,13 @@
         renderGame();
         checkResult();
         return result;
-      }
+      },
+      /* Sesleri tek tek çalmak için (testte sessiz/bozuk ses yakalanır). */
+      sfx: {
+        place: sfxPlace, points: sfxPoints, row: sfxRowClear, col: sfxColClear,
+        cross: sfxCrossClear, win: sfxWin, lose: sfxLose, reward: sfxReward
+      },
+      resetAudio: function () { app.audio = null; return true; }
     };
   }
 
@@ -2253,7 +2388,14 @@
         : (last.lines === 2 ? "GREAT!" : "GOOD!");
       var gradeClass = cross || last.lines >= 3 ? "perfect"
         : (last.lines === 2 ? "great" : "good");
-      sfxClear(last.lines);
+      var rowsCleared = last.rows ? last.rows.length : 0;
+      var colsCleared = last.cols ? last.cols.length : 0;
+      /* Yön duyusu: yatay satır, dikey sütun ve ikisi birden ayrı seslerle
+         duyurulur; böylece oyuncu neyin patladığını gözü kapalı anlar. */
+      if (rowsCleared && colsCleared) sfxCrossClear(rowsCleared + colsCleared);
+      else if (colsCleared) sfxColClear(colsCleared);
+      else if (rowsCleared) sfxRowClear(rowsCleared);
+      else sfxClear(last.lines);
       sfxBass(last.lines, !!cross);
       if (app.vibrate && FX) {
         FX.vibrate(cross ? [22, 30, 22, 30, 34] : (last.lines > 1 ? [18, 35, 18] : 14));
