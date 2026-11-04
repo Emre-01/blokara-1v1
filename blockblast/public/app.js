@@ -1055,14 +1055,50 @@
   /* sunucu / websocket                                                  */
   /* ------------------------------------------------------------------ */
 
-  function wsUrl() {
-    var base = serverBase();
+  /* Sunucu adresi değişse de oyunun kilitlenmemesi için bilinen kalıcı
+     adres. APK'nın içine gömülü adres ölü bir tünel olsa bile oyun buraya
+     düşer; çalışan adres cihazda saklanır. */
+  var FALLBACK_SERVER = "https://blok-iki.onrender.com";
+
+  function wsUrlFor(base) {
     if (base) {
       var parsed = parseServer(base);
       if (parsed) return (parsed.secure ? "wss:" : "ws:") + "//" + parsed.host + "/ws";
     }
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
     return protocol + "//" + location.host + "/ws";
+  }
+
+  function wsUrl() {
+    return wsUrlFor(serverBase());
+  }
+
+  /* Denenecek sunucular, sırayla: ?sunucu= > kayıtlı > Android köprüsü >
+     aynı köken > kalıcı yedek. Aynı adres iki kez denenmez. */
+  function serverCandidates() {
+    var list = [];
+    var push = function (value) {
+      var parsed = typeof value === "string" ? parseServer(value) : value;
+      if (!parsed || !parsed.base) return;
+      if (list.indexOf(parsed.base) >= 0) return;
+      list.push(parsed.base);
+    };
+    push(new URLSearchParams(location.search).get("sunucu"));
+    push(read(LS_SERVER));
+    if (window.BlokIkiServer) {
+      var raw = null;
+      try {
+        raw = typeof window.BlokIkiServer.serverUrl === "function"
+          ? window.BlokIkiServer.serverUrl()
+          : window.BlokIkiServer.base;
+      } catch (error) { raw = null; }
+      push(raw);
+    }
+    if (location.protocol !== "file:" && location.host) {
+      push(location.protocol + "//" + location.host);
+    }
+    push(FALLBACK_SERVER);
+    return list;
   }
 
   /* "10.0.2.2:8080", "http://x", "https://x/" gibi girdileri normalize eder. */
@@ -1096,19 +1132,12 @@
     return "";
   }
 
-  function ensureSocket(options) {
-    var quiet = !!(options && options.quiet);
+  /* Tek bir sunucuya bağlanmayı dener. Söz: açılan soket ya da hata. */
+  function openSocket(base, quiet) {
     return new Promise(function (resolve, reject) {
-      if (app.ws && app.ws.readyState === WebSocket.OPEN) return resolve(app.ws);
-      if (navigator.onLine === false) {
-        return reject(new Error("İnternet bağlantısı yok. Bağlanınca tekrar dene."));
-      }
-      if (location.protocol === "file:" && !serverBase()) {
-        return reject(new Error("Bu sürümde sunucu adresi tanımlı değil."));
-      }
       var socket;
       try {
-        socket = new WebSocket(wsUrl());
+        socket = new WebSocket(wsUrlFor(base));
       } catch (error) {
         return reject(new Error("Sunucuya bağlanılamadı."));
       }
@@ -1119,13 +1148,12 @@
         if (!settled && !quiet) toast("Sunucu uyanıyor, birkaç saniye sürer…");
       }, 4000);
       var timer = setTimeout(function () {
-        if (!settled) {
-          settled = true;
-          clearTimeout(slowToast);
-          try { socket.close(); } catch (error) { /* yoksay */ }
-          reject(new Error("Sunucu yanıt vermedi."));
-        }
-      }, 45000);
+        if (settled) return;
+        settled = true;
+        clearTimeout(slowToast);
+        try { socket.close(); } catch (error) { /* yoksay */ }
+        reject(new Error("Sunucu yanıt vermedi."));
+      }, 40000);
 
       socket.addEventListener("open", function () {
         if (settled) return;
@@ -1133,6 +1161,12 @@
         clearTimeout(timer);
         clearTimeout(slowToast);
         app.reconnectAttempts = 0;
+        /* Çalışan adresi hatırla: sonraki açılışlarda doğrudan buraya gidilir. */
+        var parsed = parseServer(base);
+        var saved = parseServer(read(LS_SERVER));
+        if (parsed && (!saved || saved.base !== parsed.base)) {
+          save(LS_SERVER, parsed.base);
+        }
         resolve(socket);
         syncPresence();
       });
@@ -1153,14 +1187,35 @@
       });
 
       socket.addEventListener("error", function () {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          clearTimeout(slowToast);
-          reject(new Error("Sunucuya bağlanılamadı."));
-        }
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        clearTimeout(slowToast);
+        reject(new Error("Sunucuya bağlanılamadı."));
       });
     });
+  }
+
+  function ensureSocket(options) {
+    var quiet = !!(options && options.quiet);
+    if (app.ws && app.ws.readyState === WebSocket.OPEN) return Promise.resolve(app.ws);
+    if (navigator.onLine === false) {
+      return Promise.reject(new Error("İnternet bağlantısı yok. Bağlanınca tekrar dene."));
+    }
+    var bases = serverCandidates();
+    if (!bases.length) {
+      return Promise.reject(new Error("Bu sürümde sunucu adresi tanımlı değil."));
+    }
+    /* Sırayla dene: gömülü adres ölmüşse yedek kalıcı sunucuya geçilir. */
+    var index = 0;
+    var attempt = function () {
+      if (index >= bases.length) {
+        return Promise.reject(new Error("Sunucuya bağlanılamadı."));
+      }
+      var base = bases[index++];
+      return openSocket(base, quiet).catch(attempt);
+    };
+    return attempt();
   }
 
   function wsSend(message) {
