@@ -3431,7 +3431,7 @@ body {
     gap: clamp(4px, 1.1vh, 10px);
     border-radius: 20px;
     box-shadow: 4px 4px 0 var(--ink);
-    align-content: center;
+    align-content: start;
   }
   .lobby-card::before,
   .lobby-card::after { display: none; }
@@ -3470,14 +3470,15 @@ body {
   .sheet.help .help-list span { font-size: 11.5px; line-height: 1.3; }
 }
 @media (max-width: 720px) and (max-height: 640px) {
-  .sheet.help { padding: 10px 12px; }
+  .sheet.help { padding: 8px 11px; }
+  .sheet.help .result-badge { margin-bottom: 4px; padding: 2px 8px; font-size: 10px; }
   .sheet.help h2 { font-size: 19px; }
-  .sheet.help .sheet-sub { font-size: 11px; margin-bottom: 5px; }
-  .sheet.help .help-list { gap: 3px; margin-top: 4px; }
+  .sheet.help .sheet-sub { font-size: 11px; line-height: 1.28; margin-bottom: 3px; }
+  .sheet.help .help-list { gap: 2px; margin-top: 2px; }
   .sheet.help .help-list b { font-size: 12px; }
   .sheet.help .help-list span { font-size: 10.5px; line-height: 1.25; }
-  .sheet.help .sheet-actions { margin-top: 6px; }
-  .sheet.help .sheet-actions .btn { min-height: 32px; padding: 5px 10px; font-size: 13px; }
+  .sheet.help .sheet-actions { margin-top: 3px; }
+  .sheet.help .sheet-actions .btn { min-height: 30px; padding: 4px 10px; font-size: 12.5px; }
 }
 
 /* Dil listesi: telefonlarda üç sütun; kaydırma çubuğu görünmez. */
@@ -3492,6 +3493,6 @@ body {
   .lang-pick { min-height: 34px; padding: 5px 7px; font-size: 12px; }
 }
 @media (max-width: 340px) {
-  .sheet .lang-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lang-pick { font-size: 11.5px; }
+  .sheet .lang-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .lang-pick { font-size: 10.5px; padding: 4px 5px; min-height: 30px; line-height: 1.1; }
 }

@@ -557,11 +557,16 @@ const MATCH_TTL = 2 * 60 * 1000;
 /* Arkadaş kodu → açık bağlantı. Yalnızca eşleşme/davet için tutulur,
    diskte saklanmaz. */
 const presence = new Map();
-/* Arkadaş kodu → son bilinen ad. Çevrimdışı arkadaşın da güncel adı
-   görünsün diye bağlantı kapandıktan sonra kısa süre saklanır. */
+/* Arkadaş kodu → son bilinen ad. Çevrimdışı arkadaşın da son adı görünsün
+   diye saklanır; yalnızca bellekte tutulur, LRU sınırını aşınca ve sunucu
+   yeniden başlayınca temizlenir. */
 const friendNames = new Map();
 const FRIEND_NAMES_LIMIT = 5000;
 const FRIEND_CODE_RE = /^[A-Z0-9]{4,10}$/;
+/* Davet spam koruması: aynı bağlantıda iki davet arası en az süre ve
+   aynı hedefe tekrar davet için beklenmesi gereken süre. */
+const INVITE_MIN_MS = 2000;
+const INVITE_REPEAT_MS = 30 * 1000;
 
 function rememberFriendName(code, name) {
   const key = normalizeFriendCode(code);
@@ -982,15 +987,36 @@ function handleMessage(conn, message) {
       return conn.send({ t: "invited", ok: false, message: "Arkadaşın şu an çevrimiçi değil." });
     }
     const roomCode = String(message.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
-    if (!rooms.has(roomCode)) {
+    const room = rooms.get(roomCode);
+    if (!room) {
       return conn.send({ t: "invited", ok: false, message: "Oda bulunamadı." });
     }
+    /* Daveti yalnızca odanın gerçek oyuncusu gönderebilir: başka birinin
+       odası için ya da hiç girilmeyen bir oda adına davet gidemez. */
+    const info = conn.player;
+    const slot = info && info.code === roomCode ? room.players[info.index] : null;
+    if (!info || !slot || slot.token !== info.token || slot.conn !== conn) {
+      return conn.send({ t: "invited", ok: false, message: "Davet göndermek için bu odada olmalısın." });
+    }
+    /* Spam koruması: üst üste davet ve aynı hedefe kısa arayla tekrar engellenir. */
+    const now = Date.now();
+    if (!conn.inviteTargets) conn.inviteTargets = new Map();
+    if (conn.inviteTargets.size > 200) conn.inviteTargets.clear();
+    const lastTo = conn.inviteTargets.get(code);
+    if (lastTo && now - lastTo < INVITE_REPEAT_MS) {
+      return conn.send({ t: "invited", ok: false, message: "Bu arkadaşa az önce davet gönderdin." });
+    }
+    if (conn.lastInviteAt && now - conn.lastInviteAt < INVITE_MIN_MS) {
+      return conn.send({ t: "invited", ok: false, message: "Çok hızlı davet gönderiyorsun, biraz bekle." });
+    }
+    conn.lastInviteAt = now;
+    conn.inviteTargets.set(code, now);
     target.send({
       t: "invite",
       from: conn.friendName || "Arkadaşın",
       fromCode: conn.friendCode || "",
       code: roomCode,
-      mode: rooms.get(roomCode).mode
+      mode: room.mode
     });
     return conn.send({ t: "invited", ok: true, name: target.friendName || "" });
   }

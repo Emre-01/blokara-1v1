@@ -394,6 +394,19 @@ async function main() {
   const offlineInvite = await f2.next((m) => m.t === "invited");
   assert.strictEqual(offlineInvite.ok, false);
 
+  // Odada olmayan bir bağlantı başkasının odasına davet gönderemez.
+  const f3 = await connect();
+  f3.send({ t: "invite", to: "K7M2QX", code: inviteRoom.code });
+  const outsider = await f3.next((m) => m.t === "invited");
+  assert.strictEqual(outsider.ok, false, "oda üyesi olmayan davet gönderememeli");
+  f3.close();
+  await wait(100);
+
+  // Kısa arayla aynı hedefe ikinci davet spam korumasına takılır.
+  f2.send({ t: "invite", to: "K7M2QX", code: inviteRoom.code });
+  const repeat = await f2.next((m) => m.t === "invited");
+  assert.strictEqual(repeat.ok, false, "aynı hedefe kısa arayla tekrar davet engellenmeli");
+
   // Bağlantı kapanınca durum temizlenir; son bilinen ad korunur.
   f1.close();
   await wait(200);

@@ -106,14 +106,18 @@ SHA-1, Play Console, veri güvenliği beyanı, mağaza görselleri) için
 arkadaş listesi açar:
 
 - Her oyuncunun 6 haneli bir **arkadaş kodu** vardır; kopyalanıp paylaşılabilir.
-- Arkadaş koduyla ekleme; liste çevrimiçi/çevrimdışı durumunu gösterir.
+- Arkadaş koduyla ekleme (en fazla 50 arkadaş); liste çevrimiçi/çevrimdışı durumunu gösterir.
 - Liste, arkadaşın **sunucudaki güncel adını** gösterir; arkadaş adını
   değiştirdiğinde ya da yeniden bağlandığında otomatik tazelenir. Çevrimdışıyken
   son bilinen ad korunur.
 - **Davet et**: oda varsa kod doğrudan gider; oda yoksa önce rakip odası kurulur.
+  Oyun sürerken davet göndermek istenirse önce onay sorulur.
 - Davet alan oyuncunun ekranında “Katıl” şeridi çıkar ve tek dokunuşla odaya girer.
+- Liste açıkken bağlantı koparsa istemci sessizce yeniden bağlanır.
 
 Durum bilgisi sunucuda yalnızca bellekte tutulur; hesap veya veritabanı gerekmez.
+Daveti yalnızca odanın gerçek oyuncusu gönderebilir; üst üste ve kısa arayla
+tekrarlanan davetler sunucuda engellenir.
 
 ## Güvenlik
 
@@ -124,6 +128,8 @@ Sunucu herkese açık çalışacak şekilde sertleştirildi:
 - WebSocket `Origin` doğrulaması (`file://` / APK ve aynı köken kabul, `ORIGINS` ile genişletilir);
 - IP başına ve toplam bağlantı sınırı, oda sayısı sınırı;
 - dakikada hatalı oda kodu denemesi sınırı;
+- davetler yalnızca odanın gerçek oyuncusundan gönderilebilir; davet spam'i
+  süreye bağlı olarak engellenir;
 - kimlik doğrulama gövdesi 16 KB ile sınırlı (413 ile reddedilir);
 - WebView’da dosya kaynakları arası erişim kapalı, yalnızca HTTPS/WSS.
 

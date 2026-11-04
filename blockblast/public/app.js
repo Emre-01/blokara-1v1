@@ -63,11 +63,9 @@
     backgrounded: false,
     friendCode: "",
     friends: [],
-    friendLookup: {},
-    pendingFriendAdd: "",
     pendingInvite: null,
     friendsTimer: null,
-    friendLookupSeq: 0,
+    friendsConnectBusy: false,
     inviteAfterCreate: "",
     interstitialPending: false,
     daily: false,
@@ -1346,6 +1344,9 @@
       app.heartbeat = null;
     }
     app.pending = false;
+    /* Bağlantı koptuysa bekleyen davet gönderilemez; eski davet başka bir
+       odanın karşılama mesajıyla yanlışlıkla çıkmasın. */
+    app.inviteAfterCreate = "";
     if (app.matching) {
       app.matching = false;
       updateMatchButton();
@@ -1357,6 +1358,9 @@
         scheduleReconnect();
       }
     }
+    /* Arkadaş listesi açıksa çevrimiçi durumu kaybolmasın: sessizce
+       yeniden bağlanmayı dene. */
+    if (!$("#overlay").hidden && $("#friend-list")) refreshFriendsOnline();
   }
 
   function scheduleReconnect() {
@@ -3841,7 +3845,7 @@
   }
 
   function createRoom(mode) {
-    if (app.busy) return;
+    if (app.busy) return false;
     app.busy = true;
     var name = playerName();
     ensureSocket().then(function () {
@@ -3849,10 +3853,13 @@
       setTimeout(function () { app.busy = false; }, 500);
     }).catch(function (error) {
       app.busy = false;
+      /* Oda kurulamazsa bekleyen davet artık gönderilemez: kalmasın. */
+      app.inviteAfterCreate = "";
       var message = error.message || "Sunucuya bağlanılamadı.";
       if (/sunucu/i.test(message)) askServer(message);
       else toast(message);
     });
+    return true;
   }
 
   function joinRoom(code) {
@@ -3932,9 +3939,11 @@
   /* ------------------------------------------------------------------ */
 
   var FRIEND_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var MAX_FRIENDS = 50;
 
-  /* Cihazda kalıcı arkadaş kodu; hesap gerekmez. Aynı tarayıcıda açılan
-     sekmeler aynı kaydı paylaşsa da her oturum kendi kodunu korur. */
+  /* Cihazda kalıcı arkadaş kodu; hesap gerekmez. Aynı tarayıcıdaki
+     sekmeler aynı kodu paylaşır; sunucuda en son bağlanan sekme
+     davetleri alır. */
   function friendCode() {
     if (app.friendCode && /^[A-Z0-9]{4,10}$/.test(app.friendCode)) return app.friendCode;
     var code = read(LS_FRIEND_CODE);
@@ -3996,11 +4005,14 @@
   }
 
   function addFriend(code, name) {
-    var key = friendKey(code);
-    if (!key || key.length < 4) {
+    var raw = String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    /* Uzun girdiyi sessizce kısaltmak yanlış kod ekler: sınırı aşan
+       girdi tamamen reddedilir. */
+    if (!raw || raw.length < 4 || raw.length > 10) {
       toast("Arkadaş kodu 4-10 karakter olmalı.");
       return false;
     }
+    var key = raw;
     if (key === friendCode()) {
       toast("Bu senin kendi kodun.");
       return false;
@@ -4011,6 +4023,10 @@
       saveFriends();
       toast("Arkadaş listende zaten var.");
       return true;
+    }
+    if (app.friends.length >= MAX_FRIENDS) {
+      toast("Arkadaş listesi dolu. Bir arkadaşını kaldır.");
+      return false;
     }
     app.friends.push({ code: key, name: name || "" });
     saveFriends();
@@ -4032,6 +4048,18 @@
     if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
       app.friends.forEach(function (item) { item.online = false; });
       renderFriendsSheet();
+      /* Liste açıkken bağlantı koptuysa sessizce yeniden dene; bağlanınca
+         durum yenilenir. Aynı anda tek deneme yeter. */
+      if (!app.friendsConnectBusy) {
+        app.friendsConnectBusy = true;
+        ensureSocket({ quiet: true }).then(function () {
+          app.friendsConnectBusy = false;
+          syncPresence();
+          refreshFriendsOnline();
+        }).catch(function () {
+          app.friendsConnectBusy = false;
+        });
+      }
       return;
     }
     app.friends.forEach(function (item) {
@@ -4063,6 +4091,7 @@
   function showFriends() {
     if (!app.friends.length) loadFriends();
     openOverlay(friendsSheetHTML(), true);
+    /* refreshFriendsOnline, bağlantı yoksa kendisi sessizce kurar. */
     refreshFriendsOnline();
     if (app.friendsTimer) clearInterval(app.friendsTimer);
     app.friendsTimer = setInterval(function () {
@@ -4073,12 +4102,6 @@
       }
       refreshFriendsOnline();
     }, 15000);
-    if (!app.ws || app.ws.readyState !== WebSocket.OPEN) {
-      ensureSocket({ quiet: true }).then(function () {
-        syncPresence();
-        refreshFriendsOnline();
-      }).catch(function () { /* sunucu yoksa yerel liste yeter */ });
-    }
     var form = $("#friend-add-form");
     if (form) {
       form.addEventListener("submit", function (event) {
@@ -4152,19 +4175,26 @@
   }
 
   function addFriendFromSheet(input) {
-    var code = friendKey(input);
-    if (code.length < 4) {
+    var raw = String(input || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!raw || raw.length < 4 || raw.length > 10) {
       toast("Arkadaş kodu 4-10 karakter olmalı.");
       return;
     }
-    if (code === friendCode()) {
+    if (raw === friendCode()) {
       toast("Bu senin kendi kodun.");
       return;
     }
-    app.pendingFriendAdd = code;
-    addFriend(code);
+    if (findFriend(raw)) {
+      toast("Arkadaş listende zaten var.");
+      var current = $("#friend-code-input");
+      if (current) current.value = "";
+      return;
+    }
+    /* Hata durumunda yalnızca hatanın tostu görünsün; başarısız ekleme
+       için "eklendi" mesajı gösterilmez. */
+    if (!addFriend(raw)) return;
     renderFriendsSheet();
-    lookupFriend(code);
+    lookupFriend(raw);
     toast("Arkadaş eklendi. Güncel adı alınıyor…");
     var field = $("#friend-code-input");
     if (field) field.value = "";
@@ -4186,11 +4216,28 @@
       send();
       return;
     }
-    /* Oda yoksa önce rakip odası kur, hoş geldin mesajında davet gönder. */
-    app.inviteAfterCreate = key;
-    closeOverlay();
-    toast("Oda kuruluyor, davet hemen ardından gidecek…");
-    createRoom("versus");
+    var createAndInvite = function () {
+      /* Oda yoksa önce rakip odası kur, hoş geldin mesajında davet gönder. */
+      app.inviteAfterCreate = key;
+      closeOverlay();
+      toast("Oda kuruluyor, davet hemen ardından gidecek…");
+      if (!createRoom("versus")) {
+        /* Oda kurulamadı: bayrak kalırsa sonraki odada yanlış davet gider. */
+        app.inviteAfterCreate = "";
+        toast("Şu an başka bir işlem sürüyor; biraz sonra tekrar dene.");
+      }
+    };
+    /* Oyun sürerken davet mevcut oyunu bitirir: önce onay al. */
+    if (app.screen === "game") {
+      showConfirm("Oyundan çıkılsın mı?",
+        app.online
+          ? "Odadan ayrılırsan arkadaşın devam edemez."
+          : "Bu turdaki skor kaybolur.",
+        "Çık",
+        createAndInvite);
+      return;
+    }
+    createAndInvite();
   }
 
   function showInviteBanner(message) {
@@ -4538,13 +4585,25 @@
     document.body.removeChild(area);
   }
 
+  /* Paylaşılabilir oda bağlantısı. Uygulama içinde adres file://… olur;
+     arkadaşın cihazında açılabilmesi için sunucu adresi kullanılır. */
+  function roomLink(code) {
+    var encoded = encodeURIComponent(code);
+    if (location.protocol !== "file:" && location.host) {
+      return location.origin + location.pathname + "?oda=" + encoded;
+    }
+    var base = serverBase();
+    if (base) return base + "/?oda=" + encoded;
+    return "?oda=" + encoded;
+  }
+
   /* "Paylaş": işletim sisteminin paylaşım menüsünü açar (WhatsApp, Telegram,
      mesajlar…). "Kopyala" düğmesi ise yalnızca kodu panoya yazar; ikisi aynı
      işi yapmaz. Paylaşım yolu yoksa son çare olarak bağlantı kopyalanır. */
   function shareRoom() {
     var code = $("#lobby-code").textContent.trim();
     if (!code || code === "-----") return;
-    var url = location.origin + location.pathname + "?oda=" + encodeURIComponent(code);
+    var url = roomLink(code);
     var lead = (window.BlokI18n && window.BlokI18n.t)
       ? window.BlokI18n.t("Blokara 1v1 oynayalım mı? Oda kodu:")
       : "Blokara 1v1 oynayalım mı? Oda kodu:";
