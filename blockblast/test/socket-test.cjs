@@ -121,7 +121,7 @@ async function main() {
   }
   assert.ok(placed, "hiçbir hamle kabul edilmedi");
 
-  // rakip modunda sıra yok: Efe de aynı anda oynayabilir
+  // rakip modu varsayılan olarak sırayla: Ada oynadı, sıra Efe'de
   const trayB = startedB.state.players[1].tray;
   let placedB = false;
   for (let p = 0; p < trayB.length && !placedB; p++) {
@@ -269,11 +269,43 @@ async function main() {
   assert.strictEqual(timerStateF.state.timeMode, "turn");
   await g.next((m) => isState(m) && m.state.timeMode === "turn");
 
+  // doldurma düzenini de yalnızca oda sahibi değiştirir
+  g.send({ t: "pace", pace: "live" });
+  const paceDenied = await g.next((m) => m.t === "error" && /doldurma düzenini/i.test(m.message));
+  assert.ok(/doldurma düzenini/i.test(paceDenied.message), "oyuncu 2 doldurma düzenini değiştirememeli");
+
+  f.send({ t: "pace", pace: "live" });
+  const livePace = await f.next((m) => isState(m) && m.state.turnBased === false);
+  assert.strictEqual(livePace.state.turnBased, false);
+  await g.next((m) => isState(m) && m.state.turnBased === false);
+
+  f.send({ t: "pace", pace: "turn" });
+  const turnPace = await f.next((m) => isState(m) && m.state.turnBased === true);
+  assert.strictEqual(turnPace.state.turnBased, true);
+  await g.next((m) => isState(m) && m.state.turnBased === true);
+
+  // süre ince ayarı sınırlara oturur ve iki tarafta aynı görünür
+  f.send({ t: "timer", timeLimit: 9999 });
+  const limitHigh = await f.next((m) => isState(m) && m.state.timeLimit === 300);
+  assert.strictEqual(limitHigh.state.timeLimit, 300);
+  await g.next((m) => isState(m) && m.state.timeLimit === 300);
+
+  f.send({ t: "timer", turnLimit: 1 });
+  const limitLow = await f.next((m) => isState(m) && m.state.turnLimit === 10);
+  assert.strictEqual(limitLow.state.turnLimit, 10);
+  await g.next((m) => isState(m) && m.state.turnLimit === 10);
+
+  f.send({ t: "timer", timeLimit: 165, turnLimit: 45 });
+  const limitCustom = await f.next((m) => isState(m) && m.state.timeLimit === 165 && m.state.turnLimit === 45);
+  assert.strictEqual(limitCustom.state.timeLimit, 165);
+  assert.strictEqual(limitCustom.state.turnLimit, 45);
+  await g.next((m) => isState(m) && m.state.timeLimit === 165 && m.state.turnLimit === 45);
+
   f.send({ t: "start" });
   const timed = await f.next((m) => isState(m) && m.state.phase === "playing");
   assert.strictEqual(timed.state.timeMode, "turn");
-  assert.strictEqual(timed.state.timeLimit, 120);
-  assert.strictEqual(timed.state.turnLimit, 30);
+  assert.strictEqual(timed.state.timeLimit, 165);
+  assert.strictEqual(timed.state.turnLimit, 45);
 
   f.close();
   g.close();

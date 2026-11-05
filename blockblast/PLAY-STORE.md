@@ -17,7 +17,7 @@ depodaki hazırlıkları özetler.
 | Gereksinim | Durum |
 |---|---|
 | Paket adı | `tr.blokiki.app` (değiştirilmemeli) |
-| Sürüm | `versionName 2.0.9`, `versionCode 21` |
+| Sürüm | `versionName 2.1.0`, `versionCode 22` |
 | Hedef API | 36 (Android 16) — Play’in 2026 gereksinimi |
 | Min API | 23 (Android 6.0) |
 | Derleme | Gradle 8.14.3 + Android Gradle Plugin 8.12.3, JDK 17 |
@@ -29,7 +29,7 @@ depodaki hazırlıkları özetler.
 | Hesap girişi | Google Play Games (Android) + Google OAuth (web/yedek) |
 | Reklam | AdMob: geçiş + ödüllü + alt banner (varsayılan: resmî test kimlikleri) |
 | Sunucu güvenliği | CSP, güvenlik başlıkları, Origin kontrolü, bağlantı/oda sınırları, giriş denemesi sınırı |
-| Güncelleme | HTML/JS/CSS `no-cache`; servis çalışanı sürümü `blok-iki-v11` |
+| Güncelleme | HTML/JS/CSS `no-cache`; servis çalışanı sürümü `blok-iki-v18` |
 | WebView güvenliği | Dosya/content erişimi kapalı, karışık içerik release'te engelli, dış linkler şema denetiminden geçer |
 
 ---
@@ -364,10 +364,10 @@ powershell -ExecutionPolicy Bypass -File android\build-aab.ps1 `
   -ServerUrl "https://SUNUCU-ADRESI" `
   -GoogleAndroidClientId "ANDROID_ID.apps.googleusercontent.com" `
   -GamesAppId 123456789 `
-  -VersionName "2.0.9" -VersionCode 21
+  -VersionName "2.1.0" -VersionCode 22
 ```
 
-Çıktı: `android/dist/Blokara-1v1-2.0.9.aab` (Gradle `bundleRelease`, release
+Çıktı: `android/dist/Blokara-1v1-2.1.0.aab` (Gradle `bundleRelease`, release
 anahtarıyla imzalı). Google Play yeni uygulamalarda **AAB** ister.
 
 ### b) Doğrudan kurulacak APK (arkadaş/test)
@@ -383,10 +383,10 @@ powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
   -ServerUrl "https://SUNUCU-ADRESI" `
   -GoogleAndroidClientId "ANDROID_ID.apps.googleusercontent.com" `
   -GamesAppId 123456789 `
-  -VersionName "2.0.9" -VersionCode 21
+  -VersionName "2.1.0" -VersionCode 22
 ```
 
-Çıktı: `android/dist/Blokara-1v1-2.0.9.apk`
+Çıktı: `android/dist/Blokara-1v1-2.1.0.apk`
 
 ### c) Doğrudan Gradle
 
@@ -407,7 +407,7 @@ Gradle çıktıları:
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
-& "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\apksigner.bat" verify --print-certs android\dist\Blokara-1v1-2.0.9.apk
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\apksigner.bat" verify --print-certs android\dist\Blokara-1v1-2.1.0.apk
 ```
 
 AAB içindeki manifesti görmek için Android Studio’nun **Build → Analyze APK**

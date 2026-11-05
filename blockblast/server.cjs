@@ -599,12 +599,27 @@ function makeCode() {
   return code;
 }
 
+/* Süre ince ayarı sınırları; istemcideki LIMITS ile aynı. */
+function clampTimeLimit(value) {
+  const n = Math.round((Number(value) || GameCore.DEFAULT_TIME) / 15) * 15;
+  return Math.max(30, Math.min(300, n));
+}
+function clampTurnLimit(value) {
+  const n = Math.round((Number(value) || GameCore.DEFAULT_TURN) / 5) * 5;
+  return Math.max(10, Math.min(120, n));
+}
+
 function makeRoom(mode) {
   const code = makeCode();
   const room = {
     code,
     mode: mode === "coop" ? "coop" : "versus",
     timeMode: "shared",
+    /* İki tahtalı odalarda varsayılan "sırayla" kapışma; oda sahibi
+       "aynı anda"ya çevirebilir. Ortak tahtada sıra her zaman zorunlu. */
+    turnBased: true,
+    timeLimit: GameCore.DEFAULT_TIME,
+    turnLimit: GameCore.DEFAULT_TURN,
     phase: "lobby",
     host: 0,
     players: [],
@@ -668,8 +683,10 @@ function startRoom(room) {
     mode: room.mode,
     names: room.players.map((player) => player.name),
     seed: crypto.randomBytes(4).readUInt32BE(0),
-    turnBased: room.mode === "coop",
-    timeMode: room.timeMode
+    turnBased: room.mode === "coop" ? true : room.turnBased !== false,
+    timeMode: room.timeMode,
+    timeLimit: room.timeLimit,
+    turnLimit: room.turnLimit
   });
   room.phase = "playing";
   room.lastTick = Date.now();
@@ -707,6 +724,8 @@ function quickMatch(conn, message) {
 
   const waiter = matchQueue.splice(waiterIndex, 1)[0];
   const room = makeRoom(mode);
+  /* Rastgele eşleşmede iki taraf da beklemeden oynasın: aynı anda doldurma. */
+  room.turnBased = mode === "coop";
   const first = addPlayer(room, waiter.name, waiter.conn);
   const second = addPlayer(room, message.name, conn);
   if (!first || !second) {
@@ -730,15 +749,15 @@ function lobbyState(room) {
     host: room.host,
     online: true,
     turn: 0,
-    turnBased: true,
+    turnBased: room.mode === "coop" ? true : room.turnBased,
     seq: 0,
     winner: null,
     reason: "",
     lastMove: null,
     timeMode: room.timeMode,
-    timeLimit: GameCore.DEFAULT_TIME,
-    timeLeft: room.timeMode === "shared" ? GameCore.DEFAULT_TIME : null,
-    turnLimit: GameCore.DEFAULT_TURN,
+    timeLimit: room.timeLimit,
+    timeLeft: room.timeMode === "shared" ? room.timeLimit : null,
+    turnLimit: room.turnLimit,
     turnLeft: null,
     players: room.players.map((slot) => ({
       name: slot.name,
@@ -1073,7 +1092,19 @@ function handleMessage(conn, message) {
   if (t === "timer") {
     if (room.phase !== "lobby") return;
     if (room.host !== info.index) return conn.send({ t: "error", message: "Süre modunu oda sahibi seçer." });
-    room.timeMode = GameCore.TIME_MODES.indexOf(message.mode) >= 0 ? message.mode : "shared";
+    if (message.mode != null) {
+      room.timeMode = GameCore.TIME_MODES.indexOf(message.mode) >= 0 ? message.mode : "shared";
+    }
+    if (message.timeLimit != null) room.timeLimit = clampTimeLimit(message.timeLimit);
+    if (message.turnLimit != null) room.turnLimit = clampTurnLimit(message.turnLimit);
+    broadcast(room);
+    return;
+  }
+
+  if (t === "pace") {
+    if (room.phase !== "lobby") return;
+    if (room.host !== info.index) return conn.send({ t: "error", message: "Doldurma düzenini oda sahibi seçer." });
+    room.turnBased = message.pace !== "live";
     broadcast(room);
     return;
   }
@@ -1083,16 +1114,7 @@ function handleMessage(conn, message) {
     if (room.host !== info.index) return conn.send({ t: "error", message: "Oyunu oda sahibi başlatır." });
     if (room.players.length < 2) return conn.send({ t: "error", message: "İkinci oyuncu bekleniyor." });
     if (!room.players.every((player) => player.connected)) return conn.send({ t: "error", message: "İki oyuncu da bağlı olmalı." });
-    room.game = new GameCore.Game({
-      mode: room.mode,
-      names: room.players.map((player) => player.name),
-      seed: crypto.randomBytes(4).readUInt32BE(0),
-      turnBased: room.mode === "coop",
-      timeMode: room.timeMode
-    });
-    room.phase = "playing";
-    room.lastTick = Date.now();
-    room.lastSentSecond = -1;
+    startRoom(room);
     broadcast(room);
     return;
   }
@@ -1117,13 +1139,7 @@ function handleMessage(conn, message) {
       return conn.send({ t: "error", message: "İki oyuncu da bağlı olmalı." });
     }
     if (room.game && room.game.phase === "playing") return;
-    room.game = new GameCore.Game({
-      mode: room.mode,
-      names: room.players.map((player) => player.name),
-      seed: crypto.randomBytes(4).readUInt32BE(0),
-      turnBased: room.mode === "coop",
-      timeMode: room.timeMode
-    });
+    startRoom(room);
     room.phase = "playing";
     room.lastTick = Date.now();
     room.lastSentSecond = -1;

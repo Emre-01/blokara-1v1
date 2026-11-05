@@ -19,6 +19,21 @@
   var SS_ACTIVE = "blokiki.activeRoom";
   var MAX_RECONNECT = 6;
 
+  /* Süre ince ayarı: ortak sayaç 30–300 sn (15'er), sıra sayacı 10–120 sn
+     (5'er). Aynı sınırlar sunucuda da uygulanır. */
+  var LIMITS = {
+    shared: { min: 30, max: 300, step: 15, def: 120 },
+    turn: { min: 10, max: 120, step: 5, def: 30 }
+  };
+
+  function clampLimit(kind, value) {
+    var rule = LIMITS[kind] || LIMITS.shared;
+    var n = Number(value);
+    if (!isFinite(n)) n = rule.def;
+    n = Math.round(n / rule.step) * rule.step;
+    return Math.max(rule.min, Math.min(rule.max, n));
+  }
+
   var app = {
     screen: "home",
     online: false,
@@ -49,6 +64,13 @@
     busy: false,
     profile: null,
     timeMode: "shared",
+    timeLimit: 120,
+    turnLimit: 30,
+    localPace: "turn",
+    localActor: 0,
+    seenTurn: null,
+    seenPhase: null,
+    turnFlashAt: 0,
     matching: false,
     clockTimer: null,
     lastClockAt: 0,
@@ -344,66 +366,79 @@
     tone(392, 0.1, { volume: 0.05 });
     setTimeout(function () { tone(523.25, 0.14, { volume: 0.05 }); }, 100);
   }
-  function sfxLose() {
-    /* Kısa, alçalan bir "hayal kırıklığı" motifi ve tok bir kapanış. */
-    [392, 349.23, 293.66, 220].forEach(function (freq, index) {
-      setTimeout(function () {
-        tone(freq, 0.24, { type: "triangle", slide: -18, volume: 0.05 });
-      }, index * 130);
-    });
-    setTimeout(function () {
-      tone(110, 0.5, { type: "sine", slide: -40, volume: 0.12 });
-      tone(55, 0.55, { type: "triangle", slide: -12, volume: 0.1 });
-      noiseBurst(0.32, 0.035, 700);
-    }, 480);
+
+  /* Sıra değişimi: kendi sıran yükselen iki ton, rakip sırası alçalan iki
+     ton. Kısa ve net; tahta başında duyulur, oyun sesini bastırmaz. */
+  function sfxTurn(mine) {
+    if (mine) {
+      tone(659.25, 0.1, { type: "triangle", volume: 0.055 });
+      setTimeout(function () { tone(987.77, 0.16, { type: "triangle", volume: 0.06 }); }, 90);
+      setTimeout(function () { tone(1318.51, 0.12, { type: "sine", volume: 0.03 }); }, 165);
+    } else {
+      tone(523.25, 0.1, { type: "triangle", volume: 0.05 });
+      setTimeout(function () { tone(392, 0.14, { type: "triangle", volume: 0.05 }); }, 90);
+      setTimeout(function () { tone(261.63, 0.18, { type: "sine", volume: 0.045 }); }, 170);
+      noiseSweep(0.16, 0.018, 900, 320, 0.4, -0.4);
+    }
   }
+
+  function sfxLose() {
+    /* Yenilgi: pes perdeden düşen, hafif bozuk bir "güç kapanışı" ve tok
+       bir yere çakılma. Zaferin parlak fanfarından tamamen farklı. */
+    [392, 349.23, 311.13, 261.63].forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.22, { type: "sawtooth", slide: -22, volume: 0.045 });
+        tone(freq * 0.997, 0.22, { type: "square", slide: -18, volume: 0.018 });
+      }, index * 115);
+    });
+    noiseSweep(0.34, 0.045, 1400, 260, 0.3, -0.5);
+    setTimeout(function () {
+      tone(146.83, 0.5, { type: "sawtooth", to: 55, volume: 0.09, attack: 0.01 });
+      tone(73.42, 0.55, { type: "sine", to: 36, volume: 0.13 });
+    }, 300);
+    setTimeout(function () {
+      noiseBurst(0.3, 0.07, 620);
+      tone(110, 0.32, { type: "triangle", slide: -30, volume: 0.1 });
+    }, 520);
+  }
+
   function sfxWin() {
-    /* Zafer: yükselen fanfar, altında büyüyen bas, ardından geniş bir
-       majör akor ve tiz kıvılcımlar. Kısa bir yankı katmanı sahneyi
-       büyütür; hepsi WebAudio ile üretilir (dosya yok). */
-    var arp = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
+    /* Zafer: önce sert bir çarpma, ardından yükselen güç akoru, geniş
+       majör final ve kısa bir "arena" yankısı. Rekabetçi ve net. */
+    noiseBurst(0.18, 0.075, 2600);
+    tone(98, 0.3, { type: "sine", slide: -26, volume: 0.15 });
+    tone(196, 0.26, { type: "triangle", to: 392, volume: 0.06 });
+
+    var arp = [392, 523.25, 659.25, 783.99, 1046.5];
     arp.forEach(function (freq, index) {
       setTimeout(function () {
-        tone(freq, 0.22, { type: "triangle", volume: 0.058, attack: 0.006 });
-        tone(freq * 2, 0.14, { type: "sine", volume: 0.02 });
-        tone(freq * 1.5, 0.16, { type: "sine", volume: 0.016, pan: index % 2 ? 0.4 : -0.4 });
-      }, index * 82);
+        tone(freq, 0.2, { type: "sawtooth", volume: 0.032, attack: 0.006 });
+        tone(freq * 2, 0.16, { type: "triangle", volume: 0.038 });
+      }, 90 + index * 74);
     });
 
-    /* Altında yükselen bas: fanfara ağırlık katar. */
-    tone(130.81, 0.7, { type: "triangle", to: 196, volume: 0.07, attack: 0.05 });
-    setTimeout(function () {
-      tone(196, 0.5, { type: "sine", to: 261.63, volume: 0.05, attack: 0.05 });
-    }, 210);
-
-    /* Final akoru: kök + üçlü + beşli + oktav, hafif detune ile geniş. */
+    /* Yükselen bas ve final akoru: zaferi taşıyan geniş katman. */
+    tone(130.81, 0.7, { type: "triangle", to: 196, volume: 0.08, attack: 0.04 });
     setTimeout(function () {
       [261.63, 329.63, 392, 523.25].forEach(function (freq, index) {
-        tone(freq, 0.9, { type: "triangle", volume: 0.036, attack: 0.04, pan: -0.3 + index * 0.2 });
-        tone(freq * 1.003, 0.9, { type: "sine", volume: 0.018, attack: 0.05 });
+        tone(freq, 0.85, { type: "triangle", volume: 0.04, attack: 0.02, pan: -0.35 + index * 0.23 });
+        tone(freq * 1.004, 0.8, { type: "sine", volume: 0.016, attack: 0.04 });
       });
-      tone(1046.5, 0.55, { type: "sine", volume: 0.028 });
-      tone(2093, 0.42, { type: "sine", volume: 0.018 });
-    }, 540);
+      tone(1046.5, 0.5, { type: "sine", volume: 0.026 });
+    }, 520);
 
-    /* Tiz kıvılcım yağmuru: yukarı doğru kayan parlak notalar. */
-    [1567.98, 1975.53, 2349.32, 2637.02].forEach(function (freq, index) {
+    /* Arena alkışı: yükselen geniş gürültü ve parlak kıvılcımlar. */
+    noiseSweep(0.5, 0.028, 500, 4200, -0.9, 0.9, 0.5);
+    [1567.98, 1975.53, 2349.32].forEach(function (freq, index) {
       setTimeout(function () {
-        tone(freq, 0.18, { type: "sine", volume: 0.018, pan: -0.6 + index * 0.4 });
+        tone(freq, 0.18, { type: "sine", volume: 0.018, pan: -0.5 + index * 0.5 });
       }, 760 + index * 70);
     });
-
-    /* Kısa yankı: aynı akoru daha kısık ve gecikmeli tekrar eder. */
     setTimeout(function () {
       [523.25, 659.25, 783.99].forEach(function (freq) {
-        tone(freq, 0.5, { type: "sine", volume: 0.012 });
+        tone(freq, 0.45, { type: "sine", volume: 0.011 });
       });
-    }, 1040);
-    setTimeout(function () {
-      [523.25, 783.99].forEach(function (freq) {
-        tone(freq, 0.4, { type: "sine", volume: 0.006 });
-      });
-    }, 1320);
+    }, 1000);
   }
   function sfxPenalty() {
     tone(180, 0.16, { type: "sawtooth", slide: -60, volume: 0.04 });
@@ -484,6 +519,9 @@
       PROGRESS.refreshDailyStreak(app.profile);
       PROGRESS.save(app.profile);
       app.timeMode = CORE.TIME_MODES.indexOf(app.profile.timeMode) >= 0 ? app.profile.timeMode : "shared";
+      app.localPace = app.profile.localPace === "live" ? "live" : "turn";
+      app.timeLimit = clampLimit("shared", app.profile.timeLimit);
+      app.turnLimit = clampLimit("turn", app.profile.turnLimit);
       app.vibrate = app.profile.vibrate !== false;
     } else {
       app.profile = null;
@@ -660,23 +698,79 @@
     if (count) count.textContent = unlockedCount + " / " + PROGRESS.ACHIEVEMENTS.length;
   }
 
+  function saveSetupPrefs() {
+    if (!app.profile) return;
+    app.profile.timeMode = app.timeMode;
+    app.profile.localPace = app.localPace;
+    app.profile.timeLimit = app.timeLimit;
+    app.profile.turnLimit = app.turnLimit;
+    PROGRESS.save(app.profile);
+  }
+
+  function activeLimitKind() {
+    return app.timeMode === "turn" ? "turn" : "shared";
+  }
+
+  function activeLimit() {
+    return activeLimitKind() === "turn" ? app.turnLimit : app.timeLimit;
+  }
+
+  function setActiveLimit(value) {
+    if (activeLimitKind() === "turn") app.turnLimit = clampLimit("turn", value);
+    else app.timeLimit = clampLimit("shared", value);
+  }
+
   function syncSetupButtons() {
-    $$("#time-mode button").forEach(function (button) {
+    $$("#local-pace button").forEach(function (button) {
+      var on = button.dataset.pace === app.localPace;
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    $$("#local-timer button").forEach(function (button) {
       var on = button.dataset.time === app.timeMode;
       button.classList.toggle("on", on);
       button.setAttribute("aria-pressed", on ? "true" : "false");
     });
+    var paceNote = $("#local-pace-note");
+    if (paceNote) paceNote.textContent = app.localPace === "live" ? "Aynı anda" : "Sırayla";
+    var timeNote = $("#local-time-note");
+    if (timeNote) timeNote.textContent = timeModeLabel(app.timeMode);
+    var row = $("#local-limit-row");
+    if (row) row.hidden = app.timeMode === "none";
+    var limitText = fmtTime(activeLimit());
+    var note = $("#local-limit-note");
+    if (note) note.textContent = app.timeMode === "none" ? "" : limitText;
+    var value = $("#local-limit-value");
+    if (value) value.textContent = limitText;
   }
 
   function initHomeControls() {
-    $$("#time-mode button").forEach(function (button) {
+    $$("#local-pace button").forEach(function (button) {
       button.addEventListener("click", function () {
-        app.timeMode = CORE.TIME_MODES.indexOf(button.dataset.time) >= 0 ? button.dataset.time : "shared";
-        if (app.profile) { app.profile.timeMode = app.timeMode; PROGRESS.save(app.profile); }
+        app.localPace = button.dataset.pace === "live" ? "live" : "turn";
+        saveSetupPrefs();
         syncSetupButtons();
         sfxPlace();
       });
     });
+    $$("#local-timer button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        app.timeMode = CORE.TIME_MODES.indexOf(button.dataset.time) >= 0 ? button.dataset.time : "shared";
+        saveSetupPrefs();
+        syncSetupButtons();
+        sfxPlace();
+      });
+    });
+    $$("#local-setup [data-step]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var rule = LIMITS[activeLimitKind()];
+        setActiveLimit(activeLimit() + Number(button.dataset.step) * rule.step);
+        saveSetupPrefs();
+        syncSetupButtons();
+        sfxPlace();
+      });
+    });
+    syncSetupButtons();
   }
 
   /* Arkadaşınla oyna panelindeki üç yol arasında geçiş.
@@ -813,22 +907,33 @@
     app.lastAnimated = -1;
     app.lastReward = null;
     app.recordedKey = null;
+    app.seenTurn = null;
+    app.seenPhase = null;
+    app.localActor = 0;
     var daily = mode === "daily";
     var solo = mode === "solo" || daily;
     if (daily && PROGRESS && app.profile && !PROGRESS.dailyReady(app.profile)) {
       toast("Bugünün tahtasını oynadın. Tekrar denemek seriyi etkilemez.");
     }
     app.daily = daily;
-    app.timeMode = solo ? "none"
-      : (CORE.TIME_MODES.indexOf(options.timeMode) >= 0 ? options.timeMode : (app.timeMode || "shared"));
+    if (!solo) {
+      app.timeMode = CORE.TIME_MODES.indexOf(options.timeMode) >= 0
+        ? options.timeMode : (app.timeMode || "shared");
+    }
     var names = solo ? ["Sen"] : ["Oyuncu 1", "Oyuncu 2"];
+    var versus = !solo && mode !== "coop";
+    var pace = versus && options.turnBased === false ? "live"
+      : (versus && options.turnBased === true ? "turn"
+        : (versus && options.pace === "live" ? "live" : (versus ? app.localPace : "turn")));
     app.game = new CORE.Game({
       mode: solo ? "solo" : (mode === "coop" ? "coop" : "versus"),
       names: names,
       /* Günün tahtası: herkes aynı tohumla aynı blok dizisini oynar. */
       seed: daily && PROGRESS ? PROGRESS.dailySeed() : options.seed,
-      turnBased: true,
-      timeMode: app.timeMode
+      turnBased: solo ? false : (mode === "coop" ? true : pace !== "live"),
+      timeMode: solo ? "none" : app.timeMode,
+      timeLimit: clampLimit("shared", options.timeLimit != null ? options.timeLimit : app.timeLimit),
+      turnLimit: clampLimit("turn", options.turnLimit != null ? options.turnLimit : app.turnLimit)
     });
     app.state = app.game.snapshot();
     app.lastSignature = stateSignature(app.state);
@@ -972,28 +1077,36 @@
     if (whole > 0 && whole <= 5) tone(620 + (5 - whole) * 60, 0.05, { type: "square", volume: 0.02 });
   }
 
+  function localActorIndex() {
+    var s = app.state;
+    if (!s) return 0;
+    if (s.mode === "solo") return 0;
+    if (s.turnBased) return s.turn;
+    return app.localActor === 1 ? 1 : 0;
+  }
+
   function actorIndex() {
     var s = app.state;
     if (!s) return 0;
-    if (!s.turnBased) return app.online ? app.me : 0;
-    return s.turn;
+    if (app.online) return s.mode === "coop" ? s.turn : (s.turnBased ? s.turn : app.me);
+    return localActorIndex();
   }
 
-  /* İki insan aynı cihazda oynarken tahta sırayla döner. Tek kişilikte
-     her zaman tek tahta vardır. */
+  /* İki insan aynı cihazda oynarken tahta sırayla döner. Aynı anda
+     modunda oyuncu tahtasına dokunarak kendi tahtasını seçer. */
   function displayIndex() {
     var s = app.state;
     if (!s) return 0;
     if (app.online) return app.me;
-    if (s.mode === "solo") return 0;
-    return s.turn;
+    return localActorIndex();
   }
 
   function activePlayerIndex() {
     var s = app.state;
     if (!s) return 0;
     if (s.mode === "coop") return s.turn;
-    return s.turnBased ? s.turn : (app.online ? app.me : 0);
+    if (app.online) return s.turnBased ? s.turn : app.me;
+    return localActorIndex();
   }
 
   /* Hamle yapılabilir mi? */
@@ -1001,7 +1114,7 @@
     var s = app.state;
     if (!s || s.phase !== "playing" || app.pending) return false;
     if (!app.online) return true;
-    if (s.mode === "coop") return s.turn === app.me;
+    if (s.turnBased) return s.turn === app.me;
     return !!s.players[app.me] && s.players[app.me].alive;
   }
 
@@ -1671,20 +1784,14 @@
   function scoreCardHTML(index, s) {
     var player = s.players[index];
     if (!player) return "";
-    var active = s.phase === "playing" && s.turnBased && s.turn === index;
+    var active = s.phase === "playing" && (s.turnBased
+      ? s.turn === index
+      : (app.online ? index === app.me : index === (app.localActor === 1 ? 1 : 0)));
     var sub = player.lines + " satır · " + player.blocks + " blok";
     if (player.penalties) sub += ' · <span class="penalty">' + player.penalties + " ceza</span>";
     var offline = app.online && !player.connected;
+    /* İki tahta da oyun alanında göründüğü için skor kartında mini tahta yok. */
     var mini = "";
-    if (s.mode === "versus") {
-      /* Çevrimiçi rakipte yalnızca karşı tarafın tahtası küçük görünür;
-         kendi tahtası zaten ekranın ortasında. */
-      if (app.online) {
-        if (index !== app.me) mini = miniBoardHTML(player.board, "board-rival", String(index));
-      } else {
-        mini = miniBoardHTML(player.board);
-      }
-    }
     var clock = s.timeMode === "turn" && !s.turnBased && s.phase === "playing"
       ? '<span class="score-time" data-clock="' + index + '">' + fmtTime(clockValue(s, index)) + "</span>"
       : "";
@@ -1724,10 +1831,19 @@
         ? s.players.map(function (p) { return p.score; }).join(" - ")
         : s.players[s.winner].name;
       cls = "over";
+    } else if (app.online && s.turnBased) {
+      var myTurn = s.turn === app.me;
+      top = myTurn ? "sıra sende" : "rakip";
+      main = myTurn ? "sen" : (s.players[s.turn] ? s.players[s.turn].name : "—");
+      cls = myTurn ? "live" : "wait";
     } else if (app.online) {
       top = "canlı";
       main = "ikisi de";
       cls = "live";
+    } else if (!s.turnBased) {
+      top = "aynı anda";
+      main = s.players[app.localActor === 1 ? 1 : 0]
+        ? s.players[app.localActor === 1 ? 1 : 0].name : "—";
     } else {
       top = "sıra";
       main = s.players[s.turn] ? s.players[s.turn].name : "—";
@@ -1749,12 +1865,12 @@
   /* render: tahta / tray                                                */
   /* ------------------------------------------------------------------ */
 
-  function boardHTML(board, id, owner, label, extraClass) {
+  function boardHTML(board, id, owner, label, extraClass, labelClass) {
     var html = '<div class="board-shell' + (extraClass ? " " + extraClass : "") + '">';
     if (label) {
-      html += '<div class="board-label">' + label + '</div>';
+      html += '<div class="' + (labelClass || "board-label") + '">' + label + '</div>';
     }
-    html += '<div class="board' + (extraClass ? " " + extraClass : "") + '" id="' + id + '" data-board="' + owner + '" role="grid" aria-label="8 çarpı 8 oyun tahtası">';
+    html += '<div class="board" id="' + id + '" data-board="' + owner + '" role="grid" aria-label="8 çarpı 8 oyun tahtası">';
     for (var r = 0; r < SIZE; r++) {
       for (var c = 0; c < SIZE; c++) {
         var color = board[r][c];
@@ -1839,6 +1955,123 @@
   }
 
   /* Aynı düzen korunurken yalnızca değişenleri tazeler. */
+  /* ---------------- iki tahtalı kapışma ---------------- */
+
+  function duelBoardId(s, index) {
+    if (app.online) return index === app.me ? "board-me" : "board-rival";
+    return "board-" + index;
+  }
+
+  function duelActiveIndex(s) {
+    if (s.phase === "over") return s.winner == null ? null : s.winner;
+    if (s.turnBased) return s.turn;
+    return app.online ? app.me : (app.localActor === 1 ? 1 : 0);
+  }
+
+  function duelShellClass(s, index, active) {
+    var cls = "duel-side p" + (index + 1);
+    if (s.phase === "over") return cls + " is-over";
+    if (active === index) return cls + " is-turn";
+    if (s.turnBased) return cls + " is-wait";
+    return cls + " is-opponent";
+  }
+
+  function duelStatusText(s, index, active) {
+    if (s.phase === "over") return "Tur bitti";
+    if (!s.turnBased) {
+      /* Aynı cihazda aynı anda modunda seçili tahta oynuyor sayılır. */
+      if (!app.online && active !== index) return "Bekliyor";
+      return "Oynuyor";
+    }
+    return active === index ? "Oynuyor" : "Bekliyor";
+  }
+
+  function duelLabelHTML(s, index, active) {
+    var player = s.players[index];
+    if (!player) return "";
+    var pick = (!s.turnBased && !app.online && s.phase === "playing" && index !== active)
+      ? '<button class="duel-pick" type="button" data-pick="' + index + '">Bu tahtada oyna</button>'
+      : "";
+    return '<span class="score-dot"></span><b>' + esc(player.name) + '</b>' +
+      '<span class="duel-status">' + duelStatusText(s, index, active) + '</span>' + pick;
+  }
+
+  function duelBanner(s) {
+    if (s.phase === "over") return { cls: "over", text: "Tur bitti" };
+    if (!s.turnBased) {
+      if (app.online) return { cls: "live", text: "İkiniz de aynı anda oynuyorsunuz" };
+      var actor = s.players[app.localActor === 1 ? 1 : 0] || s.players[0];
+      return {
+        cls: "live",
+        text: "Aynı anda dolduruyorsunuz · seçili tahta: " + (actor ? actor.name : "—")
+      };
+    }
+    if (app.online) {
+      return s.turn === app.me
+        ? { cls: "mine", text: "Sıra sende" }
+        : { cls: "rival", text: "Rakibin sırası" };
+    }
+    var current = s.players[s.turn];
+    return { cls: "local", text: "Sıra: " + (current ? current.name : "—") };
+  }
+
+  function duelBannerHTML(s) {
+    var banner = duelBanner(s);
+    return '<div class="duel-turn ' + banner.cls + '" id="duel-turn" role="status" aria-live="polite">' +
+      '<span class="dot"></span><span>' + esc(banner.text) + '</span></div>';
+  }
+
+  function duelHTML(s, interactive) {
+    var active = duelActiveIndex(s);
+    var actor = active == null ? (s.turnBased ? s.turn : (app.online ? app.me : app.localActor)) : active;
+    var player = s.players[actor] || s.players[0];
+    var html = '<div class="duel">' + duelBannerHTML(s) + '<div class="duel-boards">';
+    [0, 1].forEach(function (index) {
+      var side = s.players[index];
+      if (!side) return;
+      html += boardHTML(
+        side.board,
+        duelBoardId(s, index),
+        String(index),
+        duelLabelHTML(s, index, active),
+        duelShellClass(s, index, active),
+        "duel-label"
+      );
+    });
+    html += '</div><div class="duel-tray">' + trayHTML(player ? player.tray : [], interactive) + '</div></div>';
+    return html;
+  }
+
+  function syncDuelLayout(s, interactive) {
+    var active = duelActiveIndex(s);
+    var actor = active == null ? (s.turnBased ? s.turn : (app.online ? app.me : app.localActor)) : active;
+    [0, 1].forEach(function (index) {
+      var player = s.players[index];
+      if (!player) return;
+      var boardEl = $("#" + duelBoardId(s, index));
+      if (boardEl) paintBoard(boardEl, player.board);
+      var shell = boardEl ? boardEl.closest(".duel-side") : null;
+      if (!shell) return;
+      var cls = "board-shell " + duelShellClass(s, index, active);
+      if (shell.className !== cls) shell.className = cls;
+      var label = $(".duel-label", shell);
+      if (label) {
+        var labelHTML = duelLabelHTML(s, index, active);
+        if (label.innerHTML !== labelHTML) label.innerHTML = labelHTML;
+      }
+    });
+    var banner = $("#duel-turn");
+    if (banner) {
+      var info = duelBanner(s);
+      var bannerHTML = '<span class="dot"></span><span>' + esc(info.text) + '</span>';
+      if (banner.innerHTML !== bannerHTML) banner.innerHTML = bannerHTML;
+      banner.className = "duel-turn " + info.cls;
+    }
+    var current = s.players[actor] || s.players[0];
+    if (current) syncTray($("#tray"), current.tray, interactive);
+  }
+
+  /* Aynı düzen korunurken yalnızca değişenleri tazeler. */
   function syncGameLayout(s, layout, interactive) {
     if (s.mode === "coop") {
       paintBoard($("#board-shared"), s.shared.board);
@@ -1852,31 +2085,21 @@
       syncTray($("#tray"), s.shared.tray, interactive);
       return;
     }
-    if (layout.indexOf("online-") === 0) {
-      var me = s.players[app.me];
-      var rival = s.players[1 - app.me];
-      paintBoard($("#board-me"), me.board);
-      if (rival) paintMiniBoard($("#board-rival"), rival.board);
-      var onlineNote = $("#turn-note");
-      if (onlineNote) {
-        onlineNote.innerHTML = s.phase === "over" ? '<span class="dot"></span>Tur bitti'
-          : '<span class="dot"></span>İkiniz de aynı anda oynuyorsunuz' +
-            (me.combo > 1 ? ' · combo ×' + me.combo : "");
+    if (s.mode === "solo") {
+      var soloPlayer = s.players[0];
+      if (soloPlayer) {
+        paintBoard($("#board-0"), soloPlayer.board);
+        syncTray($("#tray"), soloPlayer.tray, interactive);
       }
-      syncTray($("#tray"), me.tray, interactive);
       return;
     }
-    var activeIndex = displayIndex();
-    var activePlayer = s.players[activeIndex];
-    if (activePlayer) {
-      paintBoard($("#board-" + activeIndex), activePlayer.board);
-      syncTray($("#tray"), activePlayer.tray, interactive);
-    }
+    syncDuelLayout(s, interactive);
   }
 
   function renderGame() {
     var s = app.state;
     if (!s) return;
+    var previousTurn = app.seenTurn;
     if (s.turn !== app.lastTurn) {
       app.lastTurn = s.turn;
       app.selected = null;
@@ -1889,10 +2112,8 @@
     renderScoreboard();
     var table = $("#table-area");
     var interactive = canPlay();
-    var layout = s.mode === "coop"
-      ? "coop"
-      : (app.online ? "online-" + app.me
-        : "local-" + displayIndex() + "-" + (s.mode === "solo" ? "solo" : "versus"));
+    var layout = s.mode === "coop" ? "coop"
+      : (s.mode === "solo" ? "solo" : "duel-" + (app.online ? "online" : "local"));
     var html = "";
 
     if (s.mode === "coop") {
@@ -1907,35 +2128,19 @@
         '</div>';
       html += trayHTML(shared.tray, interactive);
       html += '</div>';
-    } else if (!app.online) {
-      var activeIndex = displayIndex();
-      var activePlayer = s.players[activeIndex];
-      var activeColor = activeIndex === 0 ? "var(--coral)" : "var(--cobalt)";
-      var statusText = s.phase === "over" ? "tur bitti"
-        : (s.mode === "solo" ? "tek kişilik" : "sıra sende");
+    } else if (s.mode === "solo") {
+      var soloPlayer = s.players[0];
       html += '<div class="vs-local">';
       html += boardHTML(
-        activePlayer.board,
-        "board-" + activeIndex,
+        soloPlayer.board,
+        "board-0",
         "active",
-        '<span class="score-dot" style="background:' + activeColor + '"></span>' +
-        esc(activePlayer.name) + ' <span class="you">' + statusText + '</span>'
+        '<span class="score-dot"></span>' + esc(soloPlayer.name) +
+        ' <span class="you">' + (s.phase === "over" ? "tur bitti" : "tek kişilik") + '</span>'
       );
-      html += '<div class="tray-wrap">';
-      html += trayHTML(activePlayer ? activePlayer.tray : [], interactive);
-      html += '</div>';
-      html += '</div>';
+      html += '<div class="tray-wrap">' + trayHTML(soloPlayer.tray, interactive) + '</div></div>';
     } else {
-      var me = s.players[app.me];
-      html += boardHTML(me.board, "board-me", String(app.me), 'Senin tahtan <span class="you">sen</span>');
-      html += '<div class="tray-wrap">';
-      html += '<div class="turn-note" id="turn-note">' +
-        (s.phase === "over" ? '<span class="dot"></span>Tur bitti' :
-          '<span class="dot"></span>İkiniz de aynı anda oynuyorsunuz' +
-          (me.combo > 1 ? ' · combo ×' + me.combo : "")) +
-        '</div>';
-      html += trayHTML(me.tray, interactive);
-      html += '</div>';
+      html += duelHTML(s, interactive);
     }
 
     if (table.dataset.layout !== layout) {
@@ -1950,6 +2155,7 @@
     updateClock();
     updateRoomChrome();
     refreshPeerGhost();
+    noteTurnChange(s, previousTurn);
   }
 
   /* Oyun sonu açıklamasını, kazanan sensen ikinci kişiye çevirir:
@@ -1966,6 +2172,34 @@
     if (text === reason && name === "Sen") text = reason.split("Sen kazandı").join("Kazandın");
     if (text !== reason && !/[.!]$/.test(text)) text += "!";
     return text;
+  }
+
+  /* Sıra değişince hem görsel hem sesli uyarı: sıradaki tahta parlar,
+     iki tonlu kısa bir sinyal çalar. */
+  function signalTurnChange(s) {
+    var mine = app.online ? s.turn === app.me : true;
+    sfxTurn(mine);
+    if (app.vibrate && FX) FX.vibrate(mine ? [0, 16, 26, 18] : [0, 24, 18]);
+    var banner = $("#duel-turn");
+    if (banner) {
+      banner.classList.remove("turn-swap");
+      void banner.offsetWidth;
+      banner.classList.add("turn-swap");
+    }
+    var activeBoard = $("#" + duelBoardId(s, s.turn));
+    if (activeBoard && FX) FX.pulse(activeBoard);
+    if (app.online) {
+      toast(mine ? "Sıra sende" : "Rakibin sırası");
+    }
+  }
+
+  function noteTurnChange(s, previousTurn) {
+    if (s.turnBased && s.phase === "playing" &&
+        previousTurn != null && previousTurn !== s.turn) {
+      signalTurnChange(s);
+    }
+    app.seenTurn = s.turn;
+    app.seenPhase = s.phase;
   }
 
   function updateHint() {
@@ -1992,11 +2226,20 @@
       } else {
         hint.textContent = "Bloğu tahtaya sürükle ya da dokunup yerleştir.";
       }
+    } else if (s.turnBased) {
+      if (app.online && s.turn !== app.me) {
+        hint.textContent = "Rakibin sırası";
+      } else if (app.online) {
+        hint.textContent = "Sıra sende · Bloğu tahtaya sürükle.";
+      } else {
+        var current = s.players[s.turn];
+        hint.textContent = "Sıra: " + (current ? current.name : "—") + " · Bloğu tahtaya sürükle.";
+      }
     } else if (app.online) {
       hint.textContent = "Tahtan dolarsa kaybedersin. Satırları patlat.";
     } else {
-      var current = s.players[s.turn];
-      hint.textContent = "Sıra: " + (current ? current.name : "—") + " · Bloğu tahtaya sürükle.";
+      var actor = s.players[app.localActor === 1 ? 1 : 0] || s.players[0];
+      hint.textContent = "Aynı anda dolduruyorsunuz · seçili tahta: " + (actor ? actor.name : "—");
     }
   }
 
@@ -2592,6 +2835,8 @@
 
   function onBoardPointerMove(event) {
     if (app.drag || app.selected == null || event.pointerType !== "mouse" || !canPlay()) return;
+    /* İki tahtalı düzende önizleme yalnızca seçili tahtada çizilir. */
+    if (event.currentTarget && event.currentTarget !== activeBoardEl()) return;
     var cell = event.target.closest(".cell");
     if (!cell || !app.state) return;
     var boardEl = activeBoardEl();
@@ -2613,6 +2858,15 @@
 
   function onBoardClick(event) {
     if (app.selected == null || !canPlay()) return;
+    /* İki tahtalı düzende seçili olmayan tahtaya dokunmak onu seçer
+       (aynı cihazda "aynı anda" modu); diğer modlarda hamle yok sayılır. */
+    if (event.currentTarget && event.currentTarget !== activeBoardEl()) {
+      if (app.online || !app.state || app.state.turnBased || app.state.mode === "solo") return;
+      var target = Number(event.currentTarget.dataset.board);
+      app.localActor = target === 1 ? 1 : 0;
+      app.cursor = null;
+      renderGame();
+    }
     var cell = event.target.closest(".cell");
     if (!cell) return;
     app.cursor = null;
@@ -2626,11 +2880,9 @@
     app.lastAnimated = s.seq;
     var last = s.lastMove;
     if (last.points > 0) sfxPoints(last.points, last.combo || 0, last.lines || 0);
-    var owner = s.mode === "coop" ? "shared" : (app.online ? String(last.by) : "active");
+    var owner = s.mode === "coop" ? "shared"
+      : (s.mode === "solo" ? "active" : String(last.by));
     var boardEl = document.querySelector('[data-board="' + owner + '"]');
-    /* Aynı cihazdaki iki insan oyununda sıra döndüğü için önceki tahta artık
-       çizili değil; tek kişilikte her zaman aynı tahta ekranda. */
-    if (boardEl && !app.online && s.mode === "versus" && last.by !== s.turn) boardEl = null;
     if (boardEl) {
       last.placed.forEach(function (cell) {
         var el = boardEl.children[cell[0] * SIZE + cell[1]];
@@ -2758,6 +3010,27 @@
     $$("#lobby-timer button").forEach(function (button) {
       var on = button.dataset.time === (s.timeMode || "shared");
       button.setAttribute("aria-pressed", on ? "true" : "false");
+      button.disabled = !isHost;
+    });
+
+    var versusRoom = s.mode !== "coop";
+    var paceRow = $("#lobby-pace-row");
+    if (paceRow) paceRow.hidden = !versusRoom;
+    $$("#lobby-pace button").forEach(function (button) {
+      var pace = s.turnBased === false ? "live" : "turn";
+      var on = button.dataset.pace === pace;
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+      button.disabled = !isHost;
+    });
+    var limitKind = s.timeMode === "turn" ? "turn" : "shared";
+    var limit = limitKind === "turn" ? (s.turnLimit || 30) : (s.timeLimit || 120);
+    var limitRow = $("#lobby-limit-row");
+    if (limitRow) limitRow.hidden = s.timeMode === "none";
+    var limitValue = $("#lobby-limit-value");
+    if (limitValue) limitValue.textContent = fmtTime(limit);
+    var limitLabel = $("#lobby-limit-label");
+    if (limitLabel) limitLabel.textContent = limitKind === "turn" ? "Sıra süresi" : "Süre ayarı";
+    $$("#lobby-limit-row [data-step]").forEach(function (button) {
       button.disabled = !isHost;
     });
 
@@ -4318,6 +4591,19 @@
       leaveToHome(true);
     });
 
+    /* Aynı cihazda "aynı anda" modunda oyuncu, oynamak istediği tahtayı
+       etiketindeki düğmeyle seçer. */
+    $("#table-area").addEventListener("click", function (event) {
+      var pick = event.target.closest("[data-pick]");
+      if (!pick || app.online || !app.state || app.state.turnBased) return;
+      event.preventDefault();
+      app.localActor = Number(pick.dataset.pick) === 1 ? 1 : 0;
+      app.selected = null;
+      app.cursor = null;
+      sfxPlace();
+      renderGame();
+    });
+
     $("#exit-btn").addEventListener("click", function () {
       leaveToHome(true);
     });
@@ -4358,7 +4644,14 @@
         var value = button.dataset.local;
         var mode = value === "daily" ? "daily"
           : (value === "coop" ? "coop" : (value === "solo" ? "solo" : "versus"));
-        startLocal(mode, { timeMode: mode === "solo" || mode === "daily" ? "none" : app.timeMode });
+        var pace = button.dataset.pace;
+        if (mode === "versus" && pace) app.localPace = pace === "live" ? "live" : "turn";
+        startLocal(mode, {
+          timeMode: mode === "solo" || mode === "daily" ? "none" : app.timeMode,
+          pace: app.localPace,
+          timeLimit: app.timeLimit,
+          turnLimit: app.turnLimit
+        });
       });
     });
 
@@ -4421,7 +4714,29 @@
 
     $$("#lobby-timer button").forEach(function (button) {
       button.addEventListener("click", function () {
+        audio();
         wsSend({ t: "timer", mode: button.dataset.time });
+      });
+    });
+
+    $$("#lobby-pace button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        audio();
+        wsSend({ t: "pace", pace: button.dataset.pace });
+      });
+    });
+
+    $$("#lobby-limit-row [data-step]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var s = app.state;
+        if (!s || app.me !== s.host) return;
+        audio();
+        var kind = s.timeMode === "turn" ? "turn" : "shared";
+        var rule = LIMITS[kind];
+        var current = kind === "turn" ? (s.turnLimit || 30) : (s.timeLimit || 120);
+        var value = clampLimit(kind, current + Number(button.dataset.step) * rule.step);
+        if (kind === "turn") wsSend({ t: "timer", turnLimit: value });
+        else wsSend({ t: "timer", timeLimit: value });
       });
     });
 

@@ -531,6 +531,46 @@ async function main() {
   })()`);
   ok("rakip odasına katıldı", versusJoin.slots === 2, versusJoin);
 
+  /* ---- lobi kapışma ayarları: varsayılan sırayla, düğmeler oda sahibinde ---- */
+  const paceDefault = await a.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 400));
+    const s = window.BlokDebug.snapshot();
+    return {
+      turnBased: s.turnBased,
+      pace: [...document.querySelectorAll('#lobby-pace button')].map(x => x.getAttribute('aria-pressed')),
+      paceVisible: !document.getElementById('lobby-pace-row').hidden,
+      limit: document.getElementById('lobby-limit-value').textContent
+    };
+  })()`);
+  ok("rakip odası sırayla başlıyor ve süre ayarı görünüyor",
+    paceDefault.turnBased === true && paceDefault.paceVisible &&
+    paceDefault.pace[0] === "true" && /2:00/.test(paceDefault.limit), paceDefault);
+
+  const paceSwitch = await a.evaluate(`(async () => {
+    document.querySelector('#lobby-pace button[data-pace="live"]').click();
+    await new Promise(r => setTimeout(r, 500));
+    const live = window.BlokDebug.snapshot().turnBased;
+    document.querySelector('#lobby-pace button[data-pace="turn"]').click();
+    await new Promise(r => setTimeout(r, 500));
+    return { live, back: window.BlokDebug.snapshot().turnBased };
+  })()`);
+  ok("doldurma düzeni iki tarafta değişiyor", paceSwitch.live === false && paceSwitch.back === true, paceSwitch);
+
+  const limitStep = await a.evaluate(`(async () => {
+    document.querySelector('#lobby-limit-row [data-step="1"]').click();
+    await new Promise(r => setTimeout(r, 500));
+    return { value: document.getElementById('lobby-limit-value').textContent,
+             limit: window.BlokDebug.snapshot().timeLimit };
+  })()`);
+  const limitSeen = await b.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 300));
+    return { value: document.getElementById('lobby-limit-value').textContent,
+             limit: window.BlokDebug.snapshot().timeLimit };
+  })()`);
+  ok("süre ince ayarı 15'er saniye artıyor ve karşı tarafa yansıyor",
+    limitStep.limit === 135 && limitSeen.limit === 135 &&
+    /2:15/.test(limitStep.value) && limitStep.value === limitSeen.value, { limitStep, limitSeen });
+
   await a.evaluate(`(async () => {
     document.getElementById('start-btn').click();
     await new Promise(r => setTimeout(r, 1400));
@@ -572,22 +612,26 @@ async function main() {
   const peerView = await b.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 400));
     const mine = document.querySelector('#board-me');
-    const rival = document.getElementById('board-rival');
+    const rival = document.querySelector('#board-rival');
     const area = document.getElementById('table-area');
-    if (!mine || !area) return { exists: false };
+    const banner = document.getElementById('duel-turn');
+    if (!mine || !rival || !area) return { exists: false };
     const mr = mine.getBoundingClientRect();
+    const rr = rival.getBoundingClientRect();
     const ar = area.getBoundingClientRect();
     return {
       exists: true,
-      centered: Math.abs((mr.left - ar.left) - (ar.right - mr.right)) <= 2,
-      rival: !!rival,
-      rivalCells: rival ? rival.querySelectorAll('.on').length : -1,
-      smaller: rival ? rival.getBoundingClientRect().width < mr.width : false
+      sideBySide: Math.abs(mr.top - rr.top) <= 10 && (mr.right <= rr.left + 1 || rr.right <= mr.left + 1),
+      similar: Math.abs(mr.width - rr.width) <= 4,
+      inside: mr.left >= ar.left - 2 && rr.right <= ar.right + 2,
+      rivalCells: rival.querySelectorAll('.on').length,
+      banner: banner ? banner.textContent : '',
+      turn: window.BlokDebug.snapshot().turn
     };
   })()`);
-  ok("kendi tahtası ekranın ortasında, rakip tahtası skor kartında küçük görünüyor",
-    peerView.exists && peerView.centered && peerView.rival &&
-    peerView.rivalCells === rivalView.rivalCells && peerView.smaller, peerView);
+  ok("iki tahta yan yana, sıra bandı doğru oyuncuyu gösteriyor",
+    peerView.exists && peerView.sideBySide && peerView.similar && peerView.inside &&
+    peerView.rivalCells === rivalView.rivalCells && /Sıra sende/.test(peerView.banner), peerView);
 
   /* ---- tek kişilik mod ---- */
   for (const page of [a, b]) {
@@ -864,7 +908,7 @@ async function main() {
     matched[0].game && matched[1].game && matched[0].mode === "versus" &&
     matched[0].players === 2 && matched[1].players === 2 &&
     matched[0].room && matched[0].room === matched[1].room, matched);
-  ok("eşleşen oyunda rakip tahtası skor kartında görünüyor", matched[0].peer && matched[1].peer, matched);
+  ok("eşleşen oyunda iki tahta yan yana görünüyor", matched[0].peer && matched[1].peer, matched);
 
   a.close();
   b.close();

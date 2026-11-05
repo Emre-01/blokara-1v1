@@ -1,7 +1,7 @@
 # Google Play Console — hazır bilgiler (Blokara 1v1)
 
 Bu dosya Play Console'a **kopyala-yapıştır** yapılacak metinleri ve form
-cevaplarını içerir. Sürüm: `2.0.9` (`versionCode 21`).
+cevaplarını içerir. Sürüm: `2.1.0` (`versionCode 22`).
 
 | Alan | Değer |
 |---|---|
@@ -150,18 +150,25 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 
 ---
 
-## 5. Sürüm notları (2.0.9)
+## 5. Sürüm notları (2.1.0)
 
 ```
-• Oda kodu artık kalıcı sunucuda çalışıyor: arkadaşınla aynı anda, farklı
-  cihazlardan, kayıt olmadan oynayabilirsin.
-• Paylaş düğmesi telefonun paylaşım menüsünü açıyor; Kopyala yalnızca oda
-  kodunu panoya yazıyor.
-• Paylaşılan oda bağlantısı arkadaşının cihazında açılabilecek adresi taşıyor.
-• Ekran oranları yenilendi: küçük ve dar telefonlarda sağa/sola kaydırma
-  oluşmuyor; skor kartları ve üst bar taşmıyor.
-• Oda ekranındaki çerçeve artık her ekrana nizami oturuyor; alt kenar ve
-  gölgesi kesilmiyor, yatay modda da kaydırma gerekmiyor.
+• Yeni logo: kırmızı ve mavi tetris parçaları merkezde çarpışıp kesişiyor;
+  hız çizgileri ve kıvılcım efektiyle hareket ediyor.
+• İki tahtalı modda sıra artık her yönden belli: sıradaki tahta renkli
+  çerçeveyle öne çıkıyor, rakip tahtası soluklaşıyor; üstte "Sıra sende /
+  Rakibin sırası" bandı var.
+• Sıra değişince kısa bir geçiş sesi çalıyor; hem görsel hem sesli uyarı var.
+• Kazanma ve kaybetme için birbirinden farklı, rekabetçi ses efektleri.
+• Yeni "Sırayla oyna" ve "Aynı anda oyna" seçenekleri: aynı cihazda ve
+  çevrimiçi odalarda iki ayrı tahtayı sırayla ya da aynı anda doldurabilirsin.
+• Aynı cihazda "aynı anda" modunda tahtaya dokunarak o tahtayı seçebilirsin.
+• İnce ayarlı süre: ortak süre 30-300 sn (15'er), sıra süresi 10-120 sn
+  (5'er). Ayar, ana menüdeki "Kapışma ayarları" ve lobide oda sahibinde.
+• Rastgele eşleşen oyunlar "aynı anda" modunda başlıyor; arkadaş odaları
+  varsayılan olarak sırayla.
+• Oda ekranındaki çerçeve her ekrana nizami oturuyor; alt kenar ve gölgesi
+  kesilmiyor, yatay modda da kaydırma gerekmiyor.
 • Oyun menüsü ve sonuç penceresi her ekrana sığıyor (yatay mod dahil).
 • Ortak tahtada arkadaşının sürüklemesi canlı görünüyor.
 • Mod kartlarındaki tahta görselleri büyütüldü; oynat düğmesi taşmıyor.
@@ -185,7 +192,7 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
 - [ ] İçerik derecelendirmesi anketi (bölüm 3).
 - [ ] Reklam beyanı: "Reklam içeriyor" işaretle.
 - [ ] Uygulama içi ürün `remove_ads` oluştur ve etkinleştir.
-- [ ] AAB yükle: `android/dist/Blokara-1v1-2.0.9.aab`.
+- [ ] AAB yükle: `android/dist/Blokara-1v1-2.1.0.aab`.
 - [ ] Kapalı test → 12 test kullanıcısı → 14 gün → üretime geçiş.
 - [ ] Üretim öncesi `assets/server.txt` kalıcı sunucu adresini gösteriyor mu
       kontrol et (tünel adresi kalıcı değildir).

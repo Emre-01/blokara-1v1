@@ -25,32 +25,38 @@
   <button class="brand" id="brand" type="button" aria-label="Ana menüye dön">
     <span class="brand-mark" aria-hidden="true">
       <svg viewBox="0 0 40 40" role="img" aria-hidden="true">
-        <!-- Sol blok: ortaya doğru savrulan T parçası -->
+        <!-- Hız çizgileri: iki parça merkeze doğru savruluyor. -->
+        <g class="speed-lines">
+          <path class="speed speed-warm" d="M1.8 12.2h4.1M1.2 17.6h3.4M2.4 23h3.1"/>
+          <path class="speed speed-cool" d="M38.2 12.2h-4.1M38.8 17.6h-3.4M37.6 23h-3.1"/>
+        </g>
+        <!-- Sol blok: kırmızı Z parçası, çaprazdan merkeze dalar. -->
         <g class="piece piece-warm">
-          <rect x="5.8" y="9" width="5.6" height="5.6" rx="1.3"/>
-          <rect x="5.8" y="14.8" width="5.6" height="5.6" rx="1.3"/>
-          <rect x="5.8" y="20.6" width="5.6" height="5.6" rx="1.3"/>
-          <rect x="11.6" y="14.8" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="4.2" y="8.6" width="5.2" height="5.2" rx="1.3"/>
+          <rect x="9.4" y="8.6" width="5.2" height="5.2" rx="1.3"/>
+          <rect x="9.4" y="13.8" width="5.2" height="5.2" rx="1.3"/>
+          <rect x="14.6" y="13.8" width="5.2" height="5.2" rx="1.3"/>
         </g>
-        <!-- Sağ blok: ona doğru gelen T parçası -->
+        <!-- Sağ blok: mavi S parçası, aynı noktaya karşıdan gelir. -->
         <g class="piece piece-cool">
-          <rect x="28.6" y="9" width="5.6" height="5.6" rx="1.3"/>
-          <rect x="28.6" y="14.8" width="5.6" height="5.6" rx="1.3"/>
-          <rect x="28.6" y="20.6" width="5.6" height="5.6" rx="1.3"/>
-          <rect x="22.8" y="14.8" width="5.6" height="5.6" rx="1.3"/>
+          <rect x="28.8" y="20.8" width="5.2" height="5.2" rx="1.3"/>
+          <rect x="23.6" y="20.8" width="5.2" height="5.2" rx="1.3"/>
+          <rect x="23.6" y="15.6" width="5.2" height="5.2" rx="1.3"/>
+          <rect x="18.4" y="15.6" width="5.2" height="5.2" rx="1.3"/>
         </g>
-        <!-- Tokuşma noktası: dört kollu kıvılcım + halka -->
+        <!-- Tokuşma noktası: dört kollu kıvılcım, halka ve sıcak çekirdek. -->
         <g class="impact">
-          <path class="burst" d="M20 12 21.3 16.2 25.2 17.6 21.3 19 20 23.2 18.7 19 14.8 17.6 18.7 16.2Z"/>
-          <circle class="burst-ring" cx="20" cy="17.6" r="5.4"/>
-          <circle class="burst-core" cx="20" cy="17.6" r="1.5"/>
+          <path class="burst" d="M20.2 11.8 21.6 16.4 26.2 17.8 21.6 19.2 20.2 23.8 18.8 19.2 14.2 17.8 18.8 16.4Z"/>
+          <circle class="burst-ring" cx="20.2" cy="17.8" r="5.6"/>
+          <circle class="burst-core" cx="20.2" cy="17.8" r="1.7"/>
         </g>
         <!-- Çarpışmadan fırlayan kıymıklar -->
         <g class="shards">
-          <rect class="shard shard-a" x="13.4" y="4.6" width="2.3" height="2.3" rx="0.6"/>
-          <rect class="shard shard-b" x="24.4" y="29.6" width="2.1" height="2.1" rx="0.6"/>
-          <rect class="shard shard-c" x="31.2" y="4.2" width="1.8" height="1.8" rx="0.5"/>
-          <rect class="shard shard-d" x="6.6" y="30.4" width="1.6" height="1.6" rx="0.5"/>
+          <rect class="shard shard-a" x="12.8" y="4.2" width="2.4" height="2.4" rx="0.6"/>
+          <rect class="shard shard-b" x="25.4" y="29.2" width="2.2" height="2.2" rx="0.6"/>
+          <rect class="shard shard-c" x="31.8" y="3.6" width="1.9" height="1.9" rx="0.5"/>
+          <rect class="shard shard-d" x="6.2" y="30.8" width="1.7" height="1.7" rx="0.5"/>
+          <rect class="shard shard-e" x="33.4" y="26.4" width="1.5" height="1.5" rx="0.5"/>
         </g>
       </svg>
     </span>
@@ -294,17 +300,61 @@
           <h2>Rakip</h2>
           <p>Herkesin kendi tahtası var, blok dizisi aynı. İlk tıkanan kaybeder;
             skor tablosu seni bekliyor.</p>
-          <div class="mode-actions">
-            <button class="btn btn-ink" type="button" data-local="versus">
+          <div class="mode-actions mode-actions-split">
+            <button class="btn btn-ink" type="button" data-local="versus" data-pace="turn">
               <svg class="btn-play-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                 <path d="M7 4.9 16.2 10 7 15.1Z" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
               </svg>
-              <span class="btn-label">Aynı cihazda oyna</span>
+              <span class="btn-label">Sırayla oyna</span>
+            </button>
+            <button class="btn btn-outline" type="button" data-local="versus" data-pace="live" aria-label="Aynı anda oyna">
+              <svg class="btn-pace-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <rect x="2.4" y="5.8" width="6.6" height="8.6" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <rect x="11" y="5.8" width="6.6" height="8.6" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <rect x="4.4" y="8" width="2.6" height="2.6" rx="0.7" fill="currentColor"/>
+                <rect x="13" y="10.6" width="2.6" height="2.6" rx="0.7" fill="currentColor"/>
+              </svg>
+              <span class="btn-label">Aynı anda oyna</span>
             </button>
           </div>
         </div>
       </article>
     </div>
+
+    <details class="match-setup" id="local-setup">
+      <summary>
+        <span>Kapışma ayarları</span>
+        <span class="setup-summary">
+          <b id="local-pace-note">Sırayla</b>
+          <span aria-hidden="true">·</span>
+          <b id="local-time-note">Ortak süre</b>
+          <span id="local-limit-note">2:00</span>
+        </span>
+      </summary>
+      <div class="setup-row">
+        <span class="setup-label">Doldurma</span>
+        <div class="mode-switch setup-switch" id="local-pace" aria-label="Doldurma düzeni">
+          <button type="button" data-pace="turn">Sırayla</button>
+          <button type="button" data-pace="live">Aynı anda</button>
+        </div>
+      </div>
+      <div class="setup-row">
+        <span class="setup-label">Süre</span>
+        <div class="mode-switch setup-switch" id="local-timer" aria-label="Süre modu">
+          <button type="button" data-time="shared">Ortak süre</button>
+          <button type="button" data-time="turn">Sıra süresi</button>
+          <button type="button" data-time="none">Süresiz</button>
+        </div>
+      </div>
+      <div class="setup-row setup-fine" id="local-limit-row">
+        <span class="setup-label" id="local-limit-label">Süre ayarı</span>
+        <div class="stepper" role="group" aria-labelledby="local-limit-label">
+          <button type="button" data-step="-1" aria-label="Azalt">−</button>
+          <span class="stepper-value" id="local-limit-value">2:00</span>
+          <button type="button" data-step="1" aria-label="Artır">+</button>
+        </div>
+      </div>
+    </details>
 
     <details class="ach-card" id="ach-card">
       <summary>Başarımlar <span class="ach-count" id="ach-count">0 / 10</span></summary>
@@ -339,11 +389,32 @@
         <button type="button" data-mode="versus">Rakip</button>
       </div>
 
-      <div class="mode-switch lobby-timer" id="lobby-timer" aria-label="Süre modu">
-        <button type="button" data-time="shared">Ortak süre</button>
-        <button type="button" data-time="turn">Sıra süresi</button>
-        <button type="button" data-time="none">Süresiz</button>
+      <div class="lobby-settings">
+        <div class="lobby-setting-row" id="lobby-pace-row">
+          <span class="lobby-setting-label">Doldurma</span>
+          <div class="mode-switch lobby-pace" id="lobby-pace" aria-label="Doldurma düzeni">
+            <button type="button" data-pace="turn">Sırayla</button>
+            <button type="button" data-pace="live">Aynı anda</button>
+          </div>
+        </div>
+        <div class="lobby-setting-row">
+          <span class="lobby-setting-label">Süre</span>
+          <div class="mode-switch lobby-timer" id="lobby-timer" aria-label="Süre modu">
+            <button type="button" data-time="shared">Ortak süre</button>
+            <button type="button" data-time="turn">Sıra süresi</button>
+            <button type="button" data-time="none">Süresiz</button>
+          </div>
+        </div>
+        <div class="lobby-setting-row lobby-fine" id="lobby-limit-row">
+          <span class="lobby-setting-label" id="lobby-limit-label">Süre ayarı</span>
+          <div class="stepper" role="group" aria-labelledby="lobby-limit-label">
+            <button type="button" data-step="-1" aria-label="Azalt">−</button>
+            <span class="stepper-value" id="lobby-limit-value">2:00</span>
+            <button type="button" data-step="1" aria-label="Artır">+</button>
+          </div>
+        </div>
       </div>
+      <p class="lobby-hint lobby-owner-note" id="lobby-owner-note">Süreyi ve doldurma düzenini oda sahibi ayarlar.</p>
 
       <ul class="slots" id="lobby-slots"></ul>
 

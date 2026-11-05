@@ -203,11 +203,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 .brand-mark svg { width: 100%; height: 100%; overflow: visible; }
 .brand-mark .piece-warm rect { fill: var(--coral); }
-.brand-mark .piece-warm rect:nth-child(2),
-.brand-mark .piece-warm rect:nth-child(3) { fill: var(--mustard); }
 .brand-mark .piece-cool rect { fill: var(--cobalt); }
-.brand-mark .piece-cool rect:nth-child(2),
-.brand-mark .piece-cool rect:nth-child(3) { fill: var(--mint); }
+.brand-mark .piece rect {
+  stroke: #171428;
+  stroke-width: 0.9;
+  paint-order: stroke fill;
+}
 
 /* Çarpışma efekti: parçalar ortada tokuşur, yıldız patlar. */
 .brand-mark .piece { transform-box: fill-box; transform-origin: center; }
@@ -224,23 +225,52 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   animation: clash-ring 3.8s ease-out infinite;
 }
 .brand-mark .burst-core { fill: var(--mustard); }
-.brand-mark .shard { fill: var(--paper); }
+.brand-mark .shard-a,
+.brand-mark .shard-c { fill: var(--coral); }
+.brand-mark .shard-b,
+.brand-mark .shard-e { fill: var(--mint); }
+.brand-mark .shard-d { fill: var(--mustard); }
 .brand-mark .shard-a { animation: clash-shard-a 3.8s ease-out infinite; }
 .brand-mark .shard-b { animation: clash-shard-b 3.8s ease-out infinite; }
 .brand-mark .shard-c { animation: clash-shard-c 3.8s ease-out infinite; }
 .brand-mark .shard-d { animation: clash-shard-a 3.8s ease-out infinite; }
+.brand-mark .shard-e { animation: clash-shard-b 3.8s ease-out infinite; }
+
+/* Hız çizgileri parçaların arkasından merkeze doğru akar. */
+.brand-mark .speed-lines {
+  stroke: var(--paper);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  fill: none;
+}
+.brand-mark .speed-cool { stroke: var(--mint); }
+.brand-mark .speed { animation: clash-speed 3.8s ease-out infinite; }
+.brand-mark .speed-cool { animation-name: clash-speed-cool; }
+
+@keyframes clash-speed {
+  0%, 40% { transform: translateX(-2px); opacity: 0; }
+  46% { transform: translateX(0); opacity: 0.8; }
+  56%, 100% { transform: translateX(2.4px); opacity: 0; }
+}
+@keyframes clash-speed-cool {
+  0%, 40% { transform: translateX(2px); opacity: 0; }
+  46% { transform: translateX(0); opacity: 0.8; }
+  56%, 100% { transform: translateX(-2.4px); opacity: 0; }
+}
 
 @keyframes clash-warm {
-  0%, 52%, 100% { transform: translateX(0) rotate(-7deg); }
-  58% { transform: translateX(3.6px) rotate(-1deg); }
-  62% { transform: translateX(2.2px) rotate(-9deg); }
-  68% { transform: translateX(0.9px) rotate(-6deg); }
+  0%, 40%, 100% { transform: translateX(-2.1px) rotate(-8deg); }
+  47% { transform: translateX(2.5px) rotate(-2deg); }
+  53% { transform: translateX(0.5px) rotate(-8deg); }
+  60% { transform: translateX(-0.4px) rotate(-6deg); }
+  72% { transform: translateX(-2.1px) rotate(-8deg); }
 }
 @keyframes clash-cool {
-  0%, 52%, 100% { transform: translateX(0) rotate(7deg); }
-  58% { transform: translateX(-3.6px) rotate(1deg); }
-  62% { transform: translateX(-2.2px) rotate(9deg); }
-  68% { transform: translateX(-0.9px) rotate(6deg); }
+  0%, 40%, 100% { transform: translateX(2.1px) rotate(8deg); }
+  47% { transform: translateX(-2.5px) rotate(2deg); }
+  53% { transform: translateX(-0.5px) rotate(8deg); }
+  60% { transform: translateX(0.4px) rotate(6deg); }
+  72% { transform: translateX(2.1px) rotate(8deg); }
 }
 @keyframes clash-flash {
   0%, 52%, 100% { transform: scale(0.72); opacity: 0.65; }
@@ -273,7 +303,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .brand-mark .piece,
   .brand-mark .impact,
   .brand-mark .burst-ring,
-  .brand-mark .shard { animation: none; }
+  .brand-mark .shard,
+  .brand-mark .speed { animation: none; }
+  .duel-turn.turn-swap { animation: none; }
 }
 .brand:hover .brand-mark { transform: rotate(2deg) scale(1.04); }
 .brand-mark { transition: transform 0.18s ease; }
@@ -691,6 +723,14 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .btn-play-icon {
   width: 15px;
   height: 15px;
+  flex: 0 0 auto;
+  margin-block: -1px;
+}
+
+/* "Aynı anda oyna" ikonu: iki tahta yan yana, ikisi de doluyor. */
+.btn-pace-icon {
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
   margin-block: -1px;
 }
@@ -1331,6 +1371,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 .turn-pill.live { background: var(--mint); color: #fff; }
 .turn-pill.live .tp-top { color: rgba(255, 255, 255, 0.72); }
+.turn-pill.wait { background: var(--coral); color: #fff; }
+.turn-pill.wait .tp-top { color: rgba(255, 255, 255, 0.72); }
 .turn-pill.over { background: var(--ink); color: var(--paper); }
 .turn-pill.over .tp-top { color: rgba(243, 234, 216, 0.6); }
 
@@ -1652,8 +1694,294 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   gap: 10px;
 }
 
-/* Çevrimiçi rakip: kendi tahtası ekranın ortasında; rakip tahtası
-   skor kartındaki küçük önizlemede görünür. */
+/* ---------------- iki tahtalı kapışma (yerel + çevrimiçi) ----------------
+   İki tahta yan yana durur; sıradaki oyuncunun tahtası renkli çerçeveyle
+   parlar, rakip tahtası soluklaşır. Böylece sıranın kimde olduğu tek bakışta
+   anlaşılır. */
+.duel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.duel-turn {
+  width: min(100%, 620px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 12.5px;
+  font-weight: 800;
+  text-align: center;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.duel-turn .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.duel-turn.mine {
+  background: var(--mint);
+  color: #fff;
+  border-color: #17705c;
+}
+.duel-turn.rival {
+  background: var(--ink);
+  color: var(--paper);
+}
+.duel-turn.live { background: var(--mustard); color: var(--ink); }
+.duel-turn.local { background: #fff8e3; color: var(--ink); }
+.duel-turn.over { background: var(--paper-deep); color: var(--ink-soft); }
+
+.duel-turn.turn-swap { animation: turn-swap 0.55s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes turn-swap {
+  0% { transform: scale(0.94); }
+  45% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+
+.duel-boards {
+  width: 100%;
+  max-width: 620px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(6px, 2vw, 14px);
+  align-items: start;
+}
+
+.duel-side {
+  --turn-color: var(--coral);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  transition: filter 0.24s ease, opacity 0.24s ease, transform 0.24s ease;
+}
+.duel-side.p1 { --turn-color: var(--coral); }
+.duel-side.p2 { --turn-color: var(--cobalt); }
+
+.duel-side .board {
+  --board-w: 100%;
+  width: 100%;
+  gap: clamp(1.5px, 0.4vw, 3px);
+  padding: clamp(4px, 0.9vw, 6px);
+  border-width: 2.5px;
+  border-radius: clamp(9px, 2vw, 14px);
+  box-shadow: 0 4px 0 rgba(28, 27, 46, 0.14), 4px 4px 0 var(--ink);
+  transition: box-shadow 0.24s ease, border-color 0.24s ease, filter 0.24s ease;
+}
+.duel-side .cell { border-radius: clamp(2px, 0.55vw, 4px); }
+
+.duel-side.is-turn .board {
+  border-color: var(--turn-color);
+  box-shadow: 0 5px 0 rgba(28, 27, 46, 0.18), 4px 4px 0 var(--turn-color),
+    0 0 0 3px color-mix(in srgb, var(--turn-color) 22%, transparent);
+}
+.duel-side.is-turn { transform: translateY(-2px); }
+
+.duel-side.is-wait {
+  filter: saturate(0.32) brightness(0.96);
+  opacity: 0.72;
+}
+.duel-side.is-wait .board { box-shadow: 0 3px 0 rgba(28, 27, 46, 0.1), 3px 3px 0 rgba(28, 27, 46, 0.55); }
+
+.duel-label {
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.duel-label .score-dot { width: 6px; height: 6px; background: var(--turn-color); }
+.duel-label b {
+  max-width: 9.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.duel-status {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.duel-side.is-turn .duel-status {
+  background: var(--turn-color);
+  color: #fff;
+}
+.duel-pick {
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 1.5px 1.5px 0 var(--ink);
+}
+.duel-pick:active { transform: translate(1px, 1px); box-shadow: none; }
+
+.duel-tray {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.duel-tray .tray { min-height: calc(var(--tile) * 4 + 8px); }
+
+/* ---------------- kapışma ayarları (yerel) ---------------- */
+.match-setup {
+  width: 100%;
+  margin-top: 12px;
+  padding: 0 14px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 3px 3px 0 rgba(28, 27, 46, 0.14);
+}
+.match-setup > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 800;
+  list-style: none;
+}
+.match-setup > summary::-webkit-details-marker { display: none; }
+.match-setup > summary::after {
+  content: "+";
+  margin-left: auto;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--ink-soft);
+}
+.match-setup[open] > summary::after { content: "−"; }
+.setup-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.setup-summary b { color: var(--ink); }
+.match-setup[open] > summary { border-bottom: 1.5px dashed rgba(28, 27, 46, 0.18); }
+.match-setup[open] .setup-summary { display: none; }
+
+.setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+}
+.setup-row + .setup-row { border-top: 1px solid rgba(28, 27, 46, 0.09); }
+.setup-label {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.mode-switch.setup-switch {
+  flex: 1;
+  max-width: 300px;
+  grid-template-columns: repeat(3, 1fr);
+}
+.mode-switch.setup-switch button { padding: 6px 7px; font-size: 10.5px; }
+.mode-switch.setup-switch#local-pace { grid-template-columns: repeat(2, 1fr); }
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.stepper button {
+  border: 0;
+  width: 30px;
+  height: 28px;
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.stepper button:active { background: var(--mustard); }
+.stepper-value {
+  min-width: 46px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.setup-fine[hidden] { display: none; }
+
+/* ---------------- lobi maç ayarları ---------------- */
+.lobby-settings {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+}
+.lobby-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.lobby-setting-label {
+  flex: none;
+  width: 56px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.lobby-setting-row .mode-switch {
+  flex: 1;
+  min-width: 0;
+  padding: 3px;
+}
+.lobby-setting-row .mode-switch button { padding: 6px 5px; font-size: 11px; }
+.mode-switch.lobby-pace { grid-template-columns: repeat(2, 1fr); }
+.lobby-setting-row.lobby-fine { justify-content: space-between; }
+.lobby-setting-row.lobby-fine[hidden] { display: none; }
+.lobby-owner-note { margin-top: -4px; font-size: 10.5px; }
+
+/* Çevrimiçi rakip: iki tahta yan yana; sıradaki tahta renklenir. */
 
 .turn-note {
   font-size: 12.5px;
@@ -3235,6 +3563,11 @@ body {
     height: clamp(20px, 2.8vh, 27px);
     margin: 0 0 0 2px;
   }
+  .screen.home .mode-actions .btn-pace-icon {
+    width: clamp(19px, 2.6vh, 25px);
+    height: clamp(19px, 2.6vh, 25px);
+    margin: 0;
+  }
 
   /* Profil, hesap ve başarımlar da yüksekliğe göre nefes alır. */
   .screen.home .profile-strip { padding: clamp(5px, 0.9vh, 10px) 12px; }
@@ -3329,6 +3662,7 @@ body {
   .screen.home .mode-body h2 { font-size: 13px; }
   .screen.home .mode-actions .btn { width: 36px; height: 36px; }
   .screen.home .mode-actions .btn-play-icon { width: 19px; height: 19px; }
+  .screen.home .mode-actions .btn-pace-icon { width: 17px; height: 17px; }
   .screen.home .online-card { padding: 10px; gap: 8px; border-radius: 14px; }
   .online-badge { margin-bottom: 4px; font-size: 10.5px; padding: 2px 8px 2px 7px; }
   .play-head .online-copy h2 { font-size: 16px; }
@@ -3396,6 +3730,7 @@ body {
   .screen.home .mode-body h2 { font-size: 13.5px; }
   .screen.home .mode-actions .btn { width: 32px; height: 32px; }
   .screen.home .mode-actions .btn-play-icon { width: 17px; height: 17px; }
+  .screen.home .mode-actions .btn-pace-icon { width: 15px; height: 15px; }
   .screen.home .online-card { padding: 7px 9px; gap: 5px; border-radius: 14px; }
   .online-badge { margin-bottom: 2px; padding: 2px 7px 2px 6px; font-size: 9.5px; }
   .screen.home .play-head .online-copy h2 { font-size: 16px; }
@@ -3463,6 +3798,51 @@ body {
   .lobby-actions { gap: 5px; }
   .lobby-actions .btn { min-height: 34px; padding: 6px 10px; font-size: 13px; }
   .lobby-card > .tiny { font-size: 10px; line-height: 1.3; }
+  .lobby-settings { padding: 5px 7px; gap: 4px; }
+  .lobby-setting-label { width: 48px; font-size: 9.5px; }
+  .lobby-setting-row .mode-switch button { padding: 5px 3px; font-size: 10px; }
+  .lobby-owner-note { display: none; }
+  .duel-boards { gap: 7px; }
+  .duel-label { font-size: 10px; }
+}
+
+/* İki tahtalı oyun: kısa yatay ekranda tahtalar ve tepsi tek ekrana sığar. */
+@media (max-height: 430px) and (orientation: landscape) {
+  .duel { gap: 5px; }
+  .duel-turn { padding: 3px 10px; font-size: 11px; }
+  .duel-boards { max-width: min(100%, 460px); gap: 8px; }
+  .duel-side .board { box-shadow: 0 3px 0 rgba(28, 27, 46, 0.14), 3px 3px 0 var(--ink); }
+  .duel-tray .tray { min-height: 0; padding: 3px 2px; --tile: clamp(12px, 3.6vh, 18px); }
+  .duel-side { gap: 3px; }
+}
+
+/* Yatay ekran: iki tahtalı düzende tepsi tahtaların yanına geçer, tahta
+   boyu ekran yüksekliğine göre kısıtlanır. Böylece içerik skor tablosunun
+   üstüne taşmaz ve sayfa kaydırma gerektirmez. */
+@media (max-height: 640px) and (orientation: landscape) {
+  .duel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "banner banner"
+      "boards tray";
+    align-items: center;
+    justify-items: center;
+    gap: 6px clamp(8px, 2vw, 22px);
+    max-width: 100%;
+  }
+  .duel-turn { grid-area: banner; }
+  .duel-boards {
+    grid-area: boards;
+    width: 100%;
+    max-width: min(100%, calc(2 * (100svh - 218px) + 10px));
+    gap: clamp(6px, 1.4vw, 12px);
+  }
+  .duel-tray { grid-area: tray; width: auto; max-width: 34vw; }
+  .duel-tray .tray { flex-wrap: wrap; justify-content: center; }
+  .duel-side .board { box-shadow: 0 3px 0 rgba(28, 27, 46, 0.14), 3px 3px 0 var(--ink); }
+  .duel-label { font-size: 9.5px; }
+  .duel-side { gap: 3px; }
 }
 
 /* Yatay ve kısa ekranlar (ör. 568×320): lobi tek ekrana sığsın diye
@@ -3483,6 +3863,13 @@ body {
   .mode-switch { padding: 2px; gap: 2px; }
   .mode-switch button { padding: 3px; font-size: 10px; }
   .mode-switch.lobby-timer button { font-size: 9.5px; }
+  .lobby-settings { grid-template-columns: 1fr 1fr; gap: 3px 6px; padding: 3px 6px; }
+  .lobby-setting-row { gap: 4px; }
+  .lobby-setting-label { width: auto; font-size: 9px; }
+  .lobby-fine { grid-column: 1 / -1; }
+  .lobby-setting-row .mode-switch button { font-size: 9px; padding: 2px; }
+  .stepper button { width: 24px; height: 22px; font-size: 14px; }
+  .stepper-value { min-width: 38px; font-size: 10.5px; }
   .slot { min-height: 28px; padding: 2px 8px; gap: 6px; }
   .slot .avatar { width: 20px; height: 20px; font-size: 9.5px; }
   .slot-name { font-size: 11px; }
