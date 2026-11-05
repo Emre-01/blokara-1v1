@@ -84,11 +84,29 @@ powershell -ExecutionPolicy Bypass -File android\build-apk.ps1 `
   -GamesAppId 123456789
 ```
 
+## Profil menüsü
+
+Hesap şeridindeki **profil fotoğrafına** dokununca tek ekrana sığan, kaydırma
+gerektirmeyen bir menü açılır. Üç sekme vardır:
+
+- **Tema:** Atölye (varsayılan), Nane, Okyanus ve Gün Batımı. Seçim anında tüm
+  arayüze uygulanır, tarayıcı çubuğu rengiyle birlikte güncellenir ve cihazda
+  saklanır.
+- **Emote:** dört ifadeyi (gülme, alkış, ağlama, kızma) sesli ve animasyonlu
+  olarak denersin. Emote'lar herkese açıktır; açma veya satın alma gerekmez.
+- **Mağaza:** reklam izleyerek coin kazanma teklifleri. Reklam köprüsü yoksa
+  teklifler kapalı görünür ve neden gösterilir; “Reklamları kaldır” satın
+  alması da bu sekmededir.
+
+Sekmeler ok tuşlarıyla, `Home`/`End` ile gezilir; `Esc` menüyü kapatır ve odak
+profil fotoğrafına geri döner.
+
 ## Reklamlar (AdMob)
 
 - **Geçiş reklamı:** oyun sonucu ekrandan kalkınca, **her turdan sonra** bir kez.
 - **Alt banner:** yalnızca oyun ekranındayken, ekranın altında sabit banner.
-- **Ödüllü reklam:** sonuç ekranında “Reklam izle, 2× coin” düğmesi.
+- **Ödüllü reklam:** sonuç ekranında “Reklam izle, 2× coin” düğmesi ve profil
+  menüsünün **Mağaza** sekmesindeki coin teklifleri.
 - **Reklamları kaldır:** tek seferlik uygulama içi satın alma (`remove_ads`).
   Satın alınınca geçiş reklamı ve banner hiç gösterilmez; ödüllü reklam isteğe
   bağlı kalır.

@@ -1,0 +1,337 @@
+/* Profil menüsü testi: tema / emote / mağaza sekmeleri (Chrome CDP).
+   node --experimental-websocket test/profile-menu.cjs */
+"use strict";
+const { spawn } = require("child_process");
+const fs = require("fs");
+const http = require("http");
+const os = require("os");
+const path = require("path");
+
+if (typeof WebSocket === "undefined") {
+  const child = spawn(process.execPath, ["--experimental-websocket", __filename].concat(process.argv.slice(2)), { stdio: "inherit" });
+  child.on("exit", (code) => process.exit(code || 0));
+  return;
+}
+
+const SERVER_PORT = 8099;
+const CDP_PORT = 9468;
+const ROOT = path.join(__dirname, "..");
+const BASE = "http://127.0.0.1:" + SERVER_PORT + "/";
+
+const CHROME = [
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+].find((p) => fs.existsSync(p));
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const server = spawn(process.execPath, [path.join(ROOT, "server.cjs")], {
+  env: Object.assign({}, process.env, { PORT: String(SERVER_PORT), HOST: "127.0.0.1" }),
+  stdio: ["ignore", "pipe", "pipe"]
+});
+
+let chrome = null;
+const profile = path.join(os.tmpdir(), "blok-profile-" + process.pid);
+
+function getJson(pathname, method) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: "127.0.0.1", port: CDP_PORT, path: pathname, method: method || "GET" }, (res) => {
+      let body = "";
+      res.on("data", (c) => (body += c));
+      res.on("end", () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function waitForChrome() {
+  for (let i = 0; i < 80; i++) {
+    try { await getJson("/json/version"); return; } catch (e) { await wait(200); }
+  }
+  throw new Error("Chrome açılmadı");
+}
+
+async function openPage(url) {
+  const target = await getJson("/json/new?" + encodeURIComponent(url), "PUT");
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    ws.addEventListener("open", resolve, { once: true });
+    ws.addEventListener("error", reject, { once: true });
+  });
+  let id = 0;
+  const pending = new Map();
+  ws.addEventListener("message", (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.id && pending.has(msg.id)) {
+      const entry = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) entry.reject(new Error(JSON.stringify(msg.error)));
+      else entry.resolve(msg.result);
+    }
+  });
+  const call = (method, params) => new Promise((resolve, reject) => {
+    const msgId = ++id;
+    pending.set(msgId, { resolve, reject });
+    ws.send(JSON.stringify({ id: msgId, method, params: params || {} }));
+  });
+  await call("Runtime.enable");
+  await call("Page.enable");
+  const evaluate = async (expression) => {
+    const result = await call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+    if (result.exceptionDetails) throw new Error("JS: " + JSON.stringify(result.exceptionDetails.exception || result.exceptionDetails));
+    return result.result && result.result.value;
+  };
+  const viewport = (width, height) => call("Emulation.setDeviceMetricsOverride", {
+    width, height, deviceScaleFactor: 1, mobile: true
+  });
+  await viewport(412, 915);
+  const reload = async () => {
+    await call("Page.reload", { ignoreCache: true });
+    await wait(1200);
+  };
+  return { ws, evaluate, viewport, reload, close: () => ws.close() };
+}
+
+async function boot(page) {
+  for (let i = 0; i < 40; i++) {
+    const ready = await page.evaluate("!!(window.BlokDebug && document.getElementById('account-avatar'))").catch(() => false);
+    if (ready) return;
+    await wait(200);
+  }
+  throw new Error("Sayfa hazır olmadı");
+}
+
+let step = 0;
+function ok(name, condition, detail) {
+  step++;
+  if (!condition) {
+    console.error("✗ " + name + (detail === undefined ? "" : " → " + JSON.stringify(detail)));
+    throw new Error(name);
+  }
+  console.log("✓ " + name);
+}
+
+/* Açık pencerenin her sekmesinde kaydırma taşması olmamalı. */
+const PANE_OVERFLOW = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sheet = document.querySelector('.sheet');
+  const out = {};
+  for (const name of ['theme', 'emote', 'store']) {
+    document.querySelector('[data-profile-tab="' + name + '"]').click();
+    await sleep(140);
+    out[name] = Math.max(0, sheet.scrollHeight - sheet.clientHeight);
+  }
+  out.page = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  return out;
+})()`;
+
+async function main() {
+  await wait(700);
+
+  chrome = spawn(CHROME, [
+    "--headless=new",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    "--no-proxy-server",
+    "--remote-debugging-port=" + CDP_PORT,
+    "--user-data-dir=" + profile,
+    "--no-first-run",
+    "about:blank"
+  ], { stdio: "ignore" });
+  await waitForChrome();
+
+  const page = await openPage(BASE + "?test=1");
+  await boot(page);
+
+  /* ---- avatar bir düğme olmalı ve menüyü açmalı ---- */
+  const avatar = await page.evaluate(`(() => {
+    const el = document.getElementById('account-avatar');
+    return {
+      tag: el.tagName,
+      label: el.getAttribute('aria-label'),
+      popup: el.getAttribute('aria-haspopup'),
+      hidden: el.getAttribute('aria-hidden')
+    };
+  })()`);
+  ok("avatar bir düğme", avatar.tag === "BUTTON", avatar);
+  ok("avatar erişilebilir adı var", !!avatar.label, avatar);
+  ok("avatar menü açacağını bildiriyor", avatar.popup === "dialog", avatar);
+  ok("avatar ekran okuyucudan gizli değil", avatar.hidden === null, avatar);
+
+  await page.evaluate(`document.getElementById('account-avatar').click(); new Promise(r => setTimeout(r, 300))`);
+  const opened = await page.evaluate(`({
+    open: !document.getElementById('overlay').hidden,
+    heading: document.querySelector('.sheet h2') ? document.querySelector('.sheet h2').textContent : '',
+    tabs: [...document.querySelectorAll('[data-profile-tab]')].map((t) => t.dataset.profileTab),
+    selected: [...document.querySelectorAll('[data-profile-tab]')].filter((t) => t.getAttribute('aria-selected') === 'true').map((t) => t.dataset.profileTab),
+    panes: [...document.querySelectorAll('[data-profile-pane]')].map((p) => p.dataset.profilePane),
+    bodyOverflow: document.body.style.overflow
+  })`);
+  ok("avatar menüyü açıyor", opened.open === true, opened);
+  ok("menüde üç sekme var", opened.tabs.join(",") === "theme,emote,store", opened.tabs);
+  ok("tek sekme seçili", opened.selected.length === 1 && opened.selected[0] === "theme", opened.selected);
+  ok("üç bölüm var", opened.panes.join(",") === "theme,emote,store", opened.panes);
+  ok("menü açıkken sayfa kilitli", opened.bodyOverflow === "hidden", opened.bodyOverflow);
+
+  /* ---- sekmeler ---- */
+  const switched = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('[data-profile-tab="store"]').click();
+    await sleep(150);
+    const tab = document.querySelector('[data-profile-tab="store"]');
+    return {
+      selected: tab.getAttribute('aria-selected'),
+      active: tab.classList.contains('is-active'),
+      visible: [...document.querySelectorAll('[data-profile-pane]')]
+        .filter((p) => !p.hidden).map((p) => p.dataset.profilePane)
+    };
+  })()`);
+  ok("sekmeye basınca seçim değişiyor", switched.selected === "true" && switched.active, switched);
+  ok("yalnızca seçili bölüm görünüyor", switched.visible.join(",") === "store", switched.visible);
+
+  const keys = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const first = document.querySelector('[data-profile-tab="theme"]');
+    first.focus();
+    first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await sleep(120);
+    const afterRight = document.activeElement.dataset.profileTab;
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await sleep(120);
+    return { afterRight, afterLeft: document.activeElement.dataset.profileTab };
+  })()`);
+  ok("ok tuşu sağa sekme geçiyor", keys.afterRight === "emote", keys);
+  ok("ok tuşu sola sekme geçiyor", keys.afterLeft === "theme", keys);
+
+  /* ---- temalar ---- */
+  const themes = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const picks = [...document.querySelectorAll('[data-theme-pick]')];
+    const out = { count: picks.length, applied: {}, saved: null, meta: null, attr: null };
+    for (const pick of picks) {
+      pick.click();
+      await sleep(400);
+      out.applied[pick.dataset.themePick] = getComputedStyle(document.body).backgroundColor;
+    }
+    out.attr = document.documentElement.getAttribute('data-theme');
+    out.saved = localStorage.getItem('blokara.theme');
+    out.meta = document.querySelector('meta[name="theme-color"]').content;
+    return out;
+  })()`);
+  ok("dört tema var", themes.count === 4, themes.count);
+  const colors = Object.keys(themes.applied).map((k) => themes.applied[k]);
+  ok("her tema farklı zemin rengi veriyor", new Set(colors).size === 4, themes.applied);
+  ok("seçim html üzerine yazılıyor", themes.attr === "sunset", themes.attr);
+  ok("seçim kalıcı kaydediliyor", themes.saved === "sunset", themes.saved);
+  ok("tarayıcı çubuğu rengi güncelleniyor", /^#[0-9A-F]{6}$/i.test(themes.meta), themes.meta);
+
+  /* ---- emote önizlemesi ---- */
+  const emotes = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('[data-profile-tab="emote"]').click();
+    await sleep(150);
+    const chips = [...document.querySelectorAll('[data-profile-emote]')];
+    chips[0].click();
+    await sleep(180);
+    return {
+      count: chips.length,
+      names: chips.map((c) => c.querySelector('.profile-emote-name').textContent),
+      bubble: document.querySelectorAll('#emote-layer .emote-bubble').length,
+      status: document.getElementById('emote-status').textContent
+    };
+  })()`);
+  ok("dört emote önizlemesi var", emotes.count === 4, emotes.count);
+  ok("emote adları dolu", emotes.names.every((n) => !!n.trim()), emotes.names);
+  ok("emote seçince balon canlanıyor", emotes.bubble === 1, emotes.bubble);
+  ok("emote ekran okuyucuya duyuruluyor", !!emotes.status, emotes.status);
+
+  /* ---- mağaza ---- */
+  const store = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('[data-profile-tab="store"]').click();
+    await sleep(150);
+    const buttons = [...document.querySelectorAll('[data-reward-coins]')];
+    return {
+      offers: buttons.map((b) => Number(b.dataset.rewardCoins)),
+      disabled: buttons.every((b) => b.disabled),
+      notes: [...document.querySelectorAll('[data-profile-pane="store"] .profile-note')].map((n) => n.textContent)
+    };
+  })()`);
+  ok("iki reklam teklifi var", store.offers.join(",") === "80,200", store.offers);
+  ok("reklam köprüsü yokken teklifler kapalı", store.disabled === true, store.disabled);
+  ok("hazır değil açıklaması gösteriliyor", store.notes.some((n) => /hazır değil|ready|bereit/i.test(n)), store.notes);
+
+  /* ---- taşma yok ---- */
+  const big = await page.evaluate(PANE_OVERFLOW);
+  ok("412×915 hiçbir sekmede taşma yok", Object.keys(big).every((k) => big[k] === 0), big);
+
+  await page.viewport(568, 320);
+  await wait(250);
+  const landscape = await page.evaluate(PANE_OVERFLOW);
+  ok("568×320 hiçbir sekmede taşma yok", Object.keys(landscape).every((k) => landscape[k] === 0), landscape);
+
+  await page.viewport(344, 640);
+  await wait(250);
+  const narrow = await page.evaluate(PANE_OVERFLOW);
+  ok("344×640 hiçbir sekmede taşma yok", Object.keys(narrow).every((k) => narrow[k] === 0), narrow);
+
+  /* ---- kapatma: Esc ve odak dönüşü ---- */
+  await page.viewport(412, 915);
+  await wait(200);
+  const closed = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('[data-profile-tab="theme"]').click();
+    await sleep(120);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(180);
+    return {
+      hidden: document.getElementById('overlay').hidden,
+      focus: document.activeElement ? document.activeElement.id : '',
+      bodyOverflow: document.body.style.overflow
+    };
+  })()`);
+  ok("Esc menüyü kapatıyor", closed.hidden === true, closed);
+  ok("odak avatar düğmesine dönüyor", closed.focus === "account-avatar", closed.focus);
+  ok("sayfa kaydırması serbest kalıyor", closed.bodyOverflow === "", closed.bodyOverflow);
+
+  /* ---- tema yeniden yüklemede korunuyor ---- */
+  await page.reload();
+  await boot(page);
+  const persisted = await page.evaluate(`({
+    attr: document.documentElement.getAttribute('data-theme'),
+    saved: localStorage.getItem('blokara.theme'),
+    meta: document.querySelector('meta[name="theme-color"]').content
+  })`);
+  ok("tema yeniden açılışta korunuyor", persisted.attr === "sunset" && persisted.saved === "sunset", persisted);
+
+  /* ---- çeviri ---- */
+  const german = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    window.BlokI18n.setLang('de');
+    await sleep(250);
+    document.getElementById('account-avatar').click();
+    await sleep(300);
+    return {
+      tabs: [...document.querySelectorAll('[data-profile-tab]')].map((t) => t.textContent),
+      themes: [...document.querySelectorAll('.theme-name')].map((t) => t.textContent),
+      close: document.querySelector('.sheet-actions [data-close]').textContent
+    };
+  })()`);
+  ok("sekmeler Almancaya çevriliyor", german.tabs.join(",") === "Design,Ausdruck,Shop", german.tabs);
+  ok("tema adları Almancaya çevriliyor", german.themes.indexOf("Werkstatt") === 0, german.themes);
+  ok("kapat düğmesi Almancaya çevriliyor", german.close === "Schließen", german.close);
+
+  page.close();
+  chrome.kill();
+  server.kill();
+  console.log("\nProfil menüsü testi geçti (" + step + " kontrol).");
+  process.exit(0);
+}
+
+main().catch((error) => {
+  console.error("Test başarısız:", error.message);
+  if (chrome) chrome.kill();
+  server.kill();
+  process.exit(1);
+});

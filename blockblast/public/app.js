@@ -16,6 +16,7 @@
   var LS_FRIEND_CODE = "blokara.friendCode";
   var LS_FRIENDS = "blokara.friends";
   var LS_ADS_FREE = "blokara.adsFree";
+  var LS_THEME = "blokara.theme";
   var SS_ACTIVE = "blokiki.activeRoom";
   var MAX_RECONNECT = 6;
 
@@ -29,6 +30,20 @@
   /* Herkese açık dört emote. Sunucudaki liste ile aynı olmalı. */
   var EMOTES = ["laugh", "clap", "cry", "angry"];
   var EMOTE_LABELS = { laugh: "Gülme", clap: "Alkış", cry: "Ağlama", angry: "Kızma" };
+
+  /* Profilden seçilen renk teması. Renkler styles.css içinde
+     html[data-theme="…"] bloklarında tanımlıdır. */
+  var THEMES = [
+    { id: "workshop", name: "Atölye", meta: "#F3EAD8", swatch: ["#f3ead8", "#f2553d", "#f4b72a"] },
+    { id: "mint", name: "Nane", meta: "#E2F5EB", swatch: ["#e2f5eb", "#2da98d", "#f4b72a"] },
+    { id: "ocean", name: "Okyanus", meta: "#E2ECF9", swatch: ["#e2ecf9", "#2f55e8", "#23c3b0"] },
+    { id: "sunset", name: "Gün Batımı", meta: "#FBE7D8", swatch: ["#fbe7d8", "#e8485b", "#f4a12a"] }
+  ];
+  var PROFILE_TABS = [
+    { id: "theme", label: "Tema" },
+    { id: "emote", label: "Emote" },
+    { id: "store", label: "Mağaza" }
+  ];
 
   function clampLimit(kind, value) {
     var rule = LIMITS[kind] || LIMITS.shared;
@@ -96,7 +111,10 @@
     interstitialPending: false,
     daily: false,
     overlayReturnFocus: null,
-    lastEmoteAt: 0
+    lastEmoteAt: 0,
+    profileTab: "theme",
+    profileOpen: false,
+    theme: "workshop"
   };
 
   /* ------------------------------------------------------------------ */
@@ -114,6 +132,17 @@
 
   function fmt(number) {
     return Number(number || 0).toLocaleString("tr-TR");
+  }
+
+  /* Çeviri anahtarı + yer tutucu doldurma. Sözlük yoksa Türkçe metin kalır. */
+  function tr(key, vars) {
+    var out = window.BlokI18n && window.BlokI18n.t ? window.BlokI18n.t(key, vars) : key;
+    if (vars) {
+      out = String(out).replace(/\{(\w+)\}/g, function (whole, name) {
+        return vars[name] != null ? String(vars[name]) : whole;
+      });
+    }
+    return out;
   }
 
   function colorClass(color) {
@@ -552,6 +581,7 @@
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
     applyNativeInsetsSoon();
+    applyTheme(currentTheme(), { silent: true });
 
     var savedName = read(LS_NAME);
     var nameInput = $("#player-name");
@@ -687,6 +717,26 @@
     var m = Math.floor(value / 60);
     var s = value % 60;
     return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function currentTheme() {
+    var saved = read(LS_THEME);
+    var found = THEMES.filter(function (item) { return item.id === saved; })[0];
+    return found ? found.id : THEMES[0].id;
+  }
+
+  function applyTheme(id, options) {
+    var theme = THEMES.filter(function (item) { return item.id === id; })[0] || THEMES[0];
+    document.documentElement.setAttribute("data-theme", theme.id);
+    var color = document.querySelector('meta[name="theme-color"]');
+    if (color) color.setAttribute("content", theme.meta);
+    save(LS_THEME, theme.id);
+    app.theme = theme.id;
+    if (!options || !options.silent) {
+      var pick = document.querySelector('[data-theme-pick="' + theme.id + '"]');
+      if (pick) pick.focus({ preventScroll: true });
+    }
+    return theme.id;
   }
 
   function profileStats() {
@@ -2384,13 +2434,13 @@
     };
   }
 
-  function showEmoteBubble(kind, name, by) {
+  function showEmoteBubble(kind, name, by, spot) {
     if (EMOTES.indexOf(kind) < 0) return;
     var layer = $("#emote-layer");
     if (!layer) return;
     /* Üst üste biriken balonlar ekranı kaplamasın. */
     while (layer.children.length >= 4) layer.removeChild(layer.firstChild);
-    var spot = emoteAnchor(by);
+    spot = spot || emoteAnchor(by);
     var bubble = document.createElement("div");
     bubble.className = "emote-bubble emote-" + kind;
     bubble.style.left = (spot.x * 100).toFixed(2) + "%";
@@ -3312,6 +3362,7 @@
     var overlay = $("#overlay");
     overlay.hidden = true;
     overlay.className = "overlay";
+    app.profileOpen = false;
     $(".sheet", overlay).innerHTML = "";
     document.body.style.overflow = "";
     /* Pencereyi açan öğeye odağı geri ver: klavye kullanıcısı kaybolmasın. */
@@ -3820,6 +3871,180 @@
     toast("Adın güncellendi.");
   }
 
+  /* ------------------------------------------------------------------ */
+  /* profil menüsü: tema / emote / mağaza                                */
+  /* ------------------------------------------------------------------ */
+
+  function profileTabsHTML(active) {
+    return '<div class="profile-tabs" role="tablist" aria-label="Profil" data-profile-tablist>' +
+      PROFILE_TABS.map(function (tab) {
+        var on = tab.id === active;
+        return '<button class="profile-tab' + (on ? " is-active" : "") + '" type="button" role="tab"' +
+          ' aria-selected="' + (on ? "true" : "false") + '" data-profile-tab="' + tab.id + '">' +
+          esc(tr(tab.label)) + '</button>';
+      }).join("") + '</div>';
+  }
+
+  function themePaneHTML() {
+    var active = currentTheme();
+    return '<div class="profile-pane" role="tabpanel" data-profile-pane="theme" aria-label="' + esc(tr("Tema")) + '">' +
+      '<div class="theme-grid">' +
+      THEMES.map(function (theme) {
+        var on = theme.id === active;
+        return '<button class="theme-pick' + (on ? " is-active" : "") + '" type="button"' +
+          ' data-theme-pick="' + theme.id + '" aria-pressed="' + (on ? "true" : "false") + '">' +
+          '<span class="theme-swatch" aria-hidden="true">' +
+            theme.swatch.map(function (color) {
+              return '<i style="background:' + color + '"></i>';
+            }).join("") +
+          '</span>' +
+          '<span class="theme-name">' + esc(tr(theme.name)) + '</span>' +
+          '</button>';
+      }).join("") +
+      '</div></div>';
+  }
+
+  function emotePaneHTML() {
+    return '<div class="profile-pane" role="tabpanel" data-profile-pane="emote" aria-label="' + esc(tr("Emote")) + '" hidden>' +
+      '<p class="profile-note">' + esc(tr("Oyun sırasında ya da tur bittiğinde rakibine gülme, alkış, ağlama ve kızma gönderebilirsin.")) + '</p>' +
+      '<div class="profile-emotes" role="group" aria-label="' + esc(tr("Emote seç")) + '">' +
+      EMOTES.map(function (kind) {
+        return '<button class="profile-emote emote-' + kind + '" type="button" data-profile-emote="' +
+          kind + '" aria-label="' + esc(tr(EMOTE_LABELS[kind])) + '">' +
+          '<span class="emote-chip-art" aria-hidden="true">' + emoteArtHTML(kind) + '</span>' +
+          '<span class="profile-emote-name">' + esc(tr(EMOTE_LABELS[kind])) + '</span></button>';
+      }).join("") +
+      '</div></div>';
+  }
+
+  function profileStorePaneHTML() {
+    var p = app.profile;
+    var ready = !!ads.rewarded;
+    var html = '<div class="profile-pane" role="tabpanel" data-profile-pane="store" aria-label="' + esc(tr("Mağaza")) + '" hidden>' +
+      '<div class="store-balance"><b>' + fmt(p ? p.coins : 0) + '</b><span class="tiny">coin</span></div>' +
+      '<div class="store-offers">' +
+      [80, 200].map(function (coins) {
+        return '<div class="store-offer">' +
+          '<b class="store-amount">+' + fmt(coins) + '</b>' +
+          '<span class="tiny">coin</span>' +
+          '<button class="btn btn-ink btn-sm" type="button" data-reward-coins="' + coins + '"' +
+            (ready ? "" : " disabled") + '>' + esc(tr("Reklam izle")) + '</button>' +
+          '</div>';
+      }).join("") +
+      '</div>';
+    if (!ready) html += '<p class="profile-note">' + esc(tr("Reklam şu an hazır değil.")) + '</p>';
+    html += '<div class="store-ads">';
+    if (ads.free) {
+      html += '<p class="profile-note">' + esc(tr("Reklamlar kaldırıldı. Teşekkürler!")) + '</p>';
+    } else if (ads.billing) {
+      html += '<button class="btn btn-outline btn-sm" type="button" data-buy-ads>' +
+        esc(tr("Reklamları kaldır")) + '</button>';
+    } else {
+      html += '<p class="profile-note">' + esc(tr("Satın alma bu sürümde kullanılamıyor.")) + '</p>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function showProfileMenu(tab) {
+    if (tab && PROFILE_TABS.some(function (item) { return item.id === tab; })) app.profileTab = tab;
+    var active = app.profileTab || "theme";
+    refreshAdsState();
+    refreshBillingState();
+    var p = app.profile;
+    var info = p ? PROGRESS.levelInfo(p.xp) : null;
+    var name = accountName() || "Misafir oyuncu";
+    var meta = info
+      ? tr("Seviye {n} · {m} coin · {k} rekor", { n: info.level, m: fmt(p.coins), k: fmt(p.bestAny || 0) })
+      : tr("Misafir oyuncu");
+    openOverlay(
+      '<span class="result-badge">Profil</span>' +
+      '<h2 class="profile-name">' + esc(name) + '</h2>' +
+      '<p class="profile-meta">' + esc(meta) + '</p>' +
+      profileTabsHTML(active) +
+      themePaneHTML() +
+      emotePaneHTML() +
+      profileStorePaneHTML() +
+      '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>' +
+        esc(tr("Kapat")) + '</button></div>',
+      true,
+      "profile"
+    );
+    app.profileOpen = true;
+    /* Menü avatar düğmesinden açılır; kapanınca odak oraya dönsün. */
+    var opener = $("#account-avatar");
+    if (opener) app.overlayReturnFocus = opener;
+    selectProfileTab(active);
+    var list = $("[data-profile-tablist]", $("#overlay"));
+    if (list) list.addEventListener("keydown", onProfileTabKey);
+    fitOverlaySheet();
+  }
+
+  function selectProfileTab(tab) {
+    if (!PROFILE_TABS.some(function (item) { return item.id === tab; })) return;
+    app.profileTab = tab;
+    $$("[data-profile-tab]", $("#overlay")).forEach(function (button) {
+      var on = button.dataset.profileTab === tab;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-selected", on ? "true" : "false");
+      button.tabIndex = on ? 0 : -1;
+    });
+    $$("[data-profile-pane]", $("#overlay")).forEach(function (pane) {
+      pane.hidden = pane.dataset.profilePane !== tab;
+    });
+    fitOverlaySheet();
+  }
+
+  function onProfileTabKey(event) {
+    var keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (keys.indexOf(event.key) < 0) return;
+    event.preventDefault();
+    var tabs = $$("[data-profile-tab]", $("#overlay"));
+    if (!tabs.length) return;
+    var index = tabs.indexOf(document.activeElement);
+    if (index < 0) index = 0;
+    if (event.key === "Home") index = 0;
+    else if (event.key === "End") index = tabs.length - 1;
+    else if (event.key === "ArrowRight") index = (index + 1) % tabs.length;
+    else index = (index - 1 + tabs.length) % tabs.length;
+    tabs[index].focus();
+    selectProfileTab(tabs[index].dataset.profileTab);
+  }
+
+  function previewEmote(kind) {
+    if (EMOTES.indexOf(kind) < 0) return;
+    audio();
+    sfxEmote(kind);
+    showEmoteBubble(kind, "", 0, { x: 0.5, y: 0.42 });
+    if (FX && app.vibrate) FX.vibrate(kind === "angry" ? 45 : 24);
+    var status = $("#emote-status");
+    if (status) status.textContent = emoteLabel(kind);
+  }
+
+  function refreshProfileSheet() {
+    if (!app.profileOpen) return;
+    var overlay = $("#overlay");
+    var pane = $('[data-profile-pane="store"]', overlay);
+    if (!pane) return;
+    /* Pencereyi yeniden kurmak odağı ve açan öğeyi kaybettirir; yalnızca
+       mağaza bölümünü yerinde tazela. */
+    var wasHidden = pane.hidden;
+    var template = document.createElement("div");
+    template.innerHTML = profileStorePaneHTML();
+    var next = template.firstElementChild;
+    next.hidden = wasHidden;
+    pane.replaceWith(next);
+    var p = app.profile;
+    var info = p ? PROGRESS.levelInfo(p.xp) : null;
+    var meta = $(".profile-meta", overlay);
+    if (meta && info) {
+      meta.textContent = tr("Seviye {n} · {m} coin · {k} rekor", {
+        n: info.level, m: fmt(p.coins), k: fmt(p.bestAny || 0)
+      });
+    }
+    fitOverlaySheet();
+  }
+
   function renderAccount() {
     var profile = googleAccount.profile;
     var avatar = $("#account-avatar");
@@ -3827,11 +4052,19 @@
     var slot = $("#google-slot");
     var nativeBtn = $("#google-native");
     if (!avatar) return;
+    var initial = avatar.querySelector(".account-avatar-initial");
+    if (!initial) {
+      initial = document.createElement("span");
+      initial.className = "account-avatar-initial";
+      avatar.appendChild(initial);
+    }
     var name = accountName();
     avatar.style.backgroundImage = "";
-    avatar.textContent = accountInitial(name);
+    avatar.classList.remove("has-photo");
+    initial.textContent = accountInitial(name);
     if (profile && profile.picture) {
-      avatar.textContent = "";
+      initial.textContent = "";
+      avatar.classList.add("has-photo");
       avatar.style.backgroundImage = 'url("' + String(profile.picture).replace(/["\\]/g, "") + '")';
     }
     if (signout) signout.hidden = !profile;
@@ -4157,7 +4390,8 @@
     ads.pendingCoins = 0;
     ads.pendingKey = null;
     renderHomeMeta();
-    toast("+" + fmt(amount) + " coin eklendi (2×).");
+    refreshProfileSheet();
+    toast(tr("+{n} coin eklendi", { n: fmt(amount) }));
     var button = document.querySelector("[data-double-coins]");
     if (button) {
       button.disabled = true;
@@ -4292,11 +4526,13 @@
     if (type === "owned") {
       setAdsFree(true);
       sfxPurchase();
+      refreshProfileSheet();
       return;
     }
     if (type === "unavailable") {
       ads.billing = false;
       updatePurchaseStrip();
+      refreshProfileSheet();
       return;
     }
     if (type === "error" && payload) toast(payload);
@@ -4815,6 +5051,14 @@
 
     $("#help-btn").addEventListener("click", showHelp);
 
+    var accountAvatar = $("#account-avatar");
+    if (accountAvatar) {
+      accountAvatar.addEventListener("click", function () {
+        audio();
+        showProfileMenu();
+      });
+    }
+
     var langBtn = $("#lang-btn");
     if (langBtn) langBtn.addEventListener("click", function () {
       audio();
@@ -5018,6 +5262,33 @@
       }
       if (target.hasAttribute("data-save-name")) {
         saveNameFromEditor();
+        return;
+      }
+      if (target.hasAttribute("data-profile-tab")) {
+        selectProfileTab(target.dataset.profileTab);
+        return;
+      }
+      if (target.hasAttribute("data-theme-pick")) {
+        var themeId = applyTheme(target.dataset.themePick);
+        $$("[data-theme-pick]", $("#overlay")).forEach(function (pick) {
+          var on = pick.dataset.themePick === themeId;
+          pick.classList.toggle("is-active", on);
+          pick.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        sfxPlace();
+        return;
+      }
+      if (target.hasAttribute("data-profile-emote")) {
+        previewEmote(target.dataset.profileEmote);
+        return;
+      }
+      if (target.hasAttribute("data-reward-coins")) {
+        var coins = Number(target.dataset.rewardCoins);
+        watchRewardedCoins("store-" + coins + "-" + Date.now(), coins);
+        return;
+      }
+      if (target.hasAttribute("data-buy-ads")) {
+        startRemoveAdsPurchase();
         return;
       }
       if (target.hasAttribute("data-sound")) {

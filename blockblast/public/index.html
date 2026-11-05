@@ -202,7 +202,10 @@
          Giriş zorunlu değil; adı doğrudan buradan yazabilirsin. -->
     <section class="account-strip" id="account-strip" aria-label="Hesap">
       <div class="account-person">
-        <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
+        <button class="account-avatar" id="account-avatar" type="button"
+                aria-label="Profil" aria-haspopup="dialog">
+          <span class="account-avatar-initial">?</span>
+        </button>
         <div class="account-meta">
           <label class="account-label" for="player-name">Adın</label>
           <input id="player-name" class="account-input" name="name" type="text" maxlength="16"

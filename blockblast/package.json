@@ -13,6 +13,7 @@
     "service:remove": "powershell -ExecutionPolicy Bypass -File install-service.ps1 -Remove",
     "test": "node test/core-test.cjs && node test/socket-test.cjs && node test/check-html.cjs && node test/i18n-test.cjs",
     "test:ui": "node --experimental-websocket test/online-flow.cjs",
+    "test:profile": "node --experimental-websocket test/profile-menu.cjs",
     "apk": "powershell -ExecutionPolicy Bypass -File android/build-apk.ps1",
     "aab": "powershell -ExecutionPolicy Bypass -File android/build-aab.ps1"
   },

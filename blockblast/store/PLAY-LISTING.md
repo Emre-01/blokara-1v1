@@ -165,6 +165,12 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
   efekti var; gönderenin tahtasının üstünde balon olarak beliriyor.
 • Emote düğmesi oyun alt çubuğunda; tur bitince sonuç penceresinde de
   dört ifade tek dokunuşla gönderilebiliyor.
+• Profil fotoğrafına dokununca menü açılıyor: Tema, Emote ve Mağaza
+  sekmeleri tek ekranda. Dört renk teması (Atölye, Nane, Okyanus,
+  Gün Batımı) seçilince tüm arayüz anında renk değiştiriyor ve seçim
+  hatırlanıyor; emote sekmesinde dört ifadeyi sesli olarak deneyebilirsin.
+• Mağaza sekmesinde reklam izleyerek coin kazanma teklifleri ve varsa
+  "Reklamları kaldır" satın alması bir arada.
 • Yeni "Sırayla oyna" ve "Aynı anda oyna" seçenekleri: aynı cihazda ve
   çevrimiçi odalarda iki ayrı tahtayı sırayla ya da aynı anda doldurabilirsin.
 • Aynı cihazda "aynı anda" modunda tahtaya dokunarak o tahtayı seçebilirsin.
