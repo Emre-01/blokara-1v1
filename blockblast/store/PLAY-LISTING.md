@@ -160,6 +160,11 @@ Fiyatı Play Console belirler; kodda fiyat yoktur.
   Rakibin sırası" bandı var.
 • Sıra değişince kısa bir geçiş sesi çalıyor; hem görsel hem sesli uyarı var.
 • Kazanma ve kaybetme için birbirinden farklı, rekabetçi ses efektleri.
+• Emote sistemi: oyun sırasında ve tur bittiğinde rakibine gülme, alkış,
+  ağlama ve kızma gönderebilirsin. Her ifadenin kendi animasyonu ve ses
+  efekti var; gönderenin tahtasının üstünde balon olarak beliriyor.
+• Emote düğmesi oyun alt çubuğunda; tur bitince sonuç penceresinde de
+  dört ifade tek dokunuşla gönderilebiliyor.
 • Yeni "Sırayla oyna" ve "Aynı anda oyna" seçenekleri: aynı cihazda ve
   çevrimiçi odalarda iki ayrı tahtayı sırayla ya da aynı anda doldurabilirsin.
 • Aynı cihazda "aynı anda" modunda tahtaya dokunarak o tahtayı seçebilirsin.

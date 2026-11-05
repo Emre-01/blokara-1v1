@@ -141,6 +141,16 @@ async function main() {
   }
   assert.ok(placedB, "rakip hamlesi kabul edilmedi");
 
+  // emote: oyun sırasında rakibe iletilir, bilinmeyen ifade yok sayılır
+  a.send({ t: "emote", emote: "laugh" });
+  const gotEmote = await b.next((m) => m.t === "emote", 900);
+  assert.strictEqual(gotEmote.by, 0);
+  assert.strictEqual(gotEmote.emote, "laugh");
+
+  a.send({ t: "emote", emote: "bilinmeyen" });
+  const invalidEmote = await b.next((m) => m.t === "emote", 350).catch(() => null);
+  assert.strictEqual(invalidEmote, null, "bilinmeyen emote iletilmemeli");
+
   // yeniden bağlanma: b'nin oturumu ile yeni socket
   const tokenB = welcomeB.token;
   const b2 = await connect();
@@ -157,9 +167,19 @@ async function main() {
   const over = await a.next((m) => isState(m) && m.state.phase === "over");
   assert.strictEqual(over.state.winner, 0);
 
-  // yeniden başlatma (oda sahibi) — iki oyuncu da bağlı olmalı
+  // yeniden bağlanma; tur bittikten sonra da emote gönderilebilir
   b2.send({ t: "rejoin", code, token: tokenB });
   await b2.next(isWelcome);
+  b2.send({ t: "emote", emote: "cry" });
+  const overEmote = await a.next((m) => m.t === "emote" && m.emote === "cry", 900);
+  assert.strictEqual(overEmote.by, 1);
+
+  // art arda gönderim hız sınırına takılır
+  b2.send({ t: "emote", emote: "angry" });
+  const spamEmote = await a.next((m) => m.t === "emote", 350).catch(() => null);
+  assert.strictEqual(spamEmote, null, "art arda emote engellenmeli");
+
+  // yeniden başlatma (oda sahibi) — iki oyuncu da bağlı olmalı
   a.send({ t: "rematch" });
   const restarted = await a.next((m) => isState(m) && m.state.phase === "playing" && m.state.players.every((p) => p.score === 0));
   assert.strictEqual(restarted.state.players[0].score, 0);

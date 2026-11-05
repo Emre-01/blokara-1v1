@@ -26,6 +26,10 @@
     turn: { min: 10, max: 120, step: 5, def: 30 }
   };
 
+  /* Herkese açık dört emote. Sunucudaki liste ile aynı olmalı. */
+  var EMOTES = ["laugh", "clap", "cry", "angry"];
+  var EMOTE_LABELS = { laugh: "Gülme", clap: "Alkış", cry: "Ağlama", angry: "Kızma" };
+
   function clampLimit(kind, value) {
     var rule = LIMITS[kind] || LIMITS.shared;
     var n = Number(value);
@@ -91,7 +95,8 @@
     inviteAfterCreate: "",
     interstitialPending: false,
     daily: false,
-    overlayReturnFocus: null
+    overlayReturnFocus: null,
+    lastEmoteAt: 0
   };
 
   /* ------------------------------------------------------------------ */
@@ -448,6 +453,48 @@
     [783.99, 1046.5, 1318.5].forEach(function (freq, index) {
       setTimeout(function () { tone(freq, 0.12, { type: "triangle", volume: 0.05 }); }, index * 80);
     });
+  }
+
+  /* Emote sesleri: her ifadenin karakteri duyulur. Gülme kısa kahkaha
+     heceleri, alkış üç net el çırpma, ağlama alçalan sızlanma, kızma
+     tok bir homurtu ve buhar patlamasıdır. */
+  function sfxEmote(kind) {
+    if (kind === "laugh") {
+      [0, 115, 225, 330].forEach(function (delay, index) {
+        setTimeout(function () {
+          var base = 520 - index * 42;
+          tone(base, 0.1, { type: "triangle", slide: -70, volume: 0.07, pan: -0.15 + index * 0.1 });
+          tone(base * 0.5, 0.13, { type: "sine", slide: -24, volume: 0.04 });
+        }, delay);
+      });
+      return;
+    }
+    if (kind === "clap") {
+      [0, 160, 320].forEach(function (delay, index) {
+        setTimeout(function () {
+          noiseBurst(0.06, 0.1, 4200);
+          tone(1250 - index * 90, 0.045, { type: "square", volume: 0.022 });
+          tone(640 - index * 40, 0.05, { type: "triangle", volume: 0.03 });
+        }, delay);
+      });
+      return;
+    }
+    if (kind === "cry") {
+      tone(720, 0.55, { type: "sine", to: 360, volume: 0.055, attack: 0.04, pan: 0.2 });
+      setTimeout(function () {
+        tone(610, 0.5, { type: "triangle", to: 290, volume: 0.032, attack: 0.05, pan: -0.15 });
+      }, 230);
+      noiseSweep(0.42, 0.022, 1700, 420, 0.4, -0.35);
+      return;
+    }
+    /* Kızma: pes homurtu, kısa buhar ve diş gıcırtısı. */
+    tone(142, 0.32, { type: "sawtooth", slide: -46, volume: 0.06 });
+    tone(92, 0.42, { type: "square", slide: -20, volume: 0.028 });
+    noiseBurst(0.18, 0.065, 1300);
+    setTimeout(function () {
+      noiseBurst(0.13, 0.045, 900);
+      tone(180, 0.1, { type: "square", slide: -40, volume: 0.03 });
+    }, 170);
   }
 
   /* Kalın ve tok bir sesle "Perfect" / "Great" anonsu. Tarayıcı ses
@@ -885,10 +932,12 @@
       app.lastAnimated = -1;
       startClock();
     } else {
+      clearEmotes();
       stopClock();
       if (name === "home") renderHomeMeta();
     }
     syncBannerVisibility();
+    updateEmoteButton();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -1399,6 +1448,11 @@
       return;
     }
 
+    if (message.t === "emote") {
+      playEmote(message.emote, message.by, false);
+      return;
+    }
+
     if (message.t === "state") {
       app.pending = false;
       app.matching = false;
@@ -1679,6 +1733,7 @@
     if (signature === app.lastSignature && app.screen === "game") {
       updateClock();
       updateHint();
+      updateEmoteButton();
       return;
     }
     app.lastSignature = signature;
@@ -2151,6 +2206,7 @@
       syncGameLayout(s, layout, interactive);
     }
     updateHint();
+    updateEmoteButton();
     animateLastMove();
     updateClock();
     updateRoomChrome();
@@ -2241,6 +2297,151 @@
       var actor = s.players[app.localActor === 1 ? 1 : 0] || s.players[0];
       hint.textContent = "Aynı anda dolduruyorsunuz · seçili tahta: " + (actor ? actor.name : "—");
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* emote                                                               */
+  /* ------------------------------------------------------------------ */
+
+  function emoteAllowed() {
+    var s = app.state;
+    if (!s || !s.players || s.players.length < 2) return false;
+    /* Tek kişilikte rakip yok; ortak tahtada oda arkadaşına gönderilir. */
+    return s.mode !== "solo";
+  }
+
+  function emoteLabel(kind) {
+    var nameEl = $("#emote-tray [data-emote='" + kind + "'] .emote-chip-name");
+    return nameEl && nameEl.textContent.trim() ? nameEl.textContent.trim() : (EMOTE_LABELS[kind] || kind);
+  }
+
+  function emoteArtHTML(kind) {
+    var art = $("#emote-tray [data-emote='" + kind + "'] .emote-chip-art");
+    return art ? art.innerHTML : "";
+  }
+
+  function updateEmoteButton() {
+    var btn = $("#emote-btn");
+    if (!btn) return;
+    var overlay = $("#overlay");
+    var show = app.screen === "game" && emoteAllowed() && (!overlay || overlay.hidden);
+    btn.hidden = !show;
+    if (!show) closeEmoteTray();
+  }
+
+  function closeEmoteTray() {
+    var tray = $("#emote-tray");
+    var btn = $("#emote-btn");
+    if (tray) tray.hidden = true;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+
+  function clearEmotes() {
+    var layer = $("#emote-layer");
+    if (layer) layer.innerHTML = "";
+    var status = $("#emote-status");
+    if (status) status.textContent = "";
+  }
+
+  function toggleEmoteTray() {
+    var tray = $("#emote-tray");
+    var btn = $("#emote-btn");
+    if (!tray || !btn || btn.hidden) return;
+    var willOpen = tray.hidden;
+    tray.hidden = !willOpen;
+    btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    if (willOpen) {
+      audio();
+      var first = tray.querySelector("[data-emote]");
+      if (first) first.focus();
+    }
+  }
+
+  /* Emote balonunu gönderenin tahtasının üstüne yerleştirir. Sonuç
+     penceresi açıkken tahtalar görünmediği için sol/sağ yarıya düşer. */
+  function emoteAnchor(by) {
+    var s = app.state;
+    var index = by == null ? 0 : by;
+    var x = index === 1 ? 0.7 : 0.3;
+    var y = 0.18;
+    if (!s) return { x: x, y: y };
+    var id = s.mode === "coop" ? "board-shared" : duelBoardId(s, index);
+    var el = id ? document.getElementById(id) : null;
+    var overlay = $("#overlay");
+    if (el && overlay && overlay.hidden) {
+      var r = el.getBoundingClientRect();
+      if (r.width > 0) {
+        x = (r.left + r.width / 2) / Math.max(1, window.innerWidth);
+        /* Balon tahtanın ortasında süzülür: etiketleri ve tepsiyi kapatmaz. */
+        y = (r.top + r.height * 0.58) / Math.max(1, window.innerHeight);
+      }
+    } else if (app.online && index !== app.me) {
+      x = 0.7;
+    }
+    return {
+      x: Math.max(0.18, Math.min(0.82, x)),
+      y: Math.max(0.18, Math.min(0.72, y))
+    };
+  }
+
+  function showEmoteBubble(kind, name, by) {
+    if (EMOTES.indexOf(kind) < 0) return;
+    var layer = $("#emote-layer");
+    if (!layer) return;
+    /* Üst üste biriken balonlar ekranı kaplamasın. */
+    while (layer.children.length >= 4) layer.removeChild(layer.firstChild);
+    var spot = emoteAnchor(by);
+    var bubble = document.createElement("div");
+    bubble.className = "emote-bubble emote-" + kind;
+    bubble.style.left = (spot.x * 100).toFixed(2) + "%";
+    bubble.style.top = (spot.y * 100).toFixed(2) + "%";
+    bubble.innerHTML =
+      (name ? '<span class="emote-who">' + esc(name) + '</span>' : "") +
+      '<span class="emote-bubble-art">' + emoteArtHTML(kind) + "</span>";
+    layer.appendChild(bubble);
+    setTimeout(function () {
+      if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+    }, 2600);
+  }
+
+  function playEmote(kind, by, mine) {
+    if (EMOTES.indexOf(kind) < 0) return;
+    var s = app.state;
+    var player = s && s.players ? s.players[by] : null;
+    var name = player ? player.name : "";
+    showEmoteBubble(kind, name, by);
+    sfxEmote(kind);
+    if (FX && app.vibrate && !mine) FX.vibrate(kind === "angry" ? 45 : 24);
+    var status = $("#emote-status");
+    if (status) {
+      status.textContent = name ? name + ": " + emoteLabel(kind) : emoteLabel(kind);
+    }
+  }
+
+  /* Emote gönder: çevrimiçi odada sunucuya iletilir, aynı cihazda
+     yalnızca karşı tarafın tahtasının üstünde canlanır. */
+  function sendEmote(kind) {
+    if (EMOTES.indexOf(kind) < 0 || !emoteAllowed()) return;
+    var now = Date.now();
+    /* İstemci tarafı da spam'i keser; sunucu ayrıca sınırlar. */
+    if (now - app.lastEmoteAt < 450) return;
+    app.lastEmoteAt = now;
+    var by = app.online ? app.me : localActorIndex();
+    playEmote(kind, by, true);
+    closeEmoteTray();
+    if (app.online && app.ws && app.ws.readyState === WebSocket.OPEN) {
+      wsSend({ t: "emote", emote: kind });
+    }
+  }
+
+  function resultEmotesHTML(s) {
+    if (!emoteAllowed()) return "";
+    return '<div class="result-emotes" role="group" aria-label="Emote gönder">' +
+      EMOTES.map(function (kind) {
+        return '<button class="emote-chip emote-chip-sm emote-' + kind + '" type="button" data-emote="' +
+          kind + '" aria-label="' + esc(EMOTE_LABELS[kind]) + '">' +
+          '<span class="emote-chip-art" aria-hidden="true">' + emoteArtHTML(kind) + '</span></button>';
+      }).join("") + "</div>";
   }
 
   /* ------------------------------------------------------------------ */
@@ -3092,6 +3293,7 @@
       sheet.setAttribute("aria-label", "Oyun penceresi");
     }
     overlay.hidden = false;
+    closeEmoteTray();
     app.overlayClosable = closable !== false;
     app.overlayReturnFocus = document.activeElement;
     document.body.style.overflow = "hidden";
@@ -3121,6 +3323,7 @@
     resumeLocal();
     flushPendingInterstitial();
     syncBannerVisibility();
+    updateEmoteButton();
   }
 
   /* Açık pencereyi tek ekrana sığdırır. Önce normal ölçüler denenir;
@@ -3153,6 +3356,7 @@
         '<li><b>Süre</b><span>Ortak sayaçta süre bitince yüksek skor kazanır. Sıra sayacında süre dolarsa −15 puan ceza alır ve sıra geçer. Satır patlatmak süre kazandırır.</span></li>' +
         '<li><b>Combo</b><span>Üst üste satır patlatırsan puan çarpanı yükselir; üçlü patlatma daha çok süre verir.</span></li>' +
         '<li><b>Arkadaşınla</b><span>Oda kurup 5 haneli kodu paylaş ya da <b>Rastgele eşleş</b> ile aynı anda bekleyen biriyle hemen oyna.</span></li>' +
+        '<li><b>Emote</b><span>Oyun sırasında ya da tur bittiğinde rakibine gülme, alkış, ağlama ve kızma gönderebilirsin.</span></li>' +
         '<li><b>Klavye</b><span><b>Enter</b> ya da <b>Boşluk</b> ile blok seç; <b>ok tuşlarıyla</b> tahtada gez ve <b>Enter</b> ile bırak. <b>Esc</b> seçimi iptal eder.</span></li>' +
       '</ul>' +
       '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>Anladım</button></div>',
@@ -3341,6 +3545,7 @@
       rewardHTML +
       (s.reason ? '<p class="result-note">' + esc(s.reason) + '</p>' : "") +
       rejoinNote +
+      resultEmotesHTML(s) +
       '<div class="sheet-actions result-actions' + (doubleCoins ? " has-double" : "") + '">' +
         doubleCoins +
         action +
@@ -4742,6 +4947,24 @@
 
     $("#game-menu").addEventListener("click", showMenu);
 
+    $("#emote-btn").addEventListener("click", function (event) {
+      event.stopPropagation();
+      toggleEmoteTray();
+    });
+
+    $("#emote-tray").addEventListener("click", function (event) {
+      var chip = event.target.closest("[data-emote]");
+      if (!chip) return;
+      sendEmote(chip.dataset.emote);
+    });
+
+    document.addEventListener("click", function (event) {
+      var tray = $("#emote-tray");
+      if (!tray || tray.hidden) return;
+      if (event.target.closest("#emote-tray") || event.target.closest("#emote-btn")) return;
+      closeEmoteTray();
+    });
+
     $("#game-restart").addEventListener("click", function () {
       restartGame();
     });
@@ -4756,6 +4979,10 @@
 
       if (target.hasAttribute("data-close")) {
         closeOverlay();
+        return;
+      }
+      if (target.hasAttribute("data-emote")) {
+        sendEmote(target.dataset.emote);
         return;
       }
       if (target.hasAttribute("data-home")) {
@@ -4840,6 +5067,16 @@
         if (event.key === "Escape") closeOverlayHandler();
         else if (event.key === "Tab") trapOverlayFocus(event);
         return;
+      }
+      if (event.key === "Escape") {
+        var emoteTray = $("#emote-tray");
+        if (emoteTray && !emoteTray.hidden) {
+          closeEmoteTray();
+          var emoteBtn = $("#emote-btn");
+          if (emoteBtn) emoteBtn.focus();
+          event.preventDefault();
+          return;
+        }
       }
       if (event.defaultPrevented) return;
       if (app.screen === "game") {

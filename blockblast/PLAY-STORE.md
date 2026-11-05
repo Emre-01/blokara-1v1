@@ -29,7 +29,7 @@ depodaki hazırlıkları özetler.
 | Hesap girişi | Google Play Games (Android) + Google OAuth (web/yedek) |
 | Reklam | AdMob: geçiş + ödüllü + alt banner (varsayılan: resmî test kimlikleri) |
 | Sunucu güvenliği | CSP, güvenlik başlıkları, Origin kontrolü, bağlantı/oda sınırları, giriş denemesi sınırı |
-| Güncelleme | HTML/JS/CSS `no-cache`; servis çalışanı sürümü `blok-iki-v18` |
+| Güncelleme | HTML/JS/CSS `no-cache`; servis çalışanı sürümü `blok-iki-v19` |
 | WebView güvenliği | Dosya/content erişimi kapalı, karışık içerik release'te engelli, dış linkler şema denetiminden geçer |
 
 ---

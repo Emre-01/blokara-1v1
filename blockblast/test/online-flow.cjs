@@ -633,6 +633,48 @@ async function main() {
     peerView.exists && peerView.sideBySide && peerView.similar && peerView.inside &&
     peerView.rivalCells === rivalView.rivalCells && /Sıra sende/.test(peerView.banner), peerView);
 
+  /* ---- emote: oyun sırasında dört ifade, karşı tarafa canlı ulaşır ---- */
+  const emoteSend = await a.evaluate(`(async () => {
+    const overlay = document.getElementById('overlay');
+    if (!overlay.hidden) {
+      const close = overlay.querySelector('.sheet [data-close]');
+      if (close) close.click();
+      await new Promise(r => setTimeout(r, 350));
+    }
+    const btn = document.getElementById('emote-btn');
+    const visible = !!btn && !btn.hidden;
+    const debug = { screen: window.BlokDebug.snapshot().phase,
+      overlay: !overlay.hidden,
+      overlayText: overlay.hidden ? '' : overlay.innerText.slice(0, 80),
+      homeHidden: document.getElementById('screen-home').hidden,
+      gameHidden: document.getElementById('screen-game').hidden };
+    btn.click();
+    await new Promise(r => setTimeout(r, 140));
+    const tray = document.getElementById('emote-tray');
+    const chips = [...tray.querySelectorAll('[data-emote]')].map(x => x.dataset.emote);
+    const expanded = btn.getAttribute('aria-expanded');
+    const openBefore = !tray.hidden;
+    tray.querySelector('[data-emote="laugh"]').click();
+    await new Promise(r => setTimeout(r, 180));
+    return { visible, debug, expanded, openBefore, chips, openAfter: !tray.hidden,
+      mine: !!document.querySelector('.emote-bubble.emote-laugh'),
+      status: document.getElementById('emote-status').textContent };
+  })()`);
+  ok("oyun sırasında emote düğmesi dört ifadeyi açıyor ve gönderiyor",
+    emoteSend.visible && emoteSend.expanded === "true" && emoteSend.openBefore &&
+    !emoteSend.openAfter &&
+    emoteSend.chips.join(",") === "laugh,clap,cry,angry" &&
+    emoteSend.mine && /laugh|Gülme/i.test(emoteSend.status), emoteSend);
+
+  const emoteSeen = await b.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 500));
+    return { bubble: !!document.querySelector('.emote-bubble.emote-laugh'),
+             who: document.querySelector('.emote-who') ? document.querySelector('.emote-who').textContent : '',
+             status: document.getElementById('emote-status').textContent };
+  })()`);
+  ok("emote karşı oyuncuya ulaşıyor ve gönderenin adını gösteriyor",
+    emoteSeen.bubble && emoteSeen.who.length > 0 && /laugh|Gülme/i.test(emoteSeen.status), emoteSeen);
+
   /* ---- tek kişilik mod ---- */
   for (const page of [a, b]) {
     await page.evaluate(`(async () => {
@@ -653,12 +695,22 @@ async function main() {
     const title = document.querySelector('#overlay h2');
     const badge = document.querySelector('#overlay .result-badge');
     const hint = document.getElementById('game-hint');
+    const emotes = [...document.querySelectorAll('#overlay .result-emotes [data-emote]')]
+      .map((el) => el.dataset.emote);
+    const clap = document.querySelector('#overlay .result-emotes [data-emote="clap"]');
+    if (clap) clap.click();
+    await new Promise(r => setTimeout(r, 160));
     return { title: title ? title.textContent : '', badge: badge ? badge.textContent : '',
-             hint: hint ? hint.textContent : '' };
+             hint: hint ? hint.textContent : '', emotes,
+             bubble: !!document.querySelector('.emote-bubble.emote-clap'),
+             status: document.getElementById('emote-status').textContent };
   })()`);
   ok("kazanan metni 'Kazandın!' diyor",
     winnerText.title === "Kazandın!" && winnerText.badge === "kazandın" &&
     /^Kazandın[.!]$/.test(winnerText.hint), winnerText);
+  ok("tur bittiğinde sonuç penceresinden emote gönderilebiliyor",
+    winnerText.emotes.join(",") === "laugh,clap,cry,angry" && winnerText.bubble &&
+    /clap|Alkış/i.test(winnerText.status), winnerText);
 
   await a.evaluate(`(async () => {
     const home = document.querySelector('#overlay [data-home]');

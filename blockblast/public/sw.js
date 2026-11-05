@@ -1,7 +1,7 @@
 /* Blokara 1v1 — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v18";
+const VERSION = "blok-iki-v19";
 const SHELL = [
   "/",
   "/index.html",

@@ -27,6 +27,11 @@ const MAX_CONNECTIONS_PER_IP = Number(process.env.MAX_CONNECTIONS_PER_IP) || 6;
 const JOIN_FAIL_WINDOW = 60 * 1000;
 const JOIN_FAIL_LIMIT = Number(process.env.JOIN_FAIL_LIMIT) || 12;
 
+/* Oyuncuların birbirine gönderebildiği dört emote (istemcideki listeyle
+   aynı). Sıra: gülme, alkış, ağlama, kızma. */
+const EMOTES = ["laugh", "clap", "cry", "angry"];
+const EMOTE_MIN_MS = 700;
+
 /* WebSocket kaynağı: tarayıcılar Origin gönderir, Android WebView
    file:// için "null" gönderir. Listeye ek adresler ORIGINS ile verilir. */
 const EXTRA_ORIGINS = String(process.env.ORIGINS || "")
@@ -1077,6 +1082,23 @@ function handleMessage(conn, message) {
     room.players.forEach((other, otherIndex) => {
       if (otherIndex === info.index) return;
       if (other.connected && other.conn && !other.conn.closed) other.conn.send(relay);
+    });
+    return;
+  }
+
+  /* Emote: oyun sırasında ve tur bittikten sonra rakibe iletilir.
+     Yalnızca bilinen dört ifade geçer; hız sınırı spam'i engeller. */
+  if (t === "emote") {
+    if (room.phase !== "playing" && room.phase !== "over") return;
+    if (EMOTES.indexOf(message.emote) < 0) return;
+    const emoteNow = Date.now();
+    if (conn.lastEmoteAt && emoteNow - conn.lastEmoteAt < EMOTE_MIN_MS) return;
+    conn.lastEmoteAt = emoteNow;
+    room.players.forEach((other, otherIndex) => {
+      if (otherIndex === info.index) return;
+      if (other.connected && other.conn && !other.conn.closed) {
+        other.conn.send({ t: "emote", by: info.index, emote: message.emote });
+      }
     });
     return;
   }
