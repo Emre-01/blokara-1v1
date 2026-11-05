@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -46,8 +46,8 @@ val googleClientId = setting("blokiki.googleAndroidClientId", "")
 /* "Reklamları kaldır" ürün kimliği (Play Console → Uygulama içi ürünler). */
 val removeAdsProduct = setting("blokiki.removeAdsProduct", "remove_ads")
 
-val appVersionCode = setting("blokiki.versionCode", "20").toIntOrNull() ?: 20
-val appVersionName = setting("blokiki.versionName", "2.0.8")
+val appVersionCode = setting("blokiki.versionCode", "21").toIntOrNull() ?: 21
+val appVersionName = setting("blokiki.versionName", "2.0.9")
 
 android {
     namespace = "tr.blokiki.app"
