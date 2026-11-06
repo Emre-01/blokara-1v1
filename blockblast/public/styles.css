@@ -3888,8 +3888,8 @@ body {
   .screen.home {
     display: flex;
     flex-direction: column;
-    /* Çevrimiçi panel en üstte; içerik grubu uzun ekranlarda dikeyde
-       dengelenir, sığmayan kısa ekranlarda üstten hizalanır. */
+    /* Çevrimiçi panel en üstte. İçerik grubu uzun ekranlarda dikeyde
+       ortalanır; sığmadığında üstten hizalanır (taşma yok). */
     justify-content: safe center;
     gap: 7px;
     padding: 7px 11px 4px;
@@ -3904,8 +3904,8 @@ body {
     flex: 0 0 auto;
     min-height: 0;
     overflow: visible;
-    align-content: start;
-    justify-content: start;
+    align-content: center;
+    justify-content: center;
   }
   .home-label { order: 2; display: flex; }
   .mode-grid { order: 3; }

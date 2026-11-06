@@ -27,11 +27,16 @@ fun setting(name: String, fallback: String = ""): String {
     return fallback
 }
 
+/* Reklamsız test derlemesi: -Pblokiki.adsEnabled=false reklam birimi
+   kimliklerini boşaltır; AdsManager SDK'yı başlatmaz ve hiç reklam
+   istenmez. Uygulama kimliği geçerli kalır (Ads SDK açılışta onu okur). */
+val adsEnabled = setting("blokiki.adsEnabled", "true") != "false"
+
 /* Google'ın herkese açık test kimlikleri. Yayına geçerken değiştir. */
 val admobAppId = setting("blokiki.admobAppId", "ca-app-pub-3940256099942544~3347511713")
-val admobInterstitial = setting("blokiki.admobInterstitial", "ca-app-pub-3940256099942544/1033173712")
-val admobRewarded = setting("blokiki.admobRewarded", "ca-app-pub-3940256099942544/5224354917")
-val admobBanner = setting("blokiki.admobBanner", "ca-app-pub-3940256099942544/6300978111")
+val admobInterstitial = if (adsEnabled) setting("blokiki.admobInterstitial", "ca-app-pub-3940256099942544/1033173712") else ""
+val admobRewarded = if (adsEnabled) setting("blokiki.admobRewarded", "ca-app-pub-3940256099942544/5224354917") else ""
+val admobBanner = if (adsEnabled) setting("blokiki.admobBanner", "ca-app-pub-3940256099942544/6300978111") else ""
 
 /* Play Games Services uygulama kimliği (Play Console → Oyun hizmetleri).
    Boş/0 ise Play Games kapanır; uygulama Google OAuth ile devam eder. */
@@ -46,8 +51,8 @@ val googleClientId = setting("blokiki.googleAndroidClientId", "")
 /* "Reklamları kaldır" ürün kimliği (Play Console → Uygulama içi ürünler). */
 val removeAdsProduct = setting("blokiki.removeAdsProduct", "remove_ads")
 
-val appVersionCode = setting("blokiki.versionCode", "22").toIntOrNull() ?: 22
-val appVersionName = setting("blokiki.versionName", "2.1.0")
+val appVersionCode = setting("blokiki.versionCode", "1").toIntOrNull() ?: 1
+val appVersionName = setting("blokiki.versionName", "1.0.0")
 
 android {
     namespace = "tr.blokiki.app"

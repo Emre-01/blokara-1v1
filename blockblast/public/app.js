@@ -4888,10 +4888,15 @@
   function updatePurchaseStrip() {
     var button = $("#buy-remove-ads");
     if (!button) return;
-    /* Düğme yalnızca reklamlar hâlâ açıkken, reklam köprüsü varken ve
-       uygulama satın alma köprüsüne sahipken görünür. Reklamsız derlemede
-       (BlokAds yok) düğme hiç görünmez; satın alma tamamlanınca kaybolur. */
-    var canBuy = !!window.BlokBilling && !!window.BlokAds;
+    /* Düğme yalnızca reklamlar hâlâ açıkken, reklam köprüsü gerçekten
+       çalışırken ve uygulama satın alma köprüsüne sahipken görünür.
+       Reklamsız test derlemesinde SDK başlamaz (available=false) ve düğme
+       hiç görünmez; satın alma tamamlanınca da kaybolur. */
+    var adsReady = false;
+    if (window.BlokAds && typeof window.BlokAds.available === "function") {
+      try { adsReady = !!window.BlokAds.available(); } catch (error) { adsReady = false; }
+    }
+    var canBuy = !!window.BlokBilling && adsReady;
     button.hidden = ads.free || !canBuy;
     button.classList.toggle("is-owned", !!ads.free);
     button.setAttribute("aria-pressed", ads.free ? "true" : "false");

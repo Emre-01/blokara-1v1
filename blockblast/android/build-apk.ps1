@@ -24,7 +24,9 @@ param(
   [string]$AdMobInterstitial = "",
   [string]$AdMobRewarded = "",
   # Play Games Services uygulama kimliği (boş/0 ise kapalı).
-  [string]$GamesAppId = ""
+  [string]$GamesAppId = "",
+  # Reklamsız test derlemesi: AdMob SDK hiç başlatılmaz.
+  [switch]$NoAds
 )
 
 $ErrorActionPreference = "Stop"
@@ -98,6 +100,7 @@ if ($AdMobAppId) { $gradleArgs += "-Pblokiki.admobAppId=$($AdMobAppId.Trim())" }
 if ($AdMobInterstitial) { $gradleArgs += "-Pblokiki.admobInterstitial=$($AdMobInterstitial.Trim())" }
 if ($AdMobRewarded) { $gradleArgs += "-Pblokiki.admobRewarded=$($AdMobRewarded.Trim())" }
 if ($GamesAppId) { $gradleArgs += "-Pblokiki.gamesAppId=$($GamesAppId.Trim())" }
+if ($NoAds) { $gradleArgs += "-Pblokiki.adsEnabled=false" }
 if ($VersionName) { $gradleArgs += "-Pblokiki.versionName=$VersionName" }
 if ($VersionCode -gt 0) { $gradleArgs += "-Pblokiki.versionCode=$VersionCode" }
 
