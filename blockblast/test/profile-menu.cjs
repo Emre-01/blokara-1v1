@@ -159,6 +159,52 @@ async function main() {
   ok("avatar menü açacağını bildiriyor", avatar.popup === "dialog", avatar);
   ok("avatar ekran okuyucudan gizli değil", avatar.hidden === null, avatar);
 
+  /* ---- profil + seviye üst barda ---- */
+  const topBar = await page.evaluate(`(() => {
+    const bar = document.querySelector('.topbar');
+    const profile = document.getElementById('top-profile');
+    const account = document.getElementById('account-strip');
+    const level = document.getElementById('profile-strip');
+    const row = document.querySelector('.topbar-row');
+    const icons = document.querySelector('.top-actions');
+    const versusCard = document.querySelector('#screen-home .mode-card.versus');
+    return {
+      profileInBar: bar.contains(profile),
+      accountInProfile: profile.contains(account),
+      levelInProfile: profile.contains(level),
+      belowLogoRow: profile.getBoundingClientRect().top >= row.getBoundingClientRect().bottom - 1,
+      besideIcons: profile.getBoundingClientRect().top > icons.getBoundingClientRect().top,
+      removedFromHome: !document.getElementById('screen-home').contains(level),
+      nameInBar: bar.contains(document.getElementById('player-name')),
+      level: document.getElementById('level-num').textContent,
+      xp: document.getElementById('xp-label').textContent,
+      versusButtons: [...versusCard.querySelectorAll('.mode-actions .btn')].length
+    };
+  })()`);
+  ok("profil ve seviye üst bantta, logonun altında",
+    topBar.profileInBar && topBar.accountInProfile && topBar.levelInProfile && topBar.belowLogoRow, topBar);
+  ok("profil şeridi eski yerinden (ana ekran gövdesi) kaldırıldı", topBar.removedFromHome === true, topBar);
+  ok("seviye ve XP üst bantta dolu", topBar.level === "1" && /XP/.test(topBar.xp), topBar);
+  ok("versus kartındaki fazladan hız düğmesi kaldırıldı", topBar.versusButtons === 1, topBar);
+
+  const screenSwitch = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    window.BlokDebug.start('solo', { timeMode: 'none' });
+    await sleep(300);
+    const inGame = getComputedStyle(document.getElementById('top-profile')).display;
+    const attr = document.body.dataset.screen;
+    window.BlokDebug.finish(0, 'test');
+    await sleep(300);
+    const homeBtn = document.querySelector('#overlay [data-home]');
+    if (homeBtn) homeBtn.click();
+    await sleep(400);
+    const inHome = getComputedStyle(document.getElementById('top-profile')).display;
+    return { inGame, inHome, attr, backHome: document.body.dataset.screen };
+  })()`);
+  ok("oyuna girince üst profil gizleniyor", screenSwitch.inGame === "none" && screenSwitch.attr === "game", screenSwitch);
+  ok("ana menüye dönünce üst profil geri geliyor",
+    screenSwitch.inHome !== "none" && screenSwitch.backHome === "home", screenSwitch);
+
   await page.evaluate(`document.getElementById('account-avatar').click(); new Promise(r => setTimeout(r, 300))`);
   const opened = await page.evaluate(`({
     open: !document.getElementById('overlay').hidden,
@@ -270,6 +316,111 @@ async function main() {
   ok("iki reklam teklifi var", store.offers.join(",") === "80,200", store.offers);
   ok("reklam köprüsü yokken teklifler kapalı", store.disabled === true, store.disabled);
   ok("hazır değil açıklaması gösteriliyor", store.notes.some((n) => /hazır değil|ready|bereit/i.test(n)), store.notes);
+
+  /* ---- reklamları kaldır: üst barda, ikonların yanında ---- */
+  const adFreePlacement = await page.evaluate(`(() => {
+    const button = document.getElementById('buy-remove-ads');
+    const actions = document.querySelector('.top-actions');
+    const icons = [...actions.querySelectorAll('.icon-btn')];
+    return {
+      inTopActions: actions.contains(button),
+      afterBrand: button.getBoundingClientRect().top < 120,
+      hiddenWithoutBilling: button.hidden,
+      label: button.getAttribute('aria-label'),
+      index: icons.indexOf(button)
+    };
+  })()`);
+  ok("reklam kaldırma düğmesi üst çubukta, ikonların arasında",
+    adFreePlacement.inTopActions && adFreePlacement.afterBrand && adFreePlacement.index >= 0, adFreePlacement);
+  ok("satın alma yolu yokken düğme gizli", adFreePlacement.hiddenWithoutBilling === true, adFreePlacement);
+
+  const purchaseFlow = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const calls = [];
+    window.BlokBilling = {
+      available: () => true,
+      owned: () => false,
+      purchase: () => { calls.push('purchase'); }
+    };
+    window.BlokBillingEvent('refresh-ui');
+    await sleep(150);
+    const button = document.getElementById('buy-remove-ads');
+    const shown = !button.hidden;
+    button.click();
+    await sleep(220);
+    const sheet = document.querySelector('#overlay .sheet');
+    const opened = !!sheet && !document.getElementById('overlay').hidden;
+    const heading = sheet ? sheet.querySelector('h2').textContent : '';
+    const confirm = sheet ? sheet.querySelector('[data-buy-ads-confirm]') : null;
+    const closeBtn = sheet ? sheet.querySelector('[data-close]') : null;
+    if (confirm) confirm.click();
+    await sleep(200);
+    return { shown, opened, heading, hasConfirm: !!confirm, hasClose: !!closeBtn, calls, closedAfterBuy: document.getElementById('overlay').hidden };
+  })()`);
+  ok("satın alma varsa düğme görünür", purchaseFlow.shown === true, purchaseFlow);
+  ok("düğme onay penceresini açıyor", purchaseFlow.opened === true, purchaseFlow);
+  ok("pencerede satın alma ve kapat düğmeleri var",
+    purchaseFlow.hasConfirm === true && purchaseFlow.hasClose === true, purchaseFlow);
+  ok("onay gerçek satın almayı başlatıyor", purchaseFlow.calls.length === 1, purchaseFlow.calls);
+  ok("satın alma başlayınca pencere kapanıyor", purchaseFlow.closedAfterBuy === true, purchaseFlow);
+
+  const owned = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const banner = [];
+    window.BlokAds = {
+      available: () => true,
+      hasRewarded: () => true,
+      hasBanner: () => true,
+      showBanner: () => banner.push('show'),
+      hideBanner: () => banner.push('hide')
+    };
+    window.BlokBillingEvent('owned');
+    await sleep(200);
+    const button = document.getElementById('buy-remove-ads');
+    const state = window.BlokDebug.adsState();
+    return {
+      hidden: button.hidden,
+      ownedClass: button.classList.contains('is-owned'),
+      pressed: button.getAttribute('aria-pressed'),
+      state,
+      saved: localStorage.getItem('blokara.adsFree'),
+      banner
+    };
+  })()`);
+  ok("satın alınınca üst bardaki düğme kayboluyor", owned.hidden === true, owned);
+  ok("reklamsız durum kaydediliyor", owned.state.free === true && owned.saved === "1", owned);
+  ok("satın alınınca banner kapatılıyor", owned.banner.indexOf("hide") >= 0, owned.banner);
+
+  const ownedState = await page.evaluate(`window.BlokDebug.adsState()`);
+  ok("reklamsız durum bellekte", ownedState.free === true, ownedState);
+
+  /* Yeniden yükleme: satın alma yerelde hatırlanmalı. */
+  await page.reload();
+  await boot(page);
+  const persistsFree = await page.evaluate(`({
+    hidden: document.getElementById('buy-remove-ads').hidden,
+    free: window.BlokDebug.adsState().free,
+    pressed: document.getElementById('buy-remove-ads').getAttribute('aria-pressed')
+  })`);
+  ok("reklamsız durum yeniden açılışta da geçerli",
+    persistsFree.hidden === true && persistsFree.free === true, persistsFree);
+
+  /* Satın alma sonrası mağaza sekmesi durumu yansıtmalı. */
+  const storeAfterBuy = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.getElementById('account-avatar').click();
+    await sleep(250);
+    document.querySelector('[data-profile-tab="store"]').click();
+    await sleep(150);
+    const notes = [...document.querySelectorAll('[data-profile-pane="store"] .profile-note')].map((n) => n.textContent);
+    return {
+      buyButton: !!document.querySelector('[data-profile-pane="store"] [data-buy-ads]'),
+      thanks: notes.some((n) => /kaldırıldı|removed|entfernt/i.test(n))
+    };
+  })()`);
+  ok("satın alma sonrası mağazada satın alma düğmesi yok", storeAfterBuy.buyButton === false, storeAfterBuy);
+  ok("mağaza reklamların kalktığını söylüyor", storeAfterBuy.thanks === true, storeAfterBuy);
+  await page.evaluate(`document.querySelector('[data-profile-tab="theme"]').click(); new Promise(r => setTimeout(r, 150))`);
 
   /* ---- taşma yok ---- */
   const big = await page.evaluate(PANE_OVERFLOW);

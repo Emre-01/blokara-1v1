@@ -650,6 +650,8 @@
   function init() {
     /* Telefonda uygulama yeniden açıldığında eski kaydırma konumuna dönmesin. */
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    /* Üst bardaki profil şeridi oyun/lobi ekranlarında gizlenir. */
+    document.body.dataset.screen = app.screen;
 
     applyNativeInsetsSoon();
 
@@ -767,6 +769,25 @@
         checkResult();
         return app.state;
       },
+      /* Reklamsız sürümü test etmek için: gerçek satın alma olmadan
+         sahiplik durumunu değiştirir. */
+      adsState: function () {
+        return {
+          free: !!ads.free,
+          available: !!ads.available,
+          banner: !!ads.banner,
+          billing: !!ads.billing,
+          buttonHidden: (function () {
+            var button = $("#buy-remove-ads");
+            return button ? !!button.hidden : null;
+          })()
+        };
+      },
+      setAdsFree: function (free) {
+        setAdsFree(!!free, { silent: true });
+        return !!ads.free;
+      },
+      removeAdsSheet: showRemoveAdsSheet,
       tick: function (seconds) {
         if (!app.game) return null;
         var result = app.game.tick(seconds);
@@ -1095,6 +1116,7 @@
 
   function showScreen(name) {
     app.screen = name;
+    document.body.dataset.screen = name;
     ["home", "lobby", "game"].forEach(function (screen) {
       var el = $("#screen-" + screen);
       if (el) el.hidden = screen !== name;
@@ -4681,12 +4703,16 @@
   /* Reklam hazırlığını tazele (yükleme birkaç saniye sürebilir). */
   function refreshAdsState() {
     var bridge = window.BlokAds;
-    if (!bridge) return;
+    if (!bridge) {
+      updatePurchaseStrip();
+      return;
+    }
     try {
       if (typeof bridge.available === "function") ads.available = !!bridge.available();
       if (typeof bridge.hasRewarded === "function") ads.rewarded = !!bridge.hasRewarded();
       if (typeof bridge.hasBanner === "function") ads.banner = !!bridge.hasBanner();
     } catch (error) { /* köprü yoksa yoksay */ }
+    updatePurchaseStrip();
   }
 
   /* Banner yalnızca oyun ekranında, sonuç/menü penceresi kapalıyken ve
@@ -4864,8 +4890,35 @@
   function updatePurchaseStrip() {
     var button = $("#buy-remove-ads");
     if (!button) return;
-    button.hidden = !ads.billing || ads.free;
+    /* Düğme yalnızca reklamlar hâlâ açıkken ve uygulama satın alma
+       köprüsüne sahipken görünür; satın alma tamamlanınca kaybolur. */
+    var canBuy = !!window.BlokBilling;
+    button.hidden = ads.free || !canBuy;
     button.classList.toggle("is-owned", !!ads.free);
+    button.setAttribute("aria-pressed", ads.free ? "true" : "false");
+  }
+
+  function showRemoveAdsSheet() {
+    if (ads.free) {
+      toast("Reklamlar zaten kaldırılmış.");
+      return;
+    }
+    var canBuy = !!window.BlokBilling && typeof window.BlokBilling.purchase === "function";
+    var ready = canBuy && !!ads.billing;
+    openOverlay(
+      '<span class="result-badge">' + esc(tr("Reklamları kaldır")) + '</span>' +
+      '<h2>' + esc(tr("Reklamları kaldır")) + '</h2>' +
+      (ready ? '' :
+        '<p class="profile-note">' + esc(tr("Satın alma bu sürümde kullanılamıyor.")) + '</p>') +
+      '<div class="sheet-actions">' +
+        (ready
+          ? '<button class="btn btn-coral" type="button" data-buy-ads-confirm data-autofocus>' +
+            esc(tr("Reklamları kaldır")) + '</button>' +
+            '<button class="btn btn-outline" type="button" data-close>' + esc(tr("Kapat")) + '</button>'
+          : '<button class="btn btn-ink" type="button" data-close data-autofocus>' + esc(tr("Kapat")) + '</button>') +
+      '</div>',
+      true
+    );
   }
 
   function startRemoveAdsPurchase() {
@@ -4873,6 +4926,11 @@
       toast("Reklamlar zaten kaldırılmış.");
       return;
     }
+    showRemoveAdsSheet();
+  }
+
+  function confirmRemoveAdsPurchase() {
+    closeOverlay();
     if (!window.BlokBilling || typeof window.BlokBilling.purchase !== "function") {
       toast("Satın alma bu sürümde kullanılamıyor.");
       return;
@@ -5717,6 +5775,10 @@
       }
       if (target.hasAttribute("data-buy-ads")) {
         startRemoveAdsPurchase();
+        return;
+      }
+      if (target.hasAttribute("data-buy-ads-confirm")) {
+        confirmRemoveAdsPurchase();
         return;
       }
       if (target.hasAttribute("data-sound")) {

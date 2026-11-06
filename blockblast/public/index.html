@@ -22,6 +22,7 @@
 <a class="skip" href="#screen-home">İçeriğe geç</a>
 
 <header class="topbar">
+  <div class="topbar-row">
   <button class="brand" id="brand" type="button" aria-label="Ana menüye dön">
     <span class="brand-mark" aria-hidden="true">
       <svg viewBox="0 0 512 512" role="img" aria-hidden="true">
@@ -88,6 +89,39 @@
     <button class="icon-btn exit-btn" id="exit-btn" type="button" aria-label="Oyundan çık" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
+  </div>
+  </div>
+
+  <!-- Profil + seviye şeridi: ana ekranın üst bandında durur, oyun
+       ekranında gizlenir (tahta alanı daralmasın). -->
+  <div class="topbar-profile" id="top-profile">
+    <section class="account-strip" id="account-strip" aria-label="Hesap">
+      <button class="account-avatar" id="account-avatar" type="button"
+              aria-label="Profil" aria-haspopup="dialog">
+        <span class="account-avatar-initial">?</span>
+      </button>
+      <div class="account-meta">
+        <label class="account-label" for="player-name">Adın</label>
+        <input id="player-name" class="account-input" name="name" type="text" maxlength="16"
+               autocomplete="nickname" placeholder="Misafir oyuncu" enterkeyhint="done">
+      </div>
+      <div class="account-actions">
+        <div class="google-slot" id="google-slot"></div>
+        <button class="btn btn-outline btn-sm" id="google-native" type="button" hidden>Google ile giriş</button>
+        <button class="btn btn-outline btn-sm" id="google-signout" type="button" hidden>Çıkış yap</button>
+      </div>
+    </section>
+
+    <section class="profile-strip" id="profile-strip" aria-label="Seviye">
+      <span class="level-badge" id="level-badge">1</span>
+      <div class="level-meta">
+        <span class="level-title">Seviye <b id="level-num">1</b></span>
+        <div class="xp-bar" aria-hidden="true"><i id="xp-fill"></i></div>
+        <span class="tiny xp-label" id="xp-label">0 / 80 XP</span>
+      </div>
+      <span class="profile-coin"><b id="stat-coins">0</b><em>coin</em></span>
+      <span class="profile-best"><b id="stat-best">0</b><em>rekor</em></span>
+    </section>
   </div>
 </header>
 
@@ -185,42 +219,6 @@
     </div>
 
     <div class="home-col home-col-side">
-    <section class="profile-strip" aria-label="Profilin">
-      <div class="profile-level">
-        <span class="level-badge" id="level-badge">1</span>
-        <div class="level-meta">
-          <span class="level-title">Seviye <b id="level-num">1</b></span>
-          <div class="xp-bar" aria-hidden="true"><i id="xp-fill"></i></div>
-          <span class="tiny" id="xp-label">0 / 80 XP</span>
-        </div>
-      </div>
-      <div class="profile-stats">
-        <span><b id="stat-coins">0</b> coin</span>
-        <span><b id="stat-best">0</b> rekor</span>
-      </div>
-    </section>
-
-    <!-- Oyuncu adı: oda adında ve skor tablosunda bu ad görünür.
-         Giriş zorunlu değil; adı doğrudan buradan yazabilirsin. -->
-    <section class="account-strip" id="account-strip" aria-label="Hesap">
-      <div class="account-person">
-        <button class="account-avatar" id="account-avatar" type="button"
-                aria-label="Profil" aria-haspopup="dialog">
-          <span class="account-avatar-initial">?</span>
-        </button>
-        <div class="account-meta">
-          <label class="account-label" for="player-name">Adın</label>
-          <input id="player-name" class="account-input" name="name" type="text" maxlength="16"
-                 autocomplete="nickname" placeholder="Misafir oyuncu" enterkeyhint="done">
-        </div>
-      </div>
-      <div class="account-actions">
-        <div class="google-slot" id="google-slot"></div>
-        <button class="btn btn-outline btn-sm" id="google-native" type="button" hidden>Google ile giriş</button>
-        <button class="btn btn-outline btn-sm" id="google-signout" type="button" hidden>Çıkış yap</button>
-      </div>
-    </section>
-
     <p class="home-label">
       <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
         <rect x="4" y="1.6" width="8" height="12.8" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>
@@ -311,15 +309,6 @@
                 <path d="M7 4.9 16.2 10 7 15.1Z" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
               </svg>
               <span class="btn-label">Sırayla oyna</span>
-            </button>
-            <button class="btn btn-outline" type="button" data-local="versus" data-pace="live" aria-label="Aynı anda oyna">
-              <svg class="btn-pace-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <rect x="2.4" y="5.8" width="6.6" height="8.6" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                <rect x="11" y="5.8" width="6.6" height="8.6" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                <rect x="4.4" y="8" width="2.6" height="2.6" rx="0.7" fill="currentColor"/>
-                <rect x="13" y="10.6" width="2.6" height="2.6" rx="0.7" fill="currentColor"/>
-              </svg>
-              <span class="btn-label">Aynı anda oyna</span>
             </button>
           </div>
         </div>

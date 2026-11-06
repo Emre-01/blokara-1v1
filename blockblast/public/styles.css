@@ -298,15 +298,23 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   top: 0;
   z-index: 40;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(6px, 1.6vw, 12px);
-  padding: calc(10px + var(--safe-top)) clamp(8px, 3vw, 28px) 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  padding: calc(8px + var(--safe-top)) clamp(8px, 3vw, 28px) 8px;
   background: var(--topbar);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 2px solid rgba(28, 27, 46, 0.12);
   max-width: 100%;
+}
+
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 1.6vw, 12px);
+  min-width: 0;
 }
 
 .brand {
@@ -517,6 +525,120 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   max-width: 42vw;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---------- üst bardaki profil + seviye şeridi ---------- */
+.topbar-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.topbar-profile .account-strip,
+.topbar-profile .profile-strip {
+  margin: 0;
+  min-height: 0;
+  border-width: 1.6px;
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.12);
+}
+.topbar-profile .account-strip {
+  flex: 1 1 auto;
+  gap: 7px;
+  padding: 4px 9px;
+  background: var(--card);
+  min-width: 0;
+}
+.topbar-profile .account-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+/* Etiket görsel olarak gizlenir ama ekran okuyucu adı korunur. */
+.topbar-profile .account-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.topbar-profile .account-meta { flex: 1; min-width: 0; }
+.topbar-profile .account-input {
+  padding: 3px 0;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+}
+.topbar-profile .account-actions { display: none; }
+.topbar-profile .profile-strip {
+  flex: 0 0 auto;
+  gap: 7px;
+  padding: 4px 9px;
+  flex-wrap: nowrap;
+}
+.topbar-profile .profile-level { min-width: 0; gap: 8px; }
+.topbar-profile .level-badge {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  border-radius: 9px;
+  box-shadow: 1.5px 1.5px 0 var(--mustard);
+}
+.topbar-profile .level-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 0 auto;
+  width: 74px;
+}
+.topbar-profile .level-title {
+  font-size: 9.5px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.topbar-profile .xp-bar { height: 5px; border-width: 1.2px; }
+.topbar-profile .xp-label { display: none; }
+.topbar-profile .profile-coin,
+.topbar-profile .profile-best {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+}
+.topbar-profile .profile-coin b,
+.topbar-profile .profile-best b {
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.topbar-profile .profile-coin em,
+.topbar-profile .profile-best em {
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+/* Oyun ve lobide tahtaya yer açmak için profil şeridi gizlenir. */
+body[data-screen="game"] .topbar-profile,
+body[data-screen="lobby"] .topbar-profile { display: none; }
+
+@media (max-width: 560px) {
+  .topbar-profile .profile-best { display: none; }
+}
+@media (max-width: 400px) {
+  .topbar-profile { gap: 5px; }
+  .topbar-profile .account-strip { padding: 3px 7px; gap: 5px; }
+  .topbar-profile .account-avatar { width: 26px; height: 26px; font-size: 13px; }
+  .topbar-profile .account-input { font-size: 12.5px; }
+  .topbar-profile .level-meta { width: 56px; }
+  .topbar-profile .profile-strip { padding: 3px 7px; gap: 5px; }
+  .topbar-profile .profile-coin em { display: none; }
 }
 @media (max-width: 344px) {
   .room-badge { font-size: 10.5px; padding: 3px 7px; letter-spacing: 0.03em; max-width: 38vw; }
@@ -3948,8 +4070,6 @@ body {
   .home-col { display: contents; }
   .screen.home .home-hero { display: none; }
 
-  .screen.home .profile-strip { order: 1; flex: 0 0 auto; }
-  .account-strip { order: 2; flex: 0 0 auto; }
   .home-label { order: 3; display: flex; }
   .mode-grid { order: 4; }
   .screen.home .mode-grid { flex: 0 0 auto; }
