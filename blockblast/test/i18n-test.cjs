@@ -64,11 +64,30 @@ const dynamic = [
   "Konfeti", "Havai fişek", "Yıldız", "Kutu patlama efekti", "Kazanma efekti",
   "Avatar seç", "Avatarı kaldır", "Avatar seçildi.", "Avatar kaldırıldı.",
   "Tilki", "Panda", "Kurbağa", "Kedi", "Ayı", "Penguen", "Aslan", "Tavşan",
-  "Robot", "Uzaylı", "Kral", "Havalı"
+  "Robot", "Uzaylı", "Kral", "Havalı",
+  "Atölye", "Nane", "Okyanus", "Gün Batımı", "Sonbahar", "Pamuk Şeker", "{k} rekor"
 ];
 for (const key of dynamic) {
   if (!(key in base)) {
     problems.push("Dinamik menü anahtarı sözlükte yok: " + JSON.stringify(key));
+    continue;
+  }
+  const missing = langs.filter((lang) => !(key in data[lang]));
+  if (missing.length) problems.push(JSON.stringify(key) + " " + missing.length + " dilde eksik");
+}
+
+/* 5) app.js içindeki tüm tr("...") anahtarları sözlükte olmalı; yeni bir
+   metin eklenip çevirisi unutulursa test burada yakalar. */
+const appSource = fs.readFileSync(path.join(publicDir, "app.js"), "utf8");
+const trCall = /\btr\(\s*("(?:[^"\\]|\\.)*")/g;
+const jsKeys = new Set();
+let call;
+while ((call = trCall.exec(appSource))) {
+  try { jsKeys.add(JSON.parse(call[1])); } catch (e) { /* kaçış dizisi bozuksa geç */ }
+}
+for (const key of jsKeys) {
+  if (!(key in base)) {
+    problems.push("app.js metni sözlükte yok: " + JSON.stringify(key));
     continue;
   }
   const missing = langs.filter((lang) => !(key in data[lang]));
