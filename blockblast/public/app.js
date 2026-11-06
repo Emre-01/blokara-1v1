@@ -17,7 +17,8 @@
   var LS_FRIENDS = "blokara.friends";
   var LS_ADS_FREE = "blokara.adsFree";
   var LS_THEME = "blokara.theme";
-  var LS_PHOTO = "blokara.photo";
+  var LS_AVATAR = "blokara.avatar";
+  var LS_FX = "blokara.fx";
   var SS_ACTIVE = "blokiki.activeRoom";
   var MAX_RECONNECT = 6;
 
@@ -51,17 +52,40 @@
   var PROFILE_TABS = [
     { id: "theme", label: "Tema" },
     { id: "emote", label: "Emote" },
-    { id: "store", label: "Mağaza" }
+    { id: "fx", label: "Efektler" },
+    { id: "avatar", label: "Avatar" }
   ];
 
-  /* Reklam izleyerek açılan içerikler. */
-  var STORE_ITEMS = [
-    { id: "theme:autumn", kind: "theme", name: "Sonbahar", desc: "Yaprak efektleri ve sıcak toprak tonları." },
-    { id: "theme:cotton", kind: "theme", name: "Pamuk Şeker", desc: "Pembe döşemeler ve şeker bulutları." },
-    { id: "emote:love", kind: "emote", name: "Sevgi", desc: "Kalp gözlü, uçuşan kalpli emote." },
-    { id: "emote:cool", kind: "emote", name: "Havalı", desc: "Güneş gözlüklü, kendinden emin emote." },
-    { id: "fx:gold", kind: "fx", name: "Altın Patlama", desc: "Satır patlamalarında altın kıvılcım." },
-    { id: "fx:confetti", kind: "fx", name: "Konfeti Yağmuru", desc: "Her temizlikte renkli konfeti." }
+  /* Kutu patlama ve kazanma efektleri. Görsel motor fx.js'te, sesler bu
+     dosyadaki sfxBurstFx / sfxWinFx içinde eşleştirilir. */
+  var BURST_EFFECTS = [
+    { id: "classic", name: "Klasik", icon: "💥" },
+    { id: "pixel", name: "Piksel", icon: "🧱" },
+    { id: "bubble", name: "Balon", icon: "🎈" },
+    { id: "spark", name: "Kıvılcım", icon: "⚡" }
+  ];
+  var WIN_EFFECTS = [
+    { id: "confetti", name: "Konfeti", icon: "🎉" },
+    { id: "fireworks", name: "Havai fişek", icon: "🎆" },
+    { id: "stars", name: "Yıldız", icon: "🌟" },
+    { id: "bubbles", name: "Baloncuk", icon: "💧" }
+  ];
+
+  /* Hazır avatarlar: dosya seçmek yerine menüden seçilir. Her avatar
+     yerleşik SVG olarak üretilir; böylece çevrimdışı da çalışır. */
+  var AVATARS = [
+    { id: "fox", name: "Tilki", bg: "#f4b72a", skin: "#ffcf7a", acc: "ears" },
+    { id: "panda", name: "Panda", bg: "#bfe4ff", skin: "#f7f2e8", acc: "panda" },
+    { id: "frog", name: "Kurbağa", bg: "#8fd6a0", skin: "#b9e878", acc: "frog" },
+    { id: "cat", name: "Kedi", bg: "#f7a8d4", skin: "#ffe3c4", acc: "cat" },
+    { id: "bear", name: "Ayı", bg: "#c9a6f2", skin: "#d9b46a", acc: "bear" },
+    { id: "penguin", name: "Penguen", bg: "#8fd0ff", skin: "#f7f2e8", acc: "penguin" },
+    { id: "lion", name: "Aslan", bg: "#f4a12a", skin: "#ffd775", acc: "lion" },
+    { id: "bunny", name: "Tavşan", bg: "#fce4f1", skin: "#fff4f8", acc: "bunny" },
+    { id: "robot", name: "Robot", bg: "#9aa7c9", skin: "#cfd8ee", acc: "robot" },
+    { id: "alien", name: "Uzaylı", bg: "#8fc93a", skin: "#c9f27a", acc: "alien" },
+    { id: "crown", name: "Kral", bg: "#e8b53a", skin: "#ffe3a3", acc: "crown" },
+    { id: "cool", name: "Havalı", bg: "#4aa3d8", skin: "#ffe3a3", acc: "shades" }
   ];
 
   function clampLimit(kind, value) {
@@ -134,6 +158,9 @@
     profileTab: "theme",
     profileOpen: false,
     theme: "workshop",
+    avatar: "",
+    fxBurst: "classic",
+    fxWin: "confetti",
     setupDraft: null,
     pendingRoomSettings: null,
     pendingUnlock: null,
@@ -497,6 +524,91 @@
       });
     }, 1000);
   }
+  /* Seçilen efektin karakteristik sesi. Satır/sütun seslerinin üstüne
+     binerek efekti duyulur kılar; klasik efekte ek ses eklenmez. */
+  function sfxBurstFx(kind, strong) {
+    if (!app.sound || !kind || kind === "classic") return;
+    var power = strong ? 1.15 : 1;
+    if (kind === "pixel") {
+      noiseBurst(0.09, 0.05, 3600);
+      [880, 659.25, 493.88, 329.63].forEach(function (freq, index) {
+        setTimeout(function () {
+          tone(freq, 0.07, { type: "square", volume: 0.028 * power });
+        }, index * 34);
+      });
+      return;
+    }
+    if (kind === "bubble") {
+      tone(260, 0.16, { type: "sine", to: 720, volume: 0.045, attack: 0.01 });
+      setTimeout(function () {
+        noiseBurst(0.045, 0.045, 1500);
+        tone(980, 0.07, { type: "sine", volume: 0.028 });
+      }, 72);
+      setTimeout(function () {
+        tone(190, 0.18, { type: "sine", to: 110, volume: 0.04 });
+      }, 26);
+      return;
+    }
+    if (kind === "spark") {
+      noiseBurst(0.08, 0.065, 6800);
+      for (var i = 0; i < 5; i++) {
+        (function (index) {
+          setTimeout(function () {
+            tone(1250 + Math.random() * 2200, 0.05, {
+              type: "sawtooth", volume: 0.014, pan: Math.random() * 2 - 1
+            });
+          }, index * 26);
+        })(i);
+      }
+      tone(2200, 0.18, { type: "sine", to: 700, volume: 0.022 });
+    }
+  }
+
+  function sfxWinFx(kind) {
+    if (!app.sound || !kind) return;
+    if (kind === "fireworks") {
+      [0, 220, 430, 700].forEach(function (delay, index) {
+        setTimeout(function () {
+          noiseBurst(0.24, 0.07, 3000 - index * 350);
+          tone(88, 0.32, { type: "sine", slide: -30, volume: 0.12 });
+          tone(132, 0.2, { type: "triangle", slide: -50, volume: 0.05 });
+          noiseSweep(0.3, 0.024, 3400, 700, index % 2 ? -0.7 : 0.7, index % 2 ? 0.4 : -0.4);
+        }, delay);
+      });
+      tone(620, 0.55, { type: "sine", to: 1900, volume: 0.022, attack: 0.02 });
+      return;
+    }
+    if (kind === "stars") {
+      [1046.5, 1318.51, 1567.98, 2093, 2637.02].forEach(function (freq, index) {
+        setTimeout(function () {
+          tone(freq, 0.22, { type: "sine", volume: 0.032, pan: -0.5 + index * 0.25 });
+        }, 120 + index * 78);
+      });
+      noiseSweep(0.5, 0.018, 2600, 7200, -0.8, 0.8);
+      return;
+    }
+    if (kind === "bubbles") {
+      [0, 150, 300, 470, 660].forEach(function (delay, index) {
+        setTimeout(function () {
+          var base = 240 + index * 105;
+          tone(base, 0.2, { type: "sine", to: base * 2.6, volume: 0.04, pan: -0.5 + index * 0.25 });
+          setTimeout(function () {
+            noiseBurst(0.04, 0.03, 1700);
+            tone(base * 3.1, 0.06, { type: "sine", volume: 0.026 });
+          }, 150);
+        }, delay);
+      });
+      return;
+    }
+    /* Konfeti: havada dağılan parlak çanlar ve kısa alkış dalgası. */
+    noiseSweep(0.46, 0.022, 900, 5200, -0.85, 0.85);
+    [1567.98, 1975.53, 2349.32, 2793.83].forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.2, { type: "sine", volume: 0.026, pan: -0.6 + index * 0.4 });
+      }, 220 + index * 90);
+    });
+  }
+
   function sfxPenalty() {
     tone(180, 0.16, { type: "sawtooth", slide: -60, volume: 0.04 });
     setTimeout(function () { tone(140, 0.2, { type: "sawtooth", volume: 0.035 }); }, 110);
@@ -677,6 +789,9 @@
     }
     /* Tema kilidi profile bağlı; profil yüklendikten sonra uygula. */
     applyTheme(currentTheme(), { silent: true });
+    app.avatar = currentAvatar();
+    loadFxSettings();
+    applyFxSettings();
     renderAvatar();
     if (FX) {
       FX.init();
@@ -860,12 +975,178 @@
     return theme.id;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* hazır avatarlar                                                     */
+  /* ------------------------------------------------------------------ */
+
+  function avatarById(id) {
+    return AVATARS.filter(function (item) { return item.id === id; })[0] || null;
+  }
+
+  function currentAvatar() {
+    var id = read(LS_AVATAR) || "";
+    return avatarById(id) ? id : "";
+  }
+
+  /* Yerleşik SVG avatar: daire zemin, yüz ve seçilen aksesuar.
+     Harici dosya gerekmez; çevrimdışı APK'da da görünür. */
+  function avatarSVG(avatar) {
+    var a = avatar;
+    var ink = "#171428";
+    var s = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'];
+    s.push('<rect width="64" height="64" rx="32" fill="' + a.bg + '"/>');
+    /* Kafanın arkasında kalan aksesuarlar. */
+    if (a.acc === "ears") {
+      s.push('<path d="M14 26 17 11l11 8z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M50 26 47 11 36 19z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M18 22l1.4-6 4 3z" fill="#e8853f"/><path d="M46 22l-1.4-6-4 3z" fill="#e8853f"/>');
+    } else if (a.acc === "panda") {
+      s.push('<circle cx="17" cy="20" r="6" fill="' + ink + '"/><circle cx="47" cy="20" r="6" fill="' + ink + '"/>');
+    } else if (a.acc === "frog") {
+      s.push('<circle cx="21" cy="18" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<circle cx="43" cy="18" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+    } else if (a.acc === "cat") {
+      s.push('<path d="M16 25 18 11l10 7z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M48 25 46 11 36 18z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M19 21l.9-5 3.4 2.4z" fill="#f7a8d4"/><path d="M45 21l-.9-5-3.4 2.4z" fill="#f7a8d4"/>');
+    } else if (a.acc === "bear") {
+      s.push('<circle cx="17" cy="21" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<circle cx="47" cy="21" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+    } else if (a.acc === "lion") {
+      s.push('<circle cx="32" cy="33" r="25" fill="#d98a2b"/>');
+      for (var l = 0; l < 12; l++) {
+        var ang = (Math.PI * 2 * l) / 12;
+        s.push('<circle cx="' + (32 + Math.cos(ang) * 21).toFixed(1) + '" cy="' + (33 + Math.sin(ang) * 21).toFixed(1) + '" r="5" fill="#e8a33a"/>');
+      }
+    } else if (a.acc === "bunny") {
+      s.push('<ellipse cx="23" cy="12" rx="5" ry="12" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<ellipse cx="41" cy="12" rx="5" ry="12" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<ellipse cx="23" cy="12" rx="2.2" ry="7" fill="#f7a8d4"/><ellipse cx="41" cy="12" rx="2.2" ry="7" fill="#f7a8d4"/>');
+    } else if (a.acc === "robot") {
+      s.push('<path d="M32 9v7" stroke="' + ink + '" stroke-width="2.4" stroke-linecap="round"/>');
+      s.push('<circle cx="32" cy="8" r="3" fill="#f2553d" stroke="' + ink + '" stroke-width="1.8"/>');
+      s.push('<rect x="13" y="18" width="38" height="34" rx="9" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+    } else if (a.acc === "alien") {
+      s.push('<path d="M23 15c-2-4-5-4-5-1M41 15c2-4 5-4 5-1" stroke="' + ink + '" stroke-width="2.2" fill="none" stroke-linecap="round"/>');
+      s.push('<circle cx="18" cy="12" r="2.6" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.6"/><circle cx="46" cy="12" r="2.6" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.6"/>');
+    } else if (a.acc === "crown") {
+      s.push('<path d="M19 18 18 8l7 5 7-8 7 8 7-5-1 10z" fill="#f4b72a" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<circle cx="32" cy="12" r="2" fill="#f2553d"/><circle cx="20" cy="14" r="1.6" fill="#2da98d"/><circle cx="44" cy="14" r="1.6" fill="#3f5bd6"/>');
+    }
+    /* Yüz. */
+    if (a.acc === "penguin") {
+      s.push('<ellipse cx="32" cy="36" rx="20" ry="21" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<ellipse cx="32" cy="40" rx="13" ry="15" fill="#fff"/>');
+    } else if (a.acc === "frog") {
+      s.push('<circle cx="32" cy="35" r="20" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+    } else {
+      s.push('<circle cx="32" cy="34" r="19" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+    }
+    /* Gözler ve ağız. */
+    if (a.acc === "panda") {
+      s.push('<ellipse cx="25" cy="32" rx="5" ry="6" fill="' + ink + '" transform="rotate(-16 25 32)"/>');
+      s.push('<ellipse cx="39" cy="32" rx="5" ry="6" fill="' + ink + '" transform="rotate(16 39 32)"/>');
+      s.push('<circle cx="26" cy="31" r="1.7" fill="#fff"/><circle cx="40" cy="31" r="1.7" fill="#fff"/>');
+    } else if (a.acc === "alien") {
+      s.push('<ellipse cx="25" cy="34" rx="4.4" ry="6" fill="' + ink + '"/><ellipse cx="39" cy="34" rx="4.4" ry="6" fill="' + ink + '"/>');
+      s.push('<circle cx="26.4" cy="32" r="1.3" fill="#fff"/><circle cx="40.4" cy="32" r="1.3" fill="#fff"/>');
+    } else if (a.acc === "robot") {
+      s.push('<rect x="21" y="29" width="8" height="8" rx="2" fill="' + ink + '"/><rect x="35" y="29" width="8" height="8" rx="2" fill="' + ink + '"/>');
+      s.push('<circle cx="25" cy="33" r="1.5" fill="#8fd0ff"/><circle cx="39" cy="33" r="1.5" fill="#8fd0ff"/>');
+    } else if (a.acc === "shades") {
+      s.push('<path d="M15 29h34l-1.6 6.4c-.8 3-3.4 4.8-6.4 4.4-2.6-.3-4.6-2.2-5.4-4.8L34 30h-4l-1.6 5c-.8 2.6-2.8 4.5-5.4 4.8-3 .4-5.6-1.4-6.4-4.4z" fill="' + ink + '"/>');
+      s.push('<path d="M18 31h6l-1 3h-6zM40 31h6l1 3h-6z" fill="rgba(255,255,255,0.5)"/>');
+    } else if (a.acc === "frog") {
+      s.push('<circle cx="25" cy="30" r="4.4" fill="' + ink + '"/><circle cx="39" cy="30" r="4.4" fill="' + ink + '"/>');
+      s.push('<circle cx="26.4" cy="28.4" r="1.5" fill="#fff"/><circle cx="40.4" cy="28.4" r="1.5" fill="#fff"/>');
+    } else {
+      s.push('<circle cx="25" cy="32" r="2.8" fill="' + ink + '"/><circle cx="39" cy="32" r="2.8" fill="' + ink + '"/>');
+      s.push('<circle cx="26" cy="31" r="1" fill="#fff"/><circle cx="40" cy="31" r="1" fill="#fff"/>');
+    }
+    if (a.acc === "penguin") {
+      s.push('<path d="M28 43l4 4 4-4z" fill="#f4a12a" stroke="' + ink + '" stroke-width="1.6" stroke-linejoin="round"/>');
+    } else if (a.acc === "robot") {
+      s.push('<rect x="26" y="42" width="12" height="4" rx="2" fill="' + ink + '"/>');
+    } else if (a.acc === "cat") {
+      s.push('<path d="M27 42q5 4 10 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<path d="M11 35h6M47 35h6M12 40h6M46 40h6" stroke="' + ink + '" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>');
+    } else if (a.acc === "shades") {
+      s.push('<path d="M26 43q6 4 12 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+    } else {
+      s.push('<path d="M26 41q6 5 12 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+    }
+    /* Yanak allığı. */
+    s.push('<circle cx="18" cy="39" r="3" fill="#f2553d" opacity="0.28"/><circle cx="46" cy="39" r="3" fill="#f2553d" opacity="0.28"/>');
+    s.push('</svg>');
+    return s.join("");
+  }
+
+  function avatarImage(id) {
+    var avatar = avatarById(id);
+    return avatar ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(avatarSVG(avatar)) : "";
+  }
+
+  function avatarStyleAttr(id) {
+    var src = avatarImage(id);
+    return src ? ' style="background-image:url(&quot;' + esc(src) + '&quot;)"' : "";
+  }
+
+  function applyAvatar(id) {
+    var avatar = avatarById(id);
+    var clean = avatar ? avatar.id : "";
+    if (clean) save(LS_AVATAR, clean);
+    else remove(LS_AVATAR);
+    app.avatar = clean;
+    renderAccount();
+    return clean;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* efekt seçimi                                                        */
+  /* ------------------------------------------------------------------ */
+
+  function loadFxSettings() {
+    var data = {};
+    try { data = JSON.parse(read(LS_FX) || "{}") || {}; } catch (error) { data = {}; }
+    app.fxBurst = BURST_EFFECTS.some(function (item) { return item.id === data.burst; })
+      ? data.burst : BURST_EFFECTS[0].id;
+    app.fxWin = WIN_EFFECTS.some(function (item) { return item.id === data.win; })
+      ? data.win : WIN_EFFECTS[0].id;
+  }
+
+  function applyFxSettings() {
+    if (FX && typeof FX.setFxPack === "function") {
+      FX.setFxPack({ burst: app.fxBurst, win: app.fxWin });
+    }
+  }
+
+  function saveFxSettings() {
+    save(LS_FX, JSON.stringify({ burst: app.fxBurst, win: app.fxWin }));
+    applyFxSettings();
+  }
+
+  function selectFx(kind, id) {
+    var list = kind === "win" ? WIN_EFFECTS : BURST_EFFECTS;
+    if (!list.some(function (item) { return item.id === id; })) return;
+    if (kind === "win") app.fxWin = id;
+    else app.fxBurst = id;
+    saveFxSettings();
+    if (app.sound) {
+      if (kind === "win") sfxWinFx(id);
+      else sfxBurstFx(id, true);
+    }
+    var cx = window.innerWidth / 2;
+    var cy = window.innerHeight * 0.46;
+    if (FX) {
+      if (kind === "win") FX.victory();
+      else FX.clearBurst(cx, cy, true);
+    }
+  }
+
   function renderHomeMeta() {
     if (!PROGRESS || !app.profile) return;
     updatePurchaseStrip();
     var p = app.profile;
-    var coins = $("#stat-coins");
-    if (coins) coins.textContent = fmt(p.coins);
     var best = $("#stat-best");
     if (best) best.textContent = fmt(p.bestAny || 0);
 
@@ -3412,6 +3693,7 @@
       else if (rowsCleared) sfxRowClear(rowsCleared);
       else sfxClear(last.lines);
       sfxBass(last.lines, !!cross);
+      sfxBurstFx(app.fxBurst, cross || last.lines >= 3);
       if (app.vibrate && FX) {
         FX.vibrate(cross ? [22, 30, 22, 30, 34] : (last.lines > 1 ? [18, 35, 18] : 14));
       }
@@ -3793,8 +4075,7 @@
     var rewardHTML = "";
     if (reward) {
       rewardHTML += '<div class="reward-row">' +
-        '<span><b>+' + fmt(reward.xp) + '</b> XP</span>' +
-        '<span><b>+' + fmt(reward.coins) + '</b> coin</span>';
+        '<span><b>+' + fmt(reward.xp) + '</b> XP</span>';
       if (reward.newRecord) rewardHTML += '<span class="reward-badge">yeni rekor</span>';
       if (reward.levelUp) rewardHTML += '<span class="reward-badge level">seviye ' + reward.levelAfter + '</span>';
       rewardHTML += '</div>';
@@ -3804,11 +4085,6 @@
     var action = canRematch
       ? '<button class="btn btn-coral" type="button" data-rematch data-primary data-autofocus>Yeniden oyna</button>'
       : '<p class="result-note">Yeniden başlatmayı oda sahibi yapar.</p>';
-    var doubleCoins = "";
-    if (ads.rewarded && reward && reward.coins > 0) {
-      doubleCoins = '<button class="btn btn-outline" type="button" data-double-coins>' +
-        'Reklam izle, 2× coin</button>';
-    }
 
     var rejoinNote = app.online && s.players.some(function (p) { return !p.connected; })
       ? '<p class="result-note">Bir oyuncunun bağlantısı yok. Yeniden başlatmak için iki oyuncu da bağlı olmalı.</p>'
@@ -3847,8 +4123,7 @@
       (s.reason ? '<p class="result-note">' + esc(s.reason) + '</p>' : "") +
       rejoinNote +
       resultEmotesHTML(s) +
-      '<div class="sheet-actions result-actions' + (doubleCoins ? " has-double" : "") + '">' +
-        doubleCoins +
+      '<div class="sheet-actions result-actions">' +
         action +
         '<button class="btn btn-outline" type="button" data-close>Tahtaya bak</button>' +
         '<button class="btn btn-ghost" type="button" data-home>Ana menü</button>' +
@@ -3871,6 +4146,7 @@
       if (isWin) {
         if (FX) FX.victory();
         sfxWin();
+        setTimeout(function () { if (app.sound && isWin) sfxWinFx(app.fxWin); }, 340);
         if (app.vibrate && FX) FX.vibrate([0, 28, 40, 32, 70]);
         setTimeout(function () { if (app.sound && isWin) sfxReward(); }, 620);
       } else if (isLose) {
@@ -3894,7 +4170,7 @@
       '<p class="sheet-sub">' + (online
         ? 'Oda <b>' + esc(app.room || "") + '</b> · <span>' + modeName(s.mode) + '</span> · <span>Arkadaşınla</span>'
         : '<span>' + modeName(s.mode) + '</span> · <span>Aynı cihaz</span>') + '</p>' +
-      (info ? '<p class="result-note">Seviye ' + info.level + ' · ' + fmt(app.profile.coins) + ' coin · ' + fmt(app.profile.bestAny || 0) + ' rekor</p>' : '') +
+      (app.profile ? '<p class="result-note">' + esc(tr("{k} rekor", { k: fmt(app.profile.bestAny || 0) })) + '</p>' : '') +
       (online && s.timeMode && s.timeMode !== "none"
         ? '<p class="result-note">Oda oyununda süre menü açıkken de işler.</p>'
         : '') +
@@ -4016,9 +4292,6 @@
     rewarded: false,
     banner: false,
     shown: 0,
-    pendingCoins: 0,
-    pendingKey: null,
-    grantedKey: null,
     pendingUnlock: null,
     free: read(LS_ADS_FREE) === "1",
     billing: false,
@@ -4128,7 +4401,7 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* profil menüsü: tema / emote / mağaza                                */
+  /* profil menüsü: tema / emote / efekt / avatar                       */
   /* ------------------------------------------------------------------ */
 
   function profileTabsHTML(active) {
@@ -4142,11 +4415,11 @@
   }
 
   function profilePhotoHTML() {
-    var photo = read(LS_PHOTO) || "";
+    var avatar = currentAvatar();
     var initial = accountInitial(accountName());
-    return '<span class="profile-photo' + (photo ? " has-photo" : "") + '"' +
-      (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : "") + '>' +
-      (photo ? "" : esc(initial)) + '</span>';
+    return '<span class="profile-photo' + (avatar ? " has-photo" : "") + '"' +
+      avatarStyleAttr(avatar) + '>' +
+      (avatar ? "" : esc(initial)) + '</span>';
   }
 
   function themePaneHTML() {
@@ -4186,49 +4459,45 @@
       '</div></div>';
   }
 
-  function profileStorePaneHTML() {
-    var p = app.profile;
-    var ready = !!ads.rewarded;
-    var html = '<div class="profile-pane" role="tabpanel" data-profile-pane="store" aria-label="' + esc(tr("Mağaza")) + '" hidden>' +
-      '<div class="store-balance"><b>' + fmt(p ? p.coins : 0) + '</b><span class="tiny">coin</span></div>' +
-      '<div class="store-unlocks">' +
-      STORE_ITEMS.map(function (item) {
-        var owned = isUnlocked(item.id);
-        return '<div class="store-unlock' + (owned ? " is-owned" : "") + '">' +
-          '<span class="store-unlock-icon" aria-hidden="true">' +
-            (item.kind === "theme" ? "🎨" : (item.kind === "emote" ? "😀" : "✨")) + '</span>' +
-          '<span class="store-unlock-copy"><b>' + esc(tr(item.name)) + '</b>' +
-            '<span class="tiny">' + esc(tr(item.desc)) + '</span></span>' +
-          (owned
-            ? '<span class="store-owned">' + esc(tr("Açık")) + '</span>'
-            : '<button class="btn btn-ink btn-sm" type="button" data-unlock="' + item.id + '"' +
-              (ready ? "" : " disabled") + '>' + esc(tr("Reklam izle")) + '</button>') +
-          '</div>';
+  function fxPaneHTML() {
+    function group(title, kind, list, active) {
+      return '<div class="fx-group">' +
+        '<h3 class="fx-group-title">' + esc(tr(title)) + '</h3>' +
+        '<div class="fx-grid" role="group" aria-label="' + esc(tr(title)) + '">' +
+        list.map(function (item) {
+          var on = item.id === active;
+          return '<button class="fx-pick' + (on ? " is-active" : "") + '" type="button"' +
+            ' data-fx-kind="' + kind + '" data-fx-pick="' + item.id + '"' +
+            ' aria-pressed="' + (on ? "true" : "false") + '">' +
+            '<span class="fx-pick-icon" aria-hidden="true">' + item.icon + '</span>' +
+            '<span class="fx-pick-name">' + esc(tr(item.name)) + '</span></button>';
+        }).join("") +
+        '</div></div>';
+    }
+    return '<div class="profile-pane" role="tabpanel" data-profile-pane="fx" aria-label="' + esc(tr("Efektler")) + '" hidden>' +
+      '<p class="profile-note">' + esc(tr("Kutular patlarken ve turu kazandığında farklı efektler kullan. Seçtiğin efekte uygun ses de çalar.")) + '</p>' +
+      group("Kutu patlama efekti", "burst", BURST_EFFECTS, app.fxBurst) +
+      group("Kazanma efekti", "win", WIN_EFFECTS, app.fxWin) +
+      '</div>';
+  }
+
+  function avatarPaneHTML() {
+    var active = currentAvatar();
+    return '<div class="profile-pane" role="tabpanel" data-profile-pane="avatar" aria-label="' + esc(tr("Avatar")) + '" hidden>' +
+      '<p class="profile-note">' + esc(tr("Hazır avatarlardan birini seç. Seçimin oyun içi skor kartlarında da görünür.")) + '</p>' +
+      '<div class="avatar-grid" role="group" aria-label="' + esc(tr("Avatar seç")) + '">' +
+      AVATARS.map(function (item) {
+        var on = item.id === active;
+        return '<button class="avatar-pick' + (on ? " is-active" : "") + '" type="button"' +
+          ' data-avatar-pick="' + item.id + '" aria-pressed="' + (on ? "true" : "false") + '"' +
+          ' aria-label="' + esc(tr(item.name)) + '">' +
+          '<span class="avatar-pick-art" aria-hidden="true"' + avatarStyleAttr(item.id) + '></span>' +
+          '<span class="avatar-pick-name">' + esc(tr(item.name)) + '</span></button>';
       }).join("") +
       '</div>' +
-      '<p class="profile-note">' + esc(tr("Yeni içerikler reklam izleyerek açılır. Oyun içi coinlerle değil.")) + '</p>' +
-      '<div class="store-offers">' +
-      [80, 200].map(function (coins) {
-        return '<div class="store-offer">' +
-          '<b class="store-amount">+' + fmt(coins) + '</b>' +
-          '<span class="tiny">coin</span>' +
-          '<button class="btn btn-ink btn-sm" type="button" data-reward-coins="' + coins + '"' +
-            (ready ? "" : " disabled") + '>' + esc(tr("Reklam izle")) + '</button>' +
-          '</div>';
-      }).join("") +
+      (active ? '<button class="btn btn-ghost btn-sm avatar-reset" type="button" data-avatar-reset>' +
+        esc(tr("Avatarı kaldır")) + '</button>' : '') +
       '</div>';
-    if (!ready) html += '<p class="profile-note">' + esc(tr("Reklam şu an hazır değil.")) + '</p>';
-    html += '<div class="store-ads">';
-    if (ads.free) {
-      html += '<p class="profile-note">' + esc(tr("Reklamlar kaldırıldı. Teşekkürler!")) + '</p>';
-    } else if (ads.billing) {
-      html += '<button class="btn btn-outline btn-sm" type="button" data-buy-ads>' +
-        esc(tr("Reklamları kaldır")) + '</button>';
-    } else {
-      html += '<p class="profile-note">' + esc(tr("Satın alma bu sürümde kullanılamıyor.")) + '</p>';
-    }
-    html += '</div></div>';
-    return html;
   }
 
   function showProfileMenu(tab) {
@@ -4237,26 +4506,22 @@
     refreshAdsState();
     refreshBillingState();
     var p = app.profile;
-    var info = p ? PROGRESS.levelInfo(p.xp) : null;
     var name = accountName() || "Misafir oyuncu";
-    var meta = info
-      ? tr("Seviye {n} · {m} coin · {k} rekor", { n: info.level, m: fmt(p.coins), k: fmt(p.bestAny || 0) })
+    var meta = p
+      ? tr("{k} rekor", { k: fmt(p.bestAny || 0) })
       : tr("Misafir oyuncu");
     openOverlay(
       '<span class="result-badge">Profil</span>' +
       '<h2 class="profile-name">' + esc(name) + '</h2>' +
       '<p class="profile-meta">' + esc(meta) + '</p>' +
       '<div class="profile-photo-row">' + profilePhotoHTML() +
-        '<div class="profile-photo-actions">' +
-          '<button class="btn btn-outline btn-sm" type="button" data-photo-pick>' + esc(tr("Fotoğraf seç")) + '</button>' +
-          (read(LS_PHOTO) ? '<button class="btn btn-ghost btn-sm" type="button" data-photo-clear>' + esc(tr("Kaldır")) + '</button>' : '') +
-          '<input class="photo-input" id="photo-input" type="file" accept="image/*" hidden>' +
-        '</div>' +
+        '<p class="profile-note profile-photo-hint">' + esc(tr("Avatarını menüden seç.")) + '</p>' +
       '</div>' +
       profileTabsHTML(active) +
       themePaneHTML() +
       emotePaneHTML() +
-      profileStorePaneHTML() +
+      fxPaneHTML() +
+      avatarPaneHTML() +
       '<div class="sheet-actions"><button class="btn btn-ink" type="button" data-close data-autofocus>' +
         esc(tr("Kapat")) + '</button></div>',
       true,
@@ -4317,11 +4582,11 @@
     if (!app.profileOpen) return;
     var overlay = $("#overlay");
     if (!overlay || overlay.hidden) return;
-    var pane = $('[data-profile-pane="store"]', overlay);
+    var pane = $('[data-profile-pane="theme"]', overlay);
     if (!pane) return;
     /* Pencereyi yeniden kurmak odağı ve açan öğeyi kaybettirir; yalnızca
        içerik bölümlerini yerinde tazela. */
-    [["theme", themePaneHTML], ["emote", emotePaneHTML], ["store", profileStorePaneHTML]].forEach(function (entry) {
+    [["theme", themePaneHTML], ["emote", emotePaneHTML], ["fx", fxPaneHTML], ["avatar", avatarPaneHTML]].forEach(function (entry) {
       var current = $('[data-profile-pane="' + entry[0] + '"]', overlay);
       if (!current) return;
       var wasHidden = current.hidden;
@@ -4343,12 +4608,9 @@
       }
     }
     var p = app.profile;
-    var info = p ? PROGRESS.levelInfo(p.xp) : null;
     var meta = $(".profile-meta", overlay);
-    if (meta && info) {
-      meta.textContent = tr("Seviye {n} · {m} coin · {k} rekor", {
-        n: info.level, m: fmt(p.coins), k: fmt(p.bestAny || 0)
-      });
+    if (meta && p) {
+      meta.textContent = tr("{k} rekor", { k: fmt(p.bestAny || 0) });
     }
     fitOverlaySheet();
   }
@@ -4367,14 +4629,14 @@
       avatar.appendChild(initial);
     }
     var name = accountName();
-    var localPhoto = read(LS_PHOTO) || "";
+    var localAvatar = avatarImage(currentAvatar());
     avatar.style.backgroundImage = "";
     avatar.classList.remove("has-photo");
     initial.textContent = accountInitial(name);
-    if (localPhoto) {
+    if (localAvatar) {
       initial.textContent = "";
       avatar.classList.add("has-photo");
-      avatar.style.backgroundImage = 'url("' + String(localPhoto).replace(/["\\]/g, "") + '")';
+      avatar.style.backgroundImage = 'url("' + localAvatar.replace(/["\\]/g, "") + '")';
     } else if (profile && profile.picture) {
       initial.textContent = "";
       avatar.classList.add("has-photo");
@@ -4386,7 +4648,7 @@
     refreshGameAvatars();
   }
 
-  /* Profil fotoğrafı yerel olarak saklanır (data URL). Oyun içi skor
+  /* Seçilen hazır avatar yerel olarak saklanır. Oyun içi skor
      kartlarındaki avatarlar da aynı kaynağı kullanır. */
   function renderAvatar() { renderAccount(); }
 
@@ -4394,7 +4656,7 @@
     var name = (player && player.name) || "?";
     var initial = accountInitial(name);
     var photo = "";
-    if (index === app.me || (!app.online && index === 0)) photo = read(LS_PHOTO) || "";
+    if (index === app.me || (!app.online && index === 0)) photo = avatarImage(currentAvatar());
     return '<span class="score-avatar p' + (index + 1) + (photo ? " has-photo" : "") + '"' +
       (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : "") +
       ' aria-hidden="true">' + (photo ? "" : esc(initial)) + '</span>';
@@ -4407,7 +4669,7 @@
       if (!player) return;
       var name = player.name || "?";
       var photo = "";
-      if (index === app.me || (!app.online && index === 0)) photo = read(LS_PHOTO) || "";
+      if (index === app.me || (!app.online && index === 0)) photo = avatarImage(currentAvatar());
       el.textContent = photo ? "" : accountInitial(name);
       el.classList.toggle("has-photo", !!photo);
       el.style.backgroundImage = photo ? 'url("' + photo.replace(/["\\]/g, "") + '")' : "";
@@ -4729,26 +4991,6 @@
     } catch (error) { /* yoksay */ }
   }
 
-  function grantPendingCoins() {
-    if (!ads.pendingCoins || !app.profile || !PROGRESS) return;
-    var key = ads.pendingKey;
-    if (key && ads.grantedKey === key) return;
-    var amount = ads.pendingCoins;
-    PROGRESS.addCoins(app.profile, amount);
-    PROGRESS.save(app.profile);
-    ads.grantedKey = key;
-    ads.pendingCoins = 0;
-    ads.pendingKey = null;
-    renderHomeMeta();
-    refreshProfileSheet();
-    toast(tr("+{n} coin eklendi", { n: fmt(amount) }));
-    var button = document.querySelector("[data-double-coins]");
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Coinler eklendi";
-    }
-  }
-
   function handleAdsEvent(event) {
     var name = String(event || "");
     if (name.indexOf("banner:") === 0) {
@@ -4784,17 +5026,11 @@
         } else {
           toast("Bu içerik zaten açık.");
         }
-      } else {
-        grantPendingCoins();
       }
     } else if (name === "rewarded-closed" || name === "rewarded-failed") {
       if (ads.pendingUnlock) {
         ads.pendingUnlock = null;
         toast("Reklam tamamlanmadı; içerik açılmadı.");
-      } else if (ads.pendingCoins) {
-        ads.pendingCoins = 0;
-        ads.pendingKey = null;
-        toast("Reklam tamamlanmadı; coin eklenmedi.");
       }
     }
     refreshAdsState();
@@ -4821,23 +5057,6 @@
     }, 350);
   }
 
-  function watchRewardedCoins(key, coins) {
-    if (!ads.rewarded || !coins) {
-      toast("Reklam şu an hazır değil.");
-      return;
-    }
-    ads.pendingCoins = coins;
-    ads.pendingKey = key || null;
-    ads.pendingUnlock = null;
-    try {
-      window.BlokAds.showRewarded();
-    } catch (error) {
-      ads.pendingCoins = 0;
-      ads.pendingKey = null;
-      toast("Reklam açılamadı.");
-    }
-  }
-
   function watchRewardedUnlock(key) {
     if (!key) return;
     if (isUnlocked(key)) {
@@ -4849,8 +5068,6 @@
       return;
     }
     ads.pendingUnlock = key;
-    ads.pendingCoins = 0;
-    ads.pendingKey = null;
     try {
       window.BlokAds.showRewarded();
     } catch (error) {
@@ -5618,29 +5835,6 @@
     var gameMenuBtn = $("#game-menu-btn");
     if (gameMenuBtn) gameMenuBtn.addEventListener("click", showMenu);
 
-    document.addEventListener("change", function (event) {
-      var input = event.target;
-      if (!input || input.id !== "photo-input" || !input.files || !input.files[0]) return;
-      var file = input.files[0];
-      if (!/^image\//.test(file.type)) {
-        toast("Lütfen bir görsel seç.");
-        return;
-      }
-      if (file.size > 2.5 * 1024 * 1024) {
-        toast("Görsel çok büyük (en fazla 2,5 MB).");
-        return;
-      }
-      var reader = new FileReader();
-      reader.onload = function () {
-        save(LS_PHOTO, String(reader.result || ""));
-        renderAccount();
-        refreshProfileSheet();
-        toast("Profil fotoğrafı güncellendi.");
-      };
-      reader.onerror = function () { toast("Görsel okunamadı."); };
-      reader.readAsDataURL(file);
-    });
-
     $("#emote-tray").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-emote]");
       if (!chip) return;
@@ -5686,16 +5880,23 @@
         startSetupMatch();
         return;
       }
-      if (target.hasAttribute("data-photo-pick")) {
-        var photoInput = $("#photo-input");
-        if (photoInput) photoInput.click();
+      if (target.hasAttribute("data-avatar-pick")) {
+        var pickedAvatar = applyAvatar(target.dataset.avatarPick);
+        refreshProfileSheet();
+        if (app.sound) sfxTap();
+        if (app.vibrate && FX) FX.vibrate(18);
+        if (pickedAvatar) toast(tr("Avatar seçildi."));
         return;
       }
-      if (target.hasAttribute("data-photo-clear")) {
-        remove(LS_PHOTO);
-        renderAccount();
+      if (target.hasAttribute("data-avatar-reset")) {
+        applyAvatar("");
         refreshProfileSheet();
-        toast("Profil fotoğrafı kaldırıldı.");
+        toast(tr("Avatar kaldırıldı."));
+        return;
+      }
+      if (target.hasAttribute("data-fx-pick")) {
+        selectFx(target.dataset.fxKind, target.dataset.fxPick);
+        refreshProfileSheet();
         return;
       }
       if (target.hasAttribute("data-emote")) {
@@ -5755,21 +5956,12 @@
         if (app.sound) sfxTap();
         return;
       }
-      if (target.hasAttribute("data-unlock")) {
-        watchRewardedUnlock(target.dataset.unlock);
-        return;
-      }
       if (target.hasAttribute("data-emote-unlock")) {
         watchRewardedUnlock(target.dataset.emoteUnlock);
         return;
       }
       if (target.hasAttribute("data-profile-emote")) {
         previewEmote(target.dataset.profileEmote);
-        return;
-      }
-      if (target.hasAttribute("data-reward-coins")) {
-        var coins = Number(target.dataset.rewardCoins);
-        watchRewardedCoins("store-" + coins + "-" + Date.now(), coins);
         return;
       }
       if (target.hasAttribute("data-buy-ads")) {
@@ -5797,18 +5989,13 @@
       if (target.hasAttribute("data-reset-progress")) {
         closeOverlay();
         showConfirm("İlerleme sıfırlansın mı?",
-          "Seviye, coin, başarımlar ve rekorlar silinir. Bu geri alınamaz.",
+          "Başarımlar ve rekorlar silinir. Bu geri alınamaz.",
           "Sıfırla", function () {
             if (PROGRESS) app.profile = PROGRESS.reset();
             app.timeMode = "shared";
             renderHomeMeta();
             toast("İlerleme sıfırlandı.");
           });
-        return;
-      }
-      if (target.hasAttribute("data-double-coins")) {
-        app.interstitialPending = false;
-        watchRewardedCoins(app.shownResultKey, app.lastReward ? app.lastReward.coins : 0);
         return;
       }
       if (target.hasAttribute("data-restart") || target.hasAttribute("data-rematch")) {

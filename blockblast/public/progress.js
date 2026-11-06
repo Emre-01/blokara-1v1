@@ -1,4 +1,4 @@
-/* Blokara 1v1 — yerel ilerleme: XP, seviye, coin, rekorlar, günlük seri.
+/* Blokara 1v1 — yerel ilerleme: XP, seviye, rekorlar, günlük seri.
    Tamamen localStorage üzerinde çalışır; APK çevrimdışıyken de işler.
    Reklamla açılan içerikler `unlocks` haritasında tutulur. */
 (function (root) {
@@ -10,7 +10,6 @@
   function defaults() {
     return {
       xp: 0,
-      coins: 0,
       games: 0,
       wins: 0,
       losses: 0,
@@ -120,7 +119,7 @@
 
   function emptyReward() {
     return {
-      xp: 0, coins: 0, levelBefore: 1, levelAfter: 1, levelUp: false,
+      xp: 0, levelBefore: 1, levelAfter: 1, levelUp: false,
       unlocked: [], newRecord: false, newRecordValue: 0,
       daily: null, win: false
     };
@@ -170,11 +169,9 @@
     }
 
     reward.win = win;
-    /* Turu bitirmek de bir şey kazandırır: en az 5 XP / 2 coin. */
+    /* Turu bitirmek de bir şey kazandırır: en az 5 XP. */
     reward.xp = 5 + Math.round(score / 8) + lines * 3 + (win ? 25 : 0) + (reward.daily && reward.daily.newDay ? 30 : 0);
-    reward.coins = 2 + Math.round(score / 40) + lines * 2 + (win ? 10 : 0) + (reward.daily ? reward.daily.bonus : 0);
     profile.xp += reward.xp;
-    profile.coins += reward.coins;
 
     /* Başarım ödülü yok; alan eski çağıranlarla uyum için boş kalır. */
     reward.unlocked = [];
@@ -183,11 +180,6 @@
 
     save(profile);
     return reward;
-  }
-
-  function addCoins(profile, amount) {
-    profile.coins = Math.max(0, (profile.coins || 0) + amount);
-    save(profile);
   }
 
   root.BlokProgress = {
@@ -202,7 +194,6 @@
     dailySeed: dailySeed,
     dailyReady: dailyReady,
     refreshDailyStreak: refreshDailyStreak,
-    recordGame: recordGame,
-    addCoins: addCoins
+    recordGame: recordGame
   };
 })(typeof self !== "undefined" ? self : this);

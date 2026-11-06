@@ -427,7 +427,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   text-overflow: ellipsis;
 }
 .topbar-profile .account-actions { display: none; }
-/* Coin + rekor: çerçevesiz ince şerit; üst barı şişirmez. */
+/* Rekor: çerçevesiz ince şerit; üst barı şişirmez. */
 .topbar-profile .profile-strip {
   flex: 0 0 auto;
   gap: 9px;
@@ -437,36 +437,23 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   border: 0;
   box-shadow: none;
 }
-.topbar-profile .profile-coin,
 .topbar-profile .profile-best {
   display: inline-flex;
   align-items: baseline;
   gap: 2px;
   white-space: nowrap;
 }
-.topbar-profile .profile-coin b,
 .topbar-profile .profile-best b {
   font-family: var(--font-display);
   font-size: 14px;
   line-height: 1;
   letter-spacing: -0.02em;
 }
-.topbar-profile .profile-coin em,
 .topbar-profile .profile-best em {
   font-style: normal;
   font-size: 8.5px;
   font-weight: 700;
   color: var(--ink-soft);
-}
-.topbar-profile .profile-coin::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--mustard);
-  border: 1.4px solid var(--ink);
-  align-self: center;
-  margin-right: 1px;
 }
 
 /* Oyun ve lobide tahtaya yer açmak için profil şeridi gizlenir. */
@@ -474,7 +461,7 @@ body[data-screen="game"] .topbar-profile,
 body[data-screen="lobby"] .topbar-profile { display: none; }
 
 @media (max-width: 560px) {
-  .topbar-profile .profile-best { display: none; }
+  .topbar-profile .profile-best em { display: none; }
 }
 @media (max-width: 400px) {
   .topbar-profile { gap: 5px; }
@@ -485,8 +472,6 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
 }
 @media (max-width: 344px) {
   .room-badge { font-size: 10.5px; padding: 3px 7px; letter-spacing: 0.03em; max-width: 38vw; }
-  /* Reklam düğmesi görünürken dar ekranda coin yazısı yer kaplamasın. */
-  .topbar-profile .profile-coin em { display: none; }
 }
 
 /* ---------------------------- ekranlar ---------------------------- */
@@ -1924,8 +1909,15 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
 .emote-art .em-tear { fill: #8fd0ff; stroke: #171428; stroke-width: 1.4; }
 .emote-art .em-teeth { stroke: var(--paper); stroke-width: 2; stroke-linecap: round; }
 .emote-art .em-hand { transform-box: fill-box; transform-origin: center; }
-.emote-art .em-hand rect { fill: var(--coral); stroke: #171428; stroke-width: 2.4; }
+.emote-art .em-hand rect { fill: var(--coral); stroke: #171428; stroke-width: 1.8; }
 .emote-art .em-spark { fill: var(--paper); stroke: #171428; stroke-width: 1.8; }
+.emote-art .em-tear-flow {
+  fill: none;
+  stroke: #2f86d6;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
 .emote-art .em-steam {
   fill: none;
   stroke: #171428;
@@ -1941,7 +1933,7 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
 }
 .emote-laugh .em-face { fill: var(--mustard); }
 .emote-clap .em-face { fill: var(--mint); }
-.emote-cry .em-face { fill: var(--cobalt); }
+.emote-cry .em-face { fill: #bfe4ff; }
 .emote-angry .em-face { fill: var(--coral); }
 .emote-love .em-face { fill: var(--rose); }
 .emote-cool .em-face { fill: var(--sky); }
@@ -1962,11 +1954,11 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
 .emote-clap .em-hand-r { animation: emote-hand-r 0.6s ease-in-out infinite; }
 @keyframes emote-hand-l {
   0%, 100% { transform: translateX(0) rotate(0); }
-  50% { transform: translateX(2px) rotate(-8deg); }
+  50% { transform: translateX(4px) rotate(-7deg); }
 }
 @keyframes emote-hand-r {
   0%, 100% { transform: translateX(0) rotate(0); }
-  50% { transform: translateX(-2px) rotate(8deg); }
+  50% { transform: translateX(-4px) rotate(7deg); }
 }
 /* Ağlamada gözyaşları gözden çeneye doğru akar; iki damla sırayla düşer. */
 .emote-art .em-tear {
@@ -1975,6 +1967,16 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
 }
 .emote-cry .em-tear-a { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) infinite; }
 .emote-cry .em-tear-b { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) 0.42s infinite; }
+/* Yanaklardaki ıslak iz, damlalarla birlikte aşağı akar. */
+.emote-cry .em-tear-flow {
+  stroke-dasharray: 5 11;
+  animation: emote-tear-flow 1.15s linear infinite;
+}
+@keyframes emote-tear-flow {
+  0% { stroke-dashoffset: 16; opacity: 0.35; }
+  55% { opacity: 0.9; }
+  100% { stroke-dashoffset: 0; opacity: 0.35; }
+}
 @keyframes emote-drop {
   0% { opacity: 0; transform: translateY(-3px) scaleY(0.55); }
   18% { opacity: 1; transform: translateY(1px) scaleY(1); }
@@ -2701,7 +2703,6 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
 }
 .sheet.result .sheet-actions > .btn { padding: 10px 12px; font-size: 14px; }
 .sheet.result .sheet-actions > .btn[data-primary],
-.sheet.result .sheet-actions > .btn[data-double-coins],
 .sheet.result .sheet-actions > .result-note { grid-column: 1 / -1; }
 
 /* Sonuç ekranındaki ikincil düğmeler aynı görsel ağırlıkta olsun. */
@@ -2782,11 +2783,6 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   .sheet.tight .result-row { padding: 3px 8px; }
   .sheet.tight .sheet-actions { margin-top: 6px; }
   .sheet.tight .sheet-actions > .btn { min-height: 30px; padding: 4px 8px; }
-  /* Reklam düğmesi de varsa dört düğme iki sıraya dizilir. */
-  .sheet.tight .result-actions.has-double > .btn[data-primary],
-  .sheet.tight .result-actions.has-double > .btn[data-double-coins] {
-    grid-column: auto;
-  }
 }
 
 /* Kısa yatay ekranlar (ör. 640×320): menü düğmeleri iki sütuna dağılır,
@@ -4031,7 +4027,7 @@ body {
   .players-chip i { font-size: 8px; padding: 1.5px 3px; }
 }
 
-/* Geniş portre ekranlar (9:16; mağaza görselleri bu oranda çizilir):
+/* Geniş portre ekranlar (9:16):
    boşluklar biraz açılır. Kart ölçüleri zaten yüksekliğe göre ölçeklendiği
    için burada sabit değer yok; kaydırma hiçbir durumda oluşmaz. */
 @media (max-width: 720px) and (min-height: 780px) and (min-aspect-ratio: 1/2), (max-width: 720px) and (min-width: 391px) and (min-height: 880px) {
@@ -4356,7 +4352,7 @@ body {
 }
 
 /* ============================================================
-   Profil menüsü: tema / emote / mağaza sekmeleri
+   Profil menüsü: tema / emote / efekt / avatar sekmeleri
    ============================================================ */
 
 .sheet.profile {
@@ -4392,7 +4388,7 @@ body {
 
 .profile-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   background: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -4519,80 +4515,138 @@ body {
   line-height: 1.1;
 }
 
-/* Mağaza: reklam karşılığı coin teklifleri. */
-.store-balance {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 8px;
+/* Efekt seçimi: her efekt kendi mini görseliyle gelir. */
+.fx-group { margin-bottom: 12px; }
+.fx-group:last-child { margin-bottom: 0; }
+.fx-group-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
-.store-balance b {
-  font-family: var(--font-display);
-  font-size: 24px;
-  line-height: 1;
-}
-.store-offers {
+.fx-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-}
-.store-offer {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  padding: 8px 6px;
-  background: var(--paper);
-  border: 2px solid var(--ink);
-  border-radius: 12px;
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ink) 24%, transparent);
-}
-.store-amount {
-  font-family: var(--font-display);
-  font-size: 22px;
-  line-height: 1;
-}
-.store-offer .btn {
-  width: 100%;
-  min-height: 0;
-  margin-top: 4px;
-  padding: 5px 4px;
-  font-size: 11.5px;
-}
-.store-ads { margin-top: 8px; }
-.store-ads .btn { width: 100%; min-height: 0; padding: 7px 10px; font-size: 12.5px; }
-.store-ads .profile-note { margin: 0; }
-
-/* Reklamla açılan içerik listesi. */
-.store-unlocks {
-  display: grid;
   gap: 6px;
-  margin-bottom: 10px;
 }
-.store-unlock {
+.fx-pick {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 9px;
+  min-width: 0;
+  padding: 7px 8px;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: 2px solid color-mix(in srgb, var(--ink) 32%, transparent);
   border-radius: 12px;
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ink) 22%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
-.store-unlock.is-owned { border-style: dashed; opacity: 0.82; box-shadow: none; }
-.store-unlock-icon { flex: none; font-size: 18px; line-height: 1; }
-.store-unlock-copy { min-width: 0; flex: 1; display: grid; gap: 1px; }
-.store-unlock-copy b { font-size: 12px; }
-.store-unlock-copy .tiny { line-height: 1.25; }
-.store-unlock .btn { flex: none; min-height: 0; padding: 5px 8px; font-size: 11px; }
-.store-owned {
+.fx-pick:hover,
+.fx-pick:focus-visible { transform: translateY(-1px); border-color: var(--ink); }
+.fx-pick:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+.fx-pick.is-active {
+  border-color: var(--ink);
+  background: var(--card);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.fx-pick.is-active .fx-pick-name::after {
+  content: " ✓";
+  color: var(--mint);
+  font-weight: 800;
+}
+.fx-pick-icon {
   flex: none;
-  padding: 2px 8px;
-  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  font-size: 17px;
+  line-height: 1;
+  overflow: hidden;
+}
+.fx-pick-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hazır avatar galerisi. */
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.avatar-pick {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 6px 3px 4px;
+  background: var(--paper);
+  border: 2px solid color-mix(in srgb, var(--ink) 32%, transparent);
+  border-radius: 12px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.avatar-pick:hover,
+.avatar-pick:focus-visible { transform: translateY(-1px); border-color: var(--ink); }
+.avatar-pick:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+.avatar-pick.is-active {
+  border-color: var(--ink);
+  background: var(--card);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.avatar-pick.is-active::after {
+  content: "✓";
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
   background: var(--mint);
   color: #fff;
   font-size: 10px;
   font-weight: 800;
 }
+.avatar-pick-art {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--card);
+  box-shadow: 1.5px 1.5px 0 color-mix(in srgb, var(--ink) 24%, transparent);
+}
+.avatar-pick-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.avatar-reset {
+  margin-top: 8px;
+  width: 100%;
+}
+
 .lock-badge { font-size: 10px; line-height: 1; }
 .theme-pick.is-locked,
 .profile-emote.is-locked { border-style: dashed; }
@@ -4660,18 +4714,6 @@ body {
   .profile-pane[data-profile-pane="emote"] .profile-note { display: none; }
   .profile-emote { padding: 4px 2px 3px; }
   .profile-emote .emote-chip-art { width: 32px; height: 32px; }
-  .store-balance { margin-bottom: 4px; }
-  .store-balance b { font-size: 18px; }
-  .store-offer { padding: 4px; }
-  .store-amount { font-size: 16px; }
-  .store-offer .btn { margin-top: 2px; padding: 3px 2px; font-size: 10.5px; }
-  .store-unlocks { gap: 4px; margin-bottom: 6px; }
-  .store-unlock { padding: 4px 6px; gap: 6px; }
-  .store-unlock-copy b { font-size: 11px; }
-  .store-unlock-copy .tiny { display: none; }
-  .store-ads { margin-top: 5px; }
-  .store-ads .btn { padding: 4px 8px; font-size: 11px; }
-  .store-ads .profile-note { font-size: 10.5px; }
   .sheet.profile .sheet-actions { margin-top: 6px; flex: none; }
   .sheet.profile .sheet-actions .btn { min-height: 32px; padding: 5px 10px; font-size: 13px; }
 }

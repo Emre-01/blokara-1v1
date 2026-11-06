@@ -26,6 +26,7 @@
   var texts = [];
   var theme = "workshop";
   var unlocks = {};
+  var fxPack = { burst: "classic", win: "confetti" };
   var motionQuery = typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(prefers-reduced-motion: reduce)")
     : null;
@@ -56,6 +57,12 @@
 
   function setUnlocks(map) {
     unlocks = map && typeof map === "object" ? map : {};
+  }
+
+  function setFxPack(map) {
+    if (!map) return;
+    if (map.burst) fxPack.burst = String(map.burst);
+    if (map.win) fxPack.win = String(map.win);
   }
 
   function hasUnlock(key) {
@@ -279,8 +286,95 @@
     }
   }
 
-  /*Patlama anında tema efektlerini ve reklamla açılan süsleri birleştirir.*/
-  function clearBurst(x, y, strong) {
+  /* Piksel patlaması: 8-bit hissi veren iri, dönen kare parçalar. */
+  function burstPixels(x, y, strong) {
+    init();
+    var total = reducedMotion() ? 3 : (strong ? 30 : 18);
+    var palette = themePalette().concat(["paper", "ink", "mustard"]);
+    for (var i = 0; i < total; i++) {
+      var angle = Math.random() * Math.PI * 2;
+      var speed = (100 + Math.random() * 260) * (strong ? 1.25 : 1);
+      var life = 0.55 + Math.random() * 0.6;
+      spawn({
+        x: x, y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 90,
+        gravity: 920,
+        size: 4 + Math.random() * 8,
+        color: color(pick(palette)),
+        life: life, maxLife: life,
+        round: false,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 22,
+        drag: 0.986
+      });
+    }
+    if (!reducedMotion()) {
+      shockwave(x, y, "mustard", 8, 84, 0.32);
+      shockwave(x, y, "paper", 4, 52, 0.24);
+    }
+  }
+
+  /* Balon patlaması: yumuşak renkli kabarcıklar yükselir ve söner. */
+  function burstBubbles(x, y, strong) {
+    init();
+    var total = reducedMotion() ? 2 : (strong ? 26 : 16);
+    var palette = ["#8fd0ff", "#bfe4ff", "#f7a8d4", "#a7e8c4", "#ffe3a3", "paper"];
+    for (var i = 0; i < total; i++) {
+      var life = 0.95 + Math.random() * 1;
+      spawn({
+        x: x + (Math.random() - 0.5) * 54,
+        y: y + (Math.random() - 0.5) * 40,
+        vx: (Math.random() - 0.5) * 300,
+        vy: -(70 + Math.random() * 220),
+        gravity: -30,
+        size: 12 + Math.random() * 26,
+        color: pick(palette),
+        life: life, maxLife: life,
+        bubble: true,
+        wobble: 1.2 + Math.random() * 2.4,
+        phase: Math.random() * Math.PI * 2,
+        drag: 0.988,
+        delay: Math.random() * 0.1
+      });
+    }
+    if (!reducedMotion()) {
+      shockwave(x, y, "#bfe4ff", 6, 76, 0.36);
+      themeExtras(x, y, 0.7);
+    }
+  }
+
+  /* Kıvılcım patlaması: ışık hızında dağılan ince çizgiler. */
+  function burstSparks(x, y, strong) {
+    init();
+    var total = reducedMotion() ? 3 : (strong ? 30 : 18);
+    var palette = ["mustard", "#fff3c4", "paper", "coral", "sky"];
+    for (var i = 0; i < total; i++) {
+      var angle = Math.random() * Math.PI * 2;
+      var speed = (240 + Math.random() * 420) * (strong ? 1.2 : 1);
+      var life = 0.3 + Math.random() * 0.32;
+      spawn({
+        x: x, y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        gravity: 160,
+        size: 1.6 + Math.random() * 2.2,
+        color: pick(palette),
+        life: life, maxLife: life,
+        streak: true,
+        glow: true,
+        drag: 0.94
+      });
+    }
+    if (!reducedMotion()) {
+      shockwave(x, y, "mustard", 6, 120, 0.4);
+      shockwave(x, y, "paper", 3, 70, 0.34);
+      if (strong) shockwave(x, y, "coral", 3, 150, 0.5);
+    }
+  }
+
+  /* Klasik patlama: tema renkli kıvılcımlar, süsler ve altın unlock. */
+  function burstClassic(x, y, strong) {
     init();
     var power = strong ? 1.35 : 1;
     var palette = themePalette();
@@ -327,6 +421,16 @@
     if (hasUnlock("fx:confetti") && strong) confetti();
   }
 
+  /* Patlama anında seçilen efekti çalıştırır. */
+  function clearBurst(x, y, strong) {
+    init();
+    var style = fxPack.burst;
+    if (style === "pixel") { burstPixels(x, y, strong); return; }
+    if (style === "bubble") { burstBubbles(x, y, strong); return; }
+    if (style === "spark") { burstSparks(x, y, strong); return; }
+    burstClassic(x, y, strong);
+  }
+
   /* Merkezden yayılan altın ışık huzmeleri (DOM katmanı). Zafer anında
      sonuç kartının arkasında döner; bir buçuk saniyede söner. */
   function rays(x, y) {
@@ -342,15 +446,22 @@
     }, 1900);
   }
 
-  /* Zafer şöleni: dört dalga konfeti, alt köşelerden altın kıvılcımlar,
-     merkezden yayılan halkalar, ışık huzmeleri ve yıldız parıltıları.
-     Sonuç ekranı açılırken çalışır. */
+  /* Zafer şöleni: seçilen kazanma efektine yönlendirir. */
   function victory() {
     init();
     if (reducedMotion()) {
       flash("cross");
       return;
     }
+    if (fxPack.win === "fireworks") { victoryFireworks(); return; }
+    if (fxPack.win === "stars") { victoryStars(); return; }
+    if (fxPack.win === "bubbles") { victoryBubbles(); return; }
+    victoryConfetti();
+  }
+
+  /* Konfeti: dört dalga konfeti, alt köşelerden altın kıvılcımlar,
+     merkezden yayılan halkalar, ışık huzmeleri ve yıldız parıltıları. */
+  function victoryConfetti() {
     var width = window.innerWidth;
     var height = window.innerHeight;
     var palette = [
@@ -430,6 +541,164 @@
       shockwave(width / 2, height * 0.36, "paper", 8, Math.min(width, height) * 0.55, 0.75);
     }, 260);
     rays(width / 2, height * 0.4);
+    flash("cross");
+  }
+
+  /* Havai fişek: gökyüzünde sırayla patlayan renkli halkalar ve ışık
+     çizgileri; her patlamada kısa bir şok dalgası yayılır. */
+  function victoryFireworks() {
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    var palette = [
+      COLORS.coral, COLORS.mustard, COLORS.mint, COLORS.sky, COLORS.grape,
+      COLORS.rose, COLORS.lime, COLORS.teal, COLORS.paper
+    ];
+    var spots = [
+      [0.22, 0.24, 0], [0.66, 0.18, 230], [0.42, 0.42, 470],
+      [0.82, 0.36, 700], [0.16, 0.48, 930], [0.56, 0.28, 1160]
+    ];
+    spots.forEach(function (spot) {
+      setTimeout(function () {
+        var cx = width * spot[0];
+        var cy = height * spot[1];
+        var hue = palette[Math.floor(Math.random() * palette.length)];
+        var sparks = 26 + Math.floor(Math.random() * 14);
+        for (var i = 0; i < sparks; i++) {
+          var angle = (Math.PI * 2 * i) / sparks + Math.random() * 0.12;
+          var speed = 110 + Math.random() * 240;
+          var life = 0.85 + Math.random() * 0.75;
+          spawn({
+            x: cx, y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            gravity: 130,
+            size: 2.2 + Math.random() * 2.4,
+            color: Math.random() < 0.78 ? hue : COLORS.paper,
+            life: life, maxLife: life,
+            streak: true,
+            glow: true,
+            drag: 0.952
+          });
+        }
+        shockwave(cx, cy, hue, 6, Math.min(width, height) * 0.24, 0.62);
+        flash("cross");
+      }, spot[2]);
+    });
+    /* Gökyüzüne yükselen roket izleri. */
+    for (var r = 0; r < 5; r++) {
+      var life = 0.7 + Math.random() * 0.4;
+      spawn({
+        x: width * (0.15 + Math.random() * 0.7),
+        y: height * 0.9,
+        vx: (Math.random() - 0.5) * 60,
+        vy: -(520 + Math.random() * 260),
+        gravity: 220,
+        size: 2.4,
+        color: COLORS.paper,
+        life: life, maxLife: life,
+        streak: true,
+        glow: true,
+        drag: 0.99,
+        delay: r * 0.12
+      });
+    }
+  }
+
+  /* Yıldız: ekranın dört bir yanında parıldayan yıldızlar ve merkezden
+     yayılan altın ışık. */
+  function victoryStars() {
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    var palette = [COLORS.mustard, "#fff3c4", COLORS.paper, COLORS.sky, COLORS.rose];
+    for (var i = 0; i < 34; i++) {
+      var life = 1.2 + Math.random() * 1.1;
+      spawn({
+        x: width * (0.06 + Math.random() * 0.88),
+        y: height * (0.08 + Math.random() * 0.62),
+        vx: (Math.random() - 0.5) * 34,
+        vy: -(8 + Math.random() * 46),
+        gravity: -14,
+        size: 9 + Math.random() * 16,
+        color: palette[Math.floor(Math.random() * palette.length)],
+        life: life, maxLife: life,
+        star: true,
+        glow: true,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 1.8,
+        drag: 0.994,
+        delay: Math.random() * 0.55
+      });
+    }
+    /* Merkezde büyüyen altın yıldız ve halkalar. */
+    spawn({
+      x: width / 2, y: height * 0.36,
+      vx: 0, vy: 0,
+      gravity: 0,
+      size: Math.min(width, height) * 0.3,
+      color: COLORS.mustard,
+      life: 1.05, maxLife: 1.05,
+      star: true,
+      glow: true,
+      rot: 0,
+      vr: 0.7,
+      drag: 1
+    });
+    shockwave(width / 2, height * 0.36, "mustard", 18, Math.min(width, height) * 0.62, 0.8);
+    shockwave(width / 2, height * 0.36, "paper", 8, Math.min(width, height) * 0.45, 0.66);
+    rays(width / 2, height * 0.38);
+    flash("cross");
+  }
+
+  /* Baloncuk: alttan yükselen renkli kabarcıklar; bir kısmı havada
+     patlayarak küçük damlalar bırakır. */
+  function victoryBubbles() {
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    var palette = ["#8fd0ff", "#bfe4ff", "#f7a8d4", "#a7e8c4", "#ffe3a3", "#d7c4ff"];
+    for (var i = 0; i < 40; i++) {
+      var life = 1.4 + Math.random() * 1.4;
+      var size = 12 + Math.random() * 34;
+      spawn({
+        x: width * (0.05 + Math.random() * 0.9),
+        y: height * (0.85 + Math.random() * 0.2),
+        vx: (Math.random() - 0.5) * 50,
+        vy: -(90 + Math.random() * 150),
+        gravity: -26,
+        size: size,
+        color: palette[Math.floor(Math.random() * palette.length)],
+        life: life, maxLife: life,
+        bubble: true,
+        wobble: 1.2 + Math.random() * 2.2,
+        phase: Math.random() * Math.PI * 2,
+        drag: 0.996,
+        delay: Math.random() * 0.9
+      });
+    }
+    /* Havada patlayan birkaç baloncuk: çevresine küçük damlalar saçılır. */
+    [0.28, 0.52, 0.74].forEach(function (at, index) {
+      setTimeout(function () {
+        var bx = width * at;
+        var by = height * (0.3 + Math.random() * 0.2);
+        for (var d = 0; d < 12; d++) {
+          var angle = Math.random() * Math.PI * 2;
+          var speed = 60 + Math.random() * 160;
+          var life = 0.4 + Math.random() * 0.4;
+          spawn({
+            x: bx, y: by,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            gravity: 260,
+            size: 2.5 + Math.random() * 3,
+            color: "#ffffff",
+            life: life, maxLife: life,
+            round: true,
+            glow: true,
+            drag: 0.96
+          });
+        }
+        shockwave(bx, by, "#bfe4ff", 4, 70, 0.42);
+      }, 420 + index * 340);
+    });
     flash("cross");
   }
 
@@ -524,6 +793,71 @@
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius * 0.68, 0, Math.PI * 2);
         ctx.stroke();
+        continue;
+      }
+      if (p.bubble) {
+        var radius = p.size * 0.5;
+        ctx.save();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.6;
+        ctx.globalAlpha = fade * 0.85;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = fade * 0.18;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius * 0.94, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = fade * 0.7;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(p.x - radius * 0.34, p.y - radius * 0.36, Math.max(1, radius * 0.22), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      if (p.star) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.fillStyle = p.color;
+        if (p.glow) {
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = Math.min(30, p.size * 1.6);
+        }
+        var outer = p.size * 0.5;
+        var inner = outer * 0.44;
+        ctx.beginPath();
+        for (var s = 0; s < 10; s++) {
+          var rad = s % 2 ? inner : outer;
+          var ang = (Math.PI * 2 * s) / 10 - Math.PI / 2;
+          if (s === 0) ctx.moveTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+          else ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      if (p.streak) {
+        var speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+        var len = Math.max(p.size, Math.min(30, speed * 0.045));
+        var ux = speed > 0.01 ? p.vx / speed : 0;
+        var uy = speed > 0.01 ? p.vy / speed : 0;
+        ctx.save();
+        ctx.strokeStyle = p.color;
+        ctx.lineCap = "round";
+        ctx.lineWidth = p.size;
+        if (p.glow) {
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = Math.min(22, p.size * 3);
+        }
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - ux * len, p.y - uy * len);
+        ctx.stroke();
+        ctx.restore();
         continue;
       }
       ctx.fillStyle = p.color;
@@ -644,6 +978,7 @@
     clearBurst: clearBurst,
     setTheme: setTheme,
     setUnlocks: setUnlocks,
+    setFxPack: setFxPack,
     victory: victory,
     rays: rays,
     defeat: defeat,

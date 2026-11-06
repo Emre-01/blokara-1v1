@@ -117,7 +117,7 @@ const PANE_OVERFLOW = `(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const sheet = document.querySelector('.sheet');
   const out = {};
-  for (const name of ['theme', 'emote', 'store']) {
+  for (const name of ['theme', 'emote', 'fx', 'avatar']) {
     document.querySelector('[data-profile-tab="' + name + '"]').click();
     await sleep(140);
     out[name] = Math.max(0, sheet.scrollHeight - sheet.clientHeight);
@@ -219,17 +219,17 @@ async function main() {
     bodyOverflow: document.body.style.overflow
   })`);
   ok("avatar menüyü açıyor", opened.open === true, opened);
-  ok("menüde üç sekme var", opened.tabs.join(",") === "theme,emote,store", opened.tabs);
+  ok("menüde dört sekme var", opened.tabs.join(",") === "theme,emote,fx,avatar", opened.tabs);
   ok("tek sekme seçili", opened.selected.length === 1 && opened.selected[0] === "theme", opened.selected);
-  ok("üç bölüm var", opened.panes.join(",") === "theme,emote,store", opened.panes);
+  ok("dört bölüm var", opened.panes.join(",") === "theme,emote,fx,avatar", opened.panes);
   ok("menü açıkken sayfa kilitli", opened.bodyOverflow === "hidden", opened.bodyOverflow);
 
   /* ---- sekmeler ---- */
   const switched = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    document.querySelector('[data-profile-tab="store"]').click();
+    document.querySelector('[data-profile-tab="fx"]').click();
     await sleep(150);
-    const tab = document.querySelector('[data-profile-tab="store"]');
+    const tab = document.querySelector('[data-profile-tab="fx"]');
     return {
       selected: tab.getAttribute('aria-selected'),
       active: tab.classList.contains('is-active'),
@@ -238,7 +238,7 @@ async function main() {
     };
   })()`);
   ok("sekmeye basınca seçim değişiyor", switched.selected === "true" && switched.active, switched);
-  ok("yalnızca seçili bölüm görünüyor", switched.visible.join(",") === "store", switched.visible);
+  ok("yalnızca seçili bölüm görünüyor", switched.visible.join(",") === "fx", switched.visible);
 
   const keys = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -305,21 +305,97 @@ async function main() {
   ok("emote seçince balon canlanıyor", emotes.bubble === 1, emotes.bubble);
   ok("emote ekran okuyucuya duyuruluyor", !!emotes.status, emotes.status);
 
-  /* ---- mağaza ---- */
-  const store = await page.evaluate(`(async () => {
+  /* ---- efekt seçimi ---- */
+  const fx = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    document.querySelector('[data-profile-tab="store"]').click();
+    document.querySelector('[data-profile-tab="fx"]').click();
     await sleep(150);
-    const buttons = [...document.querySelectorAll('[data-reward-coins]')];
+    const burst = [...document.querySelectorAll('[data-fx-kind="burst"]')];
+    const win = [...document.querySelectorAll('[data-fx-kind="win"]')];
+    const burstIds = burst.map((b) => b.dataset.fxPick);
+    const winIds = win.map((b) => b.dataset.fxPick);
+    /* Seçim bölümü yerinde tazelediği için her tıklamadan sonra yeniden sorgula. */
+    burst[2].click();
+    await sleep(200);
+    document.querySelector('[data-fx-kind="win"][data-fx-pick="fireworks"]').click();
+    await sleep(250);
     return {
-      offers: buttons.map((b) => Number(b.dataset.rewardCoins)),
-      disabled: buttons.every((b) => b.disabled),
-      notes: [...document.querySelectorAll('[data-profile-pane="store"] .profile-note')].map((n) => n.textContent)
+      burstIds,
+      winIds,
+      activeBurst: [...document.querySelectorAll('[data-fx-kind="burst"][aria-pressed="true"]')]
+        .map((b) => b.dataset.fxPick),
+      activeWin: [...document.querySelectorAll('[data-fx-kind="win"][aria-pressed="true"]')]
+        .map((b) => b.dataset.fxPick),
+      groups: [...document.querySelectorAll('[data-profile-pane="fx"] .fx-group-title')]
+        .map((t) => t.textContent),
+      saved: JSON.parse(localStorage.getItem('blokara.fx') || 'null')
     };
   })()`);
-  ok("iki reklam teklifi var", store.offers.join(",") === "80,200", store.offers);
-  ok("reklam köprüsü yokken teklifler kapalı", store.disabled === true, store.disabled);
-  ok("hazır değil açıklaması gösteriliyor", store.notes.some((n) => /hazır değil|ready|bereit/i.test(n)), store.notes);
+  ok("dört patlama efekti var", fx.burstIds.join(",") === "classic,pixel,bubble,spark", fx.burstIds);
+  ok("dört kazanma efekti var", fx.winIds.join(",") === "confetti,fireworks,stars,bubbles", fx.winIds);
+  ok("seçilen efekt işaretleniyor",
+    fx.activeBurst.join(",") === "bubble" && fx.activeWin.join(",") === "fireworks", fx);
+  ok("efekt seçimi kalıcı kaydediliyor",
+    !!fx.saved && fx.saved.burst === "bubble" && fx.saved.win === "fireworks", fx.saved);
+  ok("efektler iki gruba ayrılmış", fx.groups.length === 2, fx.groups);
+
+  /* ---- hazır avatar galerisi ---- */
+  const gallery = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('[data-profile-tab="avatar"]').click();
+    await sleep(150);
+    const picks = [...document.querySelectorAll('[data-avatar-pick]')];
+    const arts = picks.map((p) => p.querySelector('.avatar-pick-art').style.backgroundImage);
+    const count = picks.length;
+    picks[3].click();
+    await sleep(250);
+    const avatarEl = document.getElementById('account-avatar');
+    return {
+      count,
+      allArt: arts.every((a) => /^url\\("data:image\\/svg\\+xml/.test(a)),
+      active: [...document.querySelectorAll('[data-avatar-pick][aria-pressed="true"]')]
+        .map((p) => p.dataset.avatarPick),
+      saved: localStorage.getItem('blokara.avatar'),
+      topbarPhoto: avatarEl.classList.contains('has-photo'),
+      topbarImage: avatarEl.style.backgroundImage,
+      hasReset: !!document.querySelector('[data-avatar-reset]'),
+      photoInput: !!document.getElementById('photo-input'),
+      fileInputs: document.querySelectorAll('input[type="file"]').length
+    };
+  })()`);
+  ok("galeride on iki hazır avatar var", gallery.count === 12, gallery.count);
+  ok("her avatar yerleşik SVG olarak üretiliyor", gallery.allArt === true, gallery.allArt);
+  ok("avatar seçimi işaretleniyor", gallery.active.join(",") === "cat", gallery.active);
+  ok("avatar seçimi kalıcı kaydediliyor", gallery.saved === "cat", gallery.saved);
+  ok("seçilen avatar üst barda görünüyor",
+    gallery.topbarPhoto === true && /data:image/.test(gallery.topbarImage), gallery);
+  ok("fotoğraf dosyası seçimi kaldırıldı",
+    gallery.photoInput === false && gallery.fileInputs === 0, gallery);
+
+  const avatarReset = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('[data-avatar-reset]').click();
+    await sleep(250);
+    return {
+      saved: localStorage.getItem('blokara.avatar'),
+      active: [...document.querySelectorAll('[data-avatar-pick][aria-pressed="true"]')].length,
+      resetGone: !document.querySelector('[data-avatar-reset]'),
+      topbarPhoto: document.getElementById('account-avatar').classList.contains('has-photo')
+    };
+  })()`);
+  ok("avatar kaldırılabiliyor",
+    avatarReset.saved === null && avatarReset.active === 0 && avatarReset.resetGone === true, avatarReset);
+  ok("avatar kaldırılınca üst bar baş harfe dönüyor", avatarReset.topbarPhoto === false, avatarReset);
+
+  const removedUi = await page.evaluate(`({
+    storePane: !!document.querySelector('[data-profile-pane="store"]'),
+    storeTab: !!document.querySelector('[data-profile-tab="store"]'),
+    coin: !!document.getElementById('stat-coins'),
+    coinText: /\\bcoin\\b/i.test(document.querySelector('.sheet').innerText)
+  })`);
+  ok("mağaza sekmesi ve bölümü kaldırıldı",
+    removedUi.storePane === false && removedUi.storeTab === false, removedUi);
+  ok("menüde coin ifadesi kalmadı", removedUi.coin === false && removedUi.coinText === false, removedUi);
 
   /* ---- reklamları kaldır: üst barda, ikonların yanında ---- */
   const adFreePlacement = await page.evaluate(`(() => {
@@ -421,24 +497,8 @@ async function main() {
   ok("reklamsız durum yeniden açılışta da geçerli",
     persistsFree.hidden === true && persistsFree.free === true, persistsFree);
 
-  /* Satın alma sonrası mağaza sekmesi durumu yansıtmalı. */
-  const storeAfterBuy = await page.evaluate(`(async () => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    document.getElementById('account-avatar').click();
-    await sleep(250);
-    document.querySelector('[data-profile-tab="store"]').click();
-    await sleep(150);
-    const notes = [...document.querySelectorAll('[data-profile-pane="store"] .profile-note')].map((n) => n.textContent);
-    return {
-      buyButton: !!document.querySelector('[data-profile-pane="store"] [data-buy-ads]'),
-      thanks: notes.some((n) => /kaldırıldı|removed|entfernt/i.test(n))
-    };
-  })()`);
-  ok("satın alma sonrası mağazada satın alma düğmesi yok", storeAfterBuy.buyButton === false, storeAfterBuy);
-  ok("mağaza reklamların kalktığını söylüyor", storeAfterBuy.thanks === true, storeAfterBuy);
-  await page.evaluate(`document.querySelector('[data-profile-tab="theme"]').click(); new Promise(r => setTimeout(r, 150))`);
-
   /* ---- taşma yok ---- */
+  await page.evaluate(`document.getElementById('account-avatar').click(); new Promise(r => setTimeout(r, 250))`);
   const big = await page.evaluate(PANE_OVERFLOW);
   ok("412×915 hiçbir sekmede taşma yok", Object.keys(big).every((k) => big[k] === 0), big);
 
@@ -494,7 +554,7 @@ async function main() {
       close: document.querySelector('.sheet-actions [data-close]').textContent
     };
   })()`);
-  ok("sekmeler Almancaya çevriliyor", german.tabs.join(",") === "Design,Ausdruck,Shop", german.tabs);
+  ok("sekmeler Almancaya çevriliyor", german.tabs.join(",") === "Design,Ausdruck,Effekte,Avatar", german.tabs);
   ok("tema adları Almancaya çevriliyor", german.themes.indexOf("Werkstatt") === 0, german.themes);
   ok("kapat düğmesi Almancaya çevriliyor", german.close === "Schließen", german.close);
 

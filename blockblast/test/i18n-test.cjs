@@ -57,6 +57,24 @@ for (const text of texts) {
 const untranslated = langs.filter((lang) => data[lang]["Çevrimiçi"] === "Çevrimiçi");
 if (untranslated.length) problems.push("'Çevrimiçi' çevrilmemiş: " + untranslated.join(", "));
 
+/* 4) JS'te üretilen menü metinleri de her dilde bulunmalı: profil
+   sekmeleri, efektler ve hazır avatar adları HTML'de geçmez. */
+const dynamic = [
+  "Efektler", "Avatar", "Klasik", "Piksel", "Baloncuk", "Kıvılcım",
+  "Konfeti", "Havai fişek", "Yıldız", "Kutu patlama efekti", "Kazanma efekti",
+  "Avatar seç", "Avatarı kaldır", "Avatar seçildi.", "Avatar kaldırıldı.",
+  "Tilki", "Panda", "Kurbağa", "Kedi", "Ayı", "Penguen", "Aslan", "Tavşan",
+  "Robot", "Uzaylı", "Kral", "Havalı"
+];
+for (const key of dynamic) {
+  if (!(key in base)) {
+    problems.push("Dinamik menü anahtarı sözlükte yok: " + JSON.stringify(key));
+    continue;
+  }
+  const missing = langs.filter((lang) => !(key in data[lang]));
+  if (missing.length) problems.push(JSON.stringify(key) + " " + missing.length + " dilde eksik");
+}
+
 if (problems.length) {
   problems.slice(0, 25).forEach((p) => console.error("✗ " + p));
   console.error("Çeviri testi başarısız (" + problems.length + " sorun).");

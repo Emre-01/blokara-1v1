@@ -32,7 +32,7 @@ ids.forEach((id) => {
 
 // app.js'in aradığı kritik düğümler (bazıları render sırasında üretilir)
 const app = fs.readFileSync(path.join(publicDir, "app.js"), "utf8");
-const generated = new Set(["time-left", "tray", "board-shared", "board-me", "board-0", "board-1", "board-rival", "duel-turn", "turn-note", "lobby-slots", "name-edit-input", "friend-code-input", "friend-add-form", "friend-list", "duel-stage", "emote-btn", "photo-input"]);
+const generated = new Set(["time-left", "tray", "board-shared", "board-me", "board-0", "board-1", "board-rival", "duel-turn", "turn-note", "lobby-slots", "name-edit-input", "friend-code-input", "friend-add-form", "friend-list", "duel-stage", "emote-btn"]);
 const required = [...app.matchAll(/\$\("#([a-z0-9-]+)"\)/gi)].map((m) => m[1]);
 [...new Set(required)].forEach((id) => {
   if (generated.has(id)) return;

@@ -25,11 +25,11 @@
       overlayOpen: !overlay.hidden,
       overlayText: document.querySelector(".sheet").innerText.replace(/\n+/g, " | ").slice(0, 700),
       profile: {
-        xp: profile.xp, coins: profile.coins, games: profile.games,
+        xp: profile.xp, games: profile.games,
         wins: profile.wins, best: profile.best, bestAny: profile.bestAny
       },
       levelGone: !document.getElementById("level-num") && !document.getElementById("level-badge"),
-      homeCoins: document.getElementById("stat-coins").textContent
+      homeBest: document.getElementById("stat-best").textContent
     };
   })();
 })();
