@@ -29,7 +29,7 @@ const JOIN_FAIL_LIMIT = Number(process.env.JOIN_FAIL_LIMIT) || 12;
 
 /* Oyuncuların birbirine gönderebildiği dört emote (istemcideki listeyle
    aynı). Sıra: gülme, alkış, ağlama, kızma. */
-const EMOTES = ["laugh", "clap", "cry", "angry"];
+const EMOTES = ["laugh", "clap", "cry", "angry", "love", "cool"];
 const EMOTE_MIN_MS = 700;
 
 /* WebSocket kaynağı: tarayıcılar Origin gönderir, Android WebView

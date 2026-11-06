@@ -1,33 +1,11 @@
-/* Blokara 1v1 — yerel ilerleme: XP, seviye, coin, rekorlar, başarımlar, günlük seri.
-   Tamamen localStorage üzerinde çalışır; APK çevrimdışıyken de işler. */
+/* Blokara 1v1 — yerel ilerleme: XP, seviye, coin, rekorlar, günlük seri.
+   Tamamen localStorage üzerinde çalışır; APK çevrimdışıyken de işler.
+   Reklamla açılan içerikler `unlocks` haritasında tutulur. */
 (function (root) {
   "use strict";
 
   var KEY = "blokiki.profile.v1";
   var DAY = 24 * 60 * 60 * 1000;
-
-  var ACHIEVEMENTS = [
-    { id: "ilk-oyun", title: "İlk Adım", desc: "İlk oyununu bitir.", goal: 1, reward: 20,
-      metric: function (p) { return p.games; }, value: function (p) { return p.games + " oyun"; } },
-    { id: "satir-50", title: "Satır Ustası", desc: "Toplam 50 satır patlat.", goal: 50, reward: 40,
-      metric: function (p) { return p.totalLines; }, value: function (p) { return p.totalLines + " satır"; } },
-    { id: "satir-250", title: "Tahta Temizleyici", desc: "Toplam 250 satır patlat.", goal: 250, reward: 90,
-      metric: function (p) { return p.totalLines; }, value: function (p) { return p.totalLines + " satır"; } },
-    { id: "combo-3", title: "Combo Kralı", desc: "×3 combo yap.", goal: 3, reward: 30,
-      metric: function (p) { return p.maxCombo; }, value: function (p) { return "en iyi ×" + p.maxCombo; } },
-    { id: "combo-5", title: "Zincir Tepkimesi", desc: "×5 combo yap.", goal: 5, reward: 70,
-      metric: function (p) { return p.maxCombo; }, value: function (p) { return "en iyi ×" + p.maxCombo; } },
-    { id: "galibiyet-5", title: "Rakip Korkusu", desc: "5 maç kazan.", goal: 5, reward: 60,
-      metric: function (p) { return p.wins; }, value: function (p) { return p.wins + " galibiyet"; } },
-    { id: "seri-3", title: "Seri Galip", desc: "3 maç üst üste kazan.", goal: 3, reward: 80,
-      metric: function (p) { return p.bestWinStreak; }, value: function (p) { return "en iyi " + p.bestWinStreak + " seri"; } },
-    { id: "skor-1000", title: "Binlik", desc: "Bir turda 1000 puan topla.", goal: 1000, reward: 50,
-      metric: function (p) { return p.bestAny; }, value: function (p) { return p.bestAny + " puan"; } },
-    { id: "skor-3000", title: "Üç Bin", desc: "Bir turda 3000 puan topla.", goal: 3000, reward: 120,
-      metric: function (p) { return p.bestAny; }, value: function (p) { return p.bestAny + " puan"; } },
-    { id: "blok-500", title: "Blok Terzisi", desc: "Toplam 500 blok yerleştir.", goal: 500, reward: 100,
-      metric: function (p) { return p.totalBlocks; }, value: function (p) { return p.totalBlocks + " blok"; } }
-  ];
 
   function defaults() {
     return {
@@ -48,6 +26,7 @@
       dailyLast: "",
       dailyBest: 0,
       unlocked: {},
+      unlocks: {},
       muted: false,
       vibrate: true,
       timeMode: "shared",
@@ -68,6 +47,7 @@
       if (typeof data.best[key] !== "number") data.best[key] = 0;
     });
     if (!data.unlocked || typeof data.unlocked !== "object") data.unlocked = {};
+    if (!data.unlocks || typeof data.unlocks !== "object") data.unlocks = {};
     return data;
   }
 
@@ -138,20 +118,6 @@
     }
   }
 
-  function checkAchievements(profile) {
-    var unlocked = [];
-    ACHIEVEMENTS.forEach(function (item) {
-      if (profile.unlocked[item.id]) return;
-      if (item.metric(profile) >= item.goal) {
-        profile.unlocked[item.id] = Date.now();
-        profile.coins += item.reward;
-        profile.xp += Math.round(item.reward / 2);
-        unlocked.push(item);
-      }
-    });
-    return unlocked;
-  }
-
   function emptyReward() {
     return {
       xp: 0, coins: 0, levelBefore: 1, levelAfter: 1, levelUp: false,
@@ -210,7 +176,8 @@
     profile.xp += reward.xp;
     profile.coins += reward.coins;
 
-    reward.unlocked = checkAchievements(profile);
+    /* Başarım ödülü yok; alan eski çağıranlarla uyum için boş kalır. */
+    reward.unlocked = [];
     reward.levelAfter = levelInfo(profile.xp).level;
     reward.levelUp = reward.levelAfter > reward.levelBefore;
 
@@ -225,7 +192,6 @@
 
   root.BlokProgress = {
     KEY: KEY,
-    ACHIEVEMENTS: ACHIEVEMENTS,
     defaults: defaults,
     load: load,
     save: save,

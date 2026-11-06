@@ -208,8 +208,13 @@ async function main() {
   const themes = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const picks = [...document.querySelectorAll('[data-theme-pick]')];
-    const out = { count: picks.length, applied: {}, saved: null, meta: null, attr: null };
+    const out = {
+      count: picks.length,
+      locked: picks.filter((p) => p.classList.contains('is-locked')).map((p) => p.dataset.themePick),
+      applied: {}, saved: null, meta: null, attr: null
+    };
     for (const pick of picks) {
+      if (pick.classList.contains('is-locked')) continue;
       pick.click();
       await sleep(400);
       out.applied[pick.dataset.themePick] = getComputedStyle(document.body).backgroundColor;
@@ -219,9 +224,10 @@ async function main() {
     out.meta = document.querySelector('meta[name="theme-color"]').content;
     return out;
   })()`);
-  ok("dört tema var", themes.count === 4, themes.count);
+  ok("altı tema var", themes.count === 6, themes.count);
+  ok("reklamla açılan iki tema kilitli", themes.locked.join(",") === "autumn,cotton", themes.locked);
   const colors = Object.keys(themes.applied).map((k) => themes.applied[k]);
-  ok("her tema farklı zemin rengi veriyor", new Set(colors).size === 4, themes.applied);
+  ok("açık temaların her biri farklı zemin rengi veriyor", new Set(colors).size === 4, themes.applied);
   ok("seçim html üzerine yazılıyor", themes.attr === "sunset", themes.attr);
   ok("seçim kalıcı kaydediliyor", themes.saved === "sunset", themes.saved);
   ok("tarayıcı çubuğu rengi güncelleniyor", /^#[0-9A-F]{6}$/i.test(themes.meta), themes.meta);
@@ -232,16 +238,19 @@ async function main() {
     document.querySelector('[data-profile-tab="emote"]').click();
     await sleep(150);
     const chips = [...document.querySelectorAll('[data-profile-emote]')];
+    const locked = [...document.querySelectorAll('[data-emote-unlock]')];
     chips[0].click();
     await sleep(180);
     return {
       count: chips.length,
+      locked: locked.length,
       names: chips.map((c) => c.querySelector('.profile-emote-name').textContent),
       bubble: document.querySelectorAll('#emote-layer .emote-bubble').length,
       status: document.getElementById('emote-status').textContent
     };
   })()`);
-  ok("dört emote önizlemesi var", emotes.count === 4, emotes.count);
+  ok("dört açık emote önizlemesi var", emotes.count === 4, emotes.count);
+  ok("iki emote reklamla açılıyor", emotes.locked === 2, emotes.locked);
   ok("emote adları dolu", emotes.names.every((n) => !!n.trim()), emotes.names);
   ok("emote seçince balon canlanıyor", emotes.bubble === 1, emotes.bubble);
   ok("emote ekran okuyucuya duyuruluyor", !!emotes.status, emotes.status);

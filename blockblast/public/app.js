@@ -17,6 +17,7 @@
   var LS_FRIENDS = "blokara.friends";
   var LS_ADS_FREE = "blokara.adsFree";
   var LS_THEME = "blokara.theme";
+  var LS_PHOTO = "blokara.photo";
   var SS_ACTIVE = "blokiki.activeRoom";
   var MAX_RECONNECT = 6;
 
@@ -27,22 +28,40 @@
     turn: { min: 10, max: 120, step: 5, def: 30 }
   };
 
-  /* Herkese açık dört emote. Sunucudaki liste ile aynı olmalı. */
-  var EMOTES = ["laugh", "clap", "cry", "angry"];
-  var EMOTE_LABELS = { laugh: "Gülme", clap: "Alkış", cry: "Ağlama", angry: "Kızma" };
+  /* Herkese açık dört emote ve reklamla açılan iki emote. Sunucudaki
+     liste ile aynı olmalı. */
+  var EMOTES = ["laugh", "clap", "cry", "angry", "love", "cool"];
+  var PUBLIC_EMOTES = ["laugh", "clap", "cry", "angry"];
+  var EMOTE_LABELS = {
+    laugh: "Gülme", clap: "Alkış", cry: "Ağlama", angry: "Kızma",
+    love: "Sevgi", cool: "Havalı"
+  };
 
   /* Profilden seçilen renk teması. Renkler styles.css içinde
-     html[data-theme="…"] bloklarında tanımlıdır. */
+     html[data-theme="…"] bloklarında tanımlıdır. Yeni temalar reklam
+     izleyerek açılır. */
   var THEMES = [
     { id: "workshop", name: "Atölye", meta: "#F3EAD8", swatch: ["#f3ead8", "#f2553d", "#f4b72a"] },
     { id: "mint", name: "Nane", meta: "#E2F5EB", swatch: ["#e2f5eb", "#2da98d", "#f4b72a"] },
     { id: "ocean", name: "Okyanus", meta: "#E2ECF9", swatch: ["#e2ecf9", "#2f55e8", "#23c3b0"] },
-    { id: "sunset", name: "Gün Batımı", meta: "#FBE7D8", swatch: ["#fbe7d8", "#e8485b", "#f4a12a"] }
+    { id: "sunset", name: "Gün Batımı", meta: "#FBE7D8", swatch: ["#fbe7d8", "#e8485b", "#f4a12a"] },
+    { id: "autumn", name: "Sonbahar", meta: "#F4E3C8", swatch: ["#f4e3c8", "#c9662f", "#7c4a2d"], unlock: "theme:autumn" },
+    { id: "cotton", name: "Pamuk Şeker", meta: "#FCE4F1", swatch: ["#fce4f1", "#ef79b9", "#8fd6f2"], unlock: "theme:cotton" }
   ];
   var PROFILE_TABS = [
     { id: "theme", label: "Tema" },
     { id: "emote", label: "Emote" },
     { id: "store", label: "Mağaza" }
+  ];
+
+  /* Reklam izleyerek açılan içerikler. */
+  var STORE_ITEMS = [
+    { id: "theme:autumn", kind: "theme", name: "Sonbahar", desc: "Yaprak efektleri ve sıcak toprak tonları." },
+    { id: "theme:cotton", kind: "theme", name: "Pamuk Şeker", desc: "Pembe döşemeler ve şeker bulutları." },
+    { id: "emote:love", kind: "emote", name: "Sevgi", desc: "Kalp gözlü, uçuşan kalpli emote." },
+    { id: "emote:cool", kind: "emote", name: "Havalı", desc: "Güneş gözlüklü, kendinden emin emote." },
+    { id: "fx:gold", kind: "fx", name: "Altın Patlama", desc: "Satır patlamalarında altın kıvılcım." },
+    { id: "fx:confetti", kind: "fx", name: "Konfeti Yağmuru", desc: "Her temizlikte renkli konfeti." }
   ];
 
   function clampLimit(kind, value) {
@@ -114,7 +133,11 @@
     lastEmoteAt: 0,
     profileTab: "theme",
     profileOpen: false,
-    theme: "workshop"
+    theme: "workshop",
+    setupDraft: null,
+    pendingRoomSettings: null,
+    pendingUnlock: null,
+    lastUnlockAt: 0
   };
 
   /* ------------------------------------------------------------------ */
@@ -483,6 +506,27 @@
       setTimeout(function () { tone(freq, 0.12, { type: "triangle", volume: 0.05 }); }, index * 80);
     });
   }
+  function sfxUnlock() {
+    noiseBurst(0.12, 0.04, 3600);
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach(function (freq, index) {
+      setTimeout(function () {
+        tone(freq, 0.22, { type: "triangle", volume: 0.055, pan: -0.4 + index * 0.2 });
+      }, index * 70);
+    });
+    setTimeout(function () { tone(1567.98, 0.3, { type: "sine", volume: 0.03 }); }, 420);
+  }
+
+  /* Ekran/tahta değişiminde yumuşak bir geçiş vınlaması. */
+  function sfxWhoosh() {
+    noiseSweep(0.26, 0.035, 480, 2600, -0.8, 0.8);
+    tone(196, 0.18, { type: "sine", to: 392, volume: 0.03 });
+  }
+
+  /* Düğme ve menü dokunuşu: kısa, tok bir tık. */
+  function sfxTap() {
+    tone(880, 0.045, { type: "triangle", volume: 0.03 });
+    tone(440, 0.06, { type: "sine", volume: 0.018 });
+  }
 
   /* Emote sesleri: her ifadenin karakteri duyulur. Gülme kısa kahkaha
      heceleri, alkış üç net el çırpma, ağlama alçalan sızlanma, kızma
@@ -514,6 +558,33 @@
         tone(610, 0.5, { type: "triangle", to: 290, volume: 0.032, attack: 0.05, pan: -0.15 });
       }, 230);
       noiseSweep(0.42, 0.022, 1700, 420, 0.4, -0.35);
+      return;
+    }
+    if (kind === "love") {
+      /* Sevgi: yükselen yumuşak arpej ve kalp atışı gibi iki pes vuruş. */
+      [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, index) {
+        setTimeout(function () {
+          tone(freq, 0.2, { type: "sine", volume: 0.045, pan: -0.35 + index * 0.22 });
+          tone(freq * 2, 0.16, { type: "triangle", volume: 0.015, pan: -0.35 + index * 0.22 });
+        }, index * 75);
+      });
+      [0, 220].forEach(function (delay) {
+        setTimeout(function () {
+          tone(88, 0.14, { type: "sine", slide: -18, volume: 0.05 });
+        }, delay);
+      });
+      return;
+    }
+    if (kind === "cool") {
+      /* Havalı: kısa bas riff, parlak dörtlü ve tokat gibi bir vurgu. */
+      noiseBurst(0.05, 0.055, 5200);
+      tone(196, 0.16, { type: "square", volume: 0.045, slide: 40 });
+      [392, 523.25, 659.25].forEach(function (freq, index) {
+        setTimeout(function () {
+          tone(freq, 0.12, { type: "triangle", volume: 0.04, pan: 0.3 - index * 0.25 });
+        }, 70 + index * 55);
+      });
+      setTimeout(function () { tone(130.81, 0.22, { type: "sawtooth", slide: -30, volume: 0.035 }); }, 180);
       return;
     }
     /* Kızma: pes homurtu, kısa buhar ve diş gıcırtısı. */
@@ -581,7 +652,6 @@
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
     applyNativeInsetsSoon();
-    applyTheme(currentTheme(), { silent: true });
 
     var savedName = read(LS_NAME);
     var nameInput = $("#player-name");
@@ -603,7 +673,13 @@
     } else {
       app.profile = null;
     }
-    if (FX) FX.init();
+    /* Tema kilidi profile bağlı; profil yüklendikten sonra uygula. */
+    applyTheme(currentTheme(), { silent: true });
+    renderAvatar();
+    if (FX) {
+      FX.init();
+      if (typeof FX.setUnlocks === "function" && app.profile) FX.setUnlocks(app.profile.unlocks || {});
+    }
 
     initServerField();
     initHomeControls();
@@ -719,32 +795,48 @@
     return m + ":" + (s < 10 ? "0" : "") + s;
   }
 
+  function isUnlocked(key) {
+    if (!key) return true;
+    if (!app.profile) return false;
+    return !!(app.profile.unlocks && app.profile.unlocks[key]) ||
+      !!(app.profile.unlocked && app.profile.unlocked[key]);
+  }
+
+  function unlockContent(key) {
+    if (!key || !app.profile) return false;
+    if (!app.profile.unlocks || typeof app.profile.unlocks !== "object") app.profile.unlocks = {};
+    if (app.profile.unlocks[key]) return false;
+    app.profile.unlocks[key] = Date.now();
+    PROGRESS.save(app.profile);
+    if (FX && typeof FX.setUnlocks === "function") FX.setUnlocks(app.profile.unlocks);
+    return true;
+  }
+
+  function themeUnlocked(theme) {
+    return !theme.unlock || isUnlocked(theme.unlock);
+  }
+
   function currentTheme() {
     var saved = read(LS_THEME);
     var found = THEMES.filter(function (item) { return item.id === saved; })[0];
-    return found ? found.id : THEMES[0].id;
+    if (!found || !themeUnlocked(found)) return THEMES[0].id;
+    return found.id;
   }
 
   function applyTheme(id, options) {
     var theme = THEMES.filter(function (item) { return item.id === id; })[0] || THEMES[0];
+    if (!themeUnlocked(theme)) theme = THEMES[0];
     document.documentElement.setAttribute("data-theme", theme.id);
     var color = document.querySelector('meta[name="theme-color"]');
     if (color) color.setAttribute("content", theme.meta);
     save(LS_THEME, theme.id);
     app.theme = theme.id;
+    if (FX && typeof FX.setTheme === "function") FX.setTheme(theme.id);
     if (!options || !options.silent) {
       var pick = document.querySelector('[data-theme-pick="' + theme.id + '"]');
       if (pick) pick.focus({ preventScroll: true });
     }
     return theme.id;
-  }
-
-  function profileStats() {
-    var p = app.profile;
-    if (!p) return null;
-    var level = PROGRESS.levelInfo(p.xp);
-    var unlocked = Object.keys(p.unlocked || {}).length;
-    return { level: level, unlocked: unlocked, total: PROGRESS.ACHIEVEMENTS.length };
   }
 
   function renderHomeMeta() {
@@ -765,34 +857,9 @@
     var best = $("#stat-best");
     if (best) best.textContent = fmt(p.bestAny || 0);
 
-    renderAchievements();
+    updateEmoteAvailability();
     syncSetupButtons();
     updateMatchButton();
-  }
-
-  function renderAchievements() {
-    if (!PROGRESS || !app.profile) return;
-    var list = $("#ach-list");
-    if (!list) return;
-    var p = app.profile;
-    var html = "";
-    var unlockedCount = 0;
-    PROGRESS.ACHIEVEMENTS.forEach(function (item) {
-      var done = !!p.unlocked[item.id];
-      if (done) unlockedCount++;
-      var value = Math.min(item.goal, Math.max(0, item.metric(p)));
-      var pct = Math.round((value / item.goal) * 100);
-      html += '<div class="ach-item' + (done ? " done" : "") + '">' +
-        '<div class="ach-head"><b>' + item.title + '</b>' +
-        '<span>' + (done ? "alındı" : "+" + item.reward + " coin") + '</span></div>' +
-        '<p>' + item.desc + '</p>' +
-        '<div class="ach-progress"><i style="width:' + pct + '%"></i></div>' +
-        '<span class="tiny">' + item.value(p) + ' / ' + item.goal + '</span>' +
-        '</div>';
-    });
-    list.innerHTML = html;
-    var count = $("#ach-count");
-    if (count) count.textContent = unlockedCount + " / " + PROGRESS.ACHIEVEMENTS.length;
   }
 
   function saveSetupPrefs() {
@@ -818,55 +885,115 @@
   }
 
   function syncSetupButtons() {
-    $$("#local-pace button").forEach(function (button) {
-      var on = button.dataset.pace === app.localPace;
-      button.classList.toggle("on", on);
-      button.setAttribute("aria-pressed", on ? "true" : "false");
+    /* Maç ayarları artık yalnızca oyun başlarken açılan pencerede yaşıyor;
+       ana ekranda senkronlanacak kalıcı bir ayar düğmesi yok. */
+    return true;
+  }
+
+  /* Oda/maç ayarları yalnızca oyun başlarken sorulur. Ana ekranda sürekli
+     açık bir ayar paneli yoktur; seçim bu pencerede yapılır. */
+  function showMatchSetup(mode, options) {
+    options = options || {};
+    app.setupDraft = {
+      mode: mode === "coop" ? "coop" : "versus",
+      online: !!options.online,
+      pace: options.pace === "live" ? "live" : (app.localPace === "live" ? "live" : "turn"),
+      timeMode: CORE.TIME_MODES.indexOf(app.timeMode) >= 0 ? app.timeMode : "shared",
+      timeLimit: clampLimit("shared", app.timeLimit),
+      turnLimit: clampLimit("turn", app.turnLimit)
+    };
+    renderSetupSheet();
+  }
+
+  function setupDraftHTML() {
+    var d = app.setupDraft;
+    if (!d) return "";
+    var versus = d.mode === "versus";
+    var limitKind = d.timeMode === "turn" ? "turn" : "shared";
+    var limit = limitKind === "turn" ? d.turnLimit : d.timeLimit;
+    return '<span class="result-badge">' + esc(tr("Kapışma ayarları")) + '</span>' +
+      '<h2>' + esc(tr(d.online ? "Oda kur" : (versus ? "Rakip" : "Ortak tahta"))) + '</h2>' +
+      '<p class="sheet-sub">' + esc(tr(d.online
+        ? "Oda açılmadan önce süreyi ve doldurma düzenini seç."
+        : "Oyun başlamadan önce süreyi ve doldurma düzenini seç.")) + '</p>' +
+      (versus
+        ? '<div class="setup-row"><span class="setup-label">' + esc(tr("Doldurma")) + '</span>' +
+          '<div class="mode-switch setup-switch" id="setup-pace" aria-label="' + esc(tr("Doldurma düzeni")) + '">' +
+            '<button type="button" data-setup-pace="turn" aria-pressed="' + (d.pace === "turn") + '" class="' + (d.pace === "turn" ? "on" : "") + '">' + esc(tr("Sırayla")) + '</button>' +
+            '<button type="button" data-setup-pace="live" aria-pressed="' + (d.pace === "live") + '" class="' + (d.pace === "live" ? "on" : "") + '">' + esc(tr("Aynı anda")) + '</button>' +
+          '</div></div>'
+        : "") +
+      '<div class="setup-row"><span class="setup-label">' + esc(tr("Süre")) + '</span>' +
+        '<div class="mode-switch setup-switch setup-timer" id="setup-timer" aria-label="' + esc(tr("Süre modu")) + '">' +
+          '<button type="button" data-setup-time="shared" aria-pressed="' + (d.timeMode === "shared") + '" class="' + (d.timeMode === "shared" ? "on" : "") + '">' + esc(tr("Ortak süre")) + '</button>' +
+          '<button type="button" data-setup-time="turn" aria-pressed="' + (d.timeMode === "turn") + '" class="' + (d.timeMode === "turn" ? "on" : "") + '">' + esc(tr("Sıra süresi")) + '</button>' +
+          '<button type="button" data-setup-time="none" aria-pressed="' + (d.timeMode === "none") + '" class="' + (d.timeMode === "none" ? "on" : "") + '">' + esc(tr("Süresiz")) + '</button>' +
+        '</div></div>' +
+      (d.timeMode === "none" ? "" :
+        '<div class="setup-row setup-fine"><span class="setup-label">' + esc(tr("Süre ayarı")) + '</span>' +
+          '<div class="stepper" role="group" aria-label="' + esc(tr("Süre ayarı")) + '">' +
+            '<button type="button" data-setup-step="-1" aria-label="' + esc(tr("Azalt")) + '">−</button>' +
+            '<span class="stepper-value">' + fmtTime(limit) + '</span>' +
+            '<button type="button" data-setup-step="1" aria-label="' + esc(tr("Artır")) + '">+</button>' +
+          '</div></div>') +
+      '<div class="sheet-actions">' +
+        '<button class="btn btn-coral" type="button" data-setup-start data-autofocus>' +
+          esc(tr(d.online ? "Oda kur" : "Oyunu başlat")) + '</button>' +
+        '<button class="btn btn-outline" type="button" data-close>' + esc(tr("Vazgeç")) + '</button>' +
+      '</div>';
+  }
+
+  function renderSetupSheet() {
+    if (!app.setupDraft) return;
+    openOverlay(setupDraftHTML(), true);
+  }
+
+  function updateSetupDraft(key, value) {
+    var d = app.setupDraft;
+    if (!d) return;
+    if (key === "pace") d.pace = value === "live" ? "live" : "turn";
+    else if (key === "time") d.timeMode = CORE.TIME_MODES.indexOf(value) >= 0 ? value : "shared";
+    else if (key === "step") {
+      var kind = d.timeMode === "turn" ? "turn" : "shared";
+      var rule = LIMITS[kind];
+      if (kind === "turn") d.turnLimit = clampLimit("turn", d.turnLimit + Number(value) * rule.step);
+      else d.timeLimit = clampLimit("shared", d.timeLimit + Number(value) * rule.step);
+    }
+    sfxPlace();
+    renderSetupSheet();
+  }
+
+  function startSetupMatch() {
+    var d = app.setupDraft;
+    if (!d) return;
+    app.timeMode = d.timeMode;
+    app.localPace = d.pace;
+    app.timeLimit = d.timeLimit;
+    app.turnLimit = d.turnLimit;
+    saveSetupPrefs();
+    closeOverlay();
+    if (d.online) {
+      app.pendingRoomSettings = {
+        mode: d.mode,
+        pace: d.pace,
+        timeMode: d.timeMode,
+        timeLimit: d.timeLimit,
+        turnLimit: d.turnLimit
+      };
+      createRoom(d.mode);
+      return;
+    }
+    startLocal(d.mode, {
+      timeMode: d.timeMode,
+      pace: d.pace,
+      timeLimit: d.timeLimit,
+      turnLimit: d.turnLimit
     });
-    $$("#local-timer button").forEach(function (button) {
-      var on = button.dataset.time === app.timeMode;
-      button.classList.toggle("on", on);
-      button.setAttribute("aria-pressed", on ? "true" : "false");
-    });
-    var paceNote = $("#local-pace-note");
-    if (paceNote) paceNote.textContent = app.localPace === "live" ? "Aynı anda" : "Sırayla";
-    var timeNote = $("#local-time-note");
-    if (timeNote) timeNote.textContent = timeModeLabel(app.timeMode);
-    var row = $("#local-limit-row");
-    if (row) row.hidden = app.timeMode === "none";
-    var limitText = fmtTime(activeLimit());
-    var note = $("#local-limit-note");
-    if (note) note.textContent = app.timeMode === "none" ? "" : limitText;
-    var value = $("#local-limit-value");
-    if (value) value.textContent = limitText;
   }
 
   function initHomeControls() {
-    $$("#local-pace button").forEach(function (button) {
-      button.addEventListener("click", function () {
-        app.localPace = button.dataset.pace === "live" ? "live" : "turn";
-        saveSetupPrefs();
-        syncSetupButtons();
-        sfxPlace();
-      });
-    });
-    $$("#local-timer button").forEach(function (button) {
-      button.addEventListener("click", function () {
-        app.timeMode = CORE.TIME_MODES.indexOf(button.dataset.time) >= 0 ? button.dataset.time : "shared";
-        saveSetupPrefs();
-        syncSetupButtons();
-        sfxPlace();
-      });
-    });
-    $$("#local-setup [data-step]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var rule = LIMITS[activeLimitKind()];
-        setActiveLimit(activeLimit() + Number(button.dataset.step) * rule.step);
-        saveSetupPrefs();
-        syncSetupButtons();
-        sfxPlace();
-      });
-    });
+    /* Ana ekranda kalıcı maç ayarı paneli yok: her oyun/oda başlangıcında
+       setup penceresi açılıyor ve seçimler orada yapılıyor. */
     syncSetupButtons();
   }
 
@@ -974,6 +1101,8 @@
     });
     var inRoom = (name === "lobby" || name === "game") && app.online;
     $("#exit-btn").hidden = name === "home";
+    var menuBtn = $("#game-menu-btn");
+    if (menuBtn) menuBtn.hidden = name !== "game";
     var badge = $("#room-badge");
     badge.hidden = !inRoom;
     if (inRoom && app.room) badge.textContent = "ODA " + app.room;
@@ -1456,6 +1585,18 @@
       startHeartbeat();
       applyState(message.state);
       syncPresence();
+      if (app.pendingRoomSettings) {
+        var roomSettings = app.pendingRoomSettings;
+        app.pendingRoomSettings = null;
+        wsSend({ t: "mode", mode: roomSettings.mode });
+        wsSend({ t: "pace", pace: roomSettings.pace });
+        wsSend({
+          t: "timer",
+          mode: roomSettings.timeMode,
+          timeLimit: roomSettings.timeLimit,
+          turnLimit: roomSettings.turnLimit
+        });
+      }
       if (app.inviteAfterCreate) {
         var inviteTo = app.inviteAfterCreate;
         app.inviteAfterCreate = null;
@@ -1857,7 +1998,7 @@
     if (!PROGRESS || !app.profile) return null;
     var reward = PROGRESS.recordGame(app.profile, resultPayload(s));
     renderHomeMeta();
-    if (FX && (reward.newRecord || reward.levelUp || reward.unlocked.length)) {
+    if (FX && (reward.newRecord || reward.levelUp)) {
       FX.confetti();
       if (app.sound) sfxReward();
       if (app.vibrate) FX.vibrate(30);
@@ -1903,7 +2044,10 @@
     return '' +
       '<div class="score-card p' + (index + 1) + (active ? " active" : "") + (mini ? " has-mini" : "") + '">' +
         '<div class="score-main">' +
-          '<span class="score-name"><span class="score-dot"></span>' + esc(player.name) + clock + '</span>' +
+          '<span class="score-name">' +
+            '<span class="score-avatar p' + (index + 1) + '" data-avatar-index="' + index + '" aria-hidden="true"></span>' +
+            '<span class="score-dot"></span>' + esc(player.name) + clock +
+          '</span>' +
           '<span class="score-value">' + fmt(player.score) + '</span>' +
           '<span class="score-sub">' + (offline ? '<span class="conn-flag">bağlantı yok</span>' : sub) + '</span>' +
         '</div>' +
@@ -2097,7 +2241,8 @@
     var pick = (!s.turnBased && !app.online && s.phase === "playing" && index !== active)
       ? '<button class="duel-pick" type="button" data-pick="' + index + '">Bu tahtada oyna</button>'
       : "";
-    return '<span class="score-dot"></span><b>' + esc(player.name) + '</b>' +
+    return playerAvatarHTML(index, player) +
+      '<span class="score-dot"></span><b>' + esc(player.name) + '</b>' +
       '<span class="duel-status">' + duelStatusText(s, index, active) + '</span>' + pick;
   }
 
@@ -2126,11 +2271,25 @@
       '<span class="dot"></span><span>' + esc(banner.text) + '</span></div>';
   }
 
+  function duelSwitchHTML(s) {
+    if (s.turnBased || app.online || s.phase !== "playing") return "";
+    var actor = app.localActor === 1 ? 1 : 0;
+    return '<div class="duel-switch" role="group" aria-label="Kim oynuyor">' +
+      [0, 1].map(function (index) {
+        var player = s.players[index];
+        if (!player) return "";
+        return '<button class="duel-switch-btn p' + (index + 1) + (index === actor ? " is-active" : "") +
+          '" type="button" data-pick="' + index + '" aria-pressed="' + (index === actor ? "true" : "false") + '">' +
+          '<span class="score-dot"></span>' + esc(player.name) + '</button>';
+      }).join("") + '</div>';
+  }
+
   function duelHTML(s, interactive) {
     var active = duelActiveIndex(s);
     var actor = active == null ? (s.turnBased ? s.turn : (app.online ? app.me : app.localActor)) : active;
     var player = s.players[actor] || s.players[0];
-    var html = '<div class="duel">' + duelBannerHTML(s) + '<div class="duel-boards">';
+    var html = '<div class="duel">' + duelBannerHTML(s) + duelSwitchHTML(s) +
+      '<div class="duel-stage" id="duel-stage" data-active="' + active + '">';
     [0, 1].forEach(function (index) {
       var side = s.players[index];
       if (!side) return;
@@ -2139,11 +2298,12 @@
         duelBoardId(s, index),
         String(index),
         duelLabelHTML(s, index, active),
-        duelShellClass(s, index, active),
+        duelShellClass(s, index, active) + " duel-card" + (index === active ? " is-front" : " is-back"),
         "duel-label"
       );
     });
-    html += '</div><div class="duel-tray">' + trayHTML(player ? player.tray : [], interactive) + '</div></div>';
+    html += '</div><div class="duel-tray">' + trayHTML(player ? player.tray : [], interactive) +
+      emoteOpenButtonHTML() + '</div></div>';
     return html;
   }
 
@@ -2157,7 +2317,8 @@
       if (boardEl) paintBoard(boardEl, player.board);
       var shell = boardEl ? boardEl.closest(".duel-side") : null;
       if (!shell) return;
-      var cls = "board-shell " + duelShellClass(s, index, active);
+      var cls = "board-shell " + duelShellClass(s, index, active) + " duel-card" +
+        (index === active ? " is-front" : " is-back");
       if (shell.className !== cls) shell.className = cls;
       var label = $(".duel-label", shell);
       if (label) {
@@ -2165,6 +2326,39 @@
         if (label.innerHTML !== labelHTML) label.innerHTML = labelHTML;
       }
     });
+    var stage = $("#duel-stage");
+    if (stage) {
+      var previous = Number(stage.dataset.active);
+      if (previous !== active && active != null) {
+        stage.classList.remove("duel-swap");
+        void stage.offsetWidth;
+        stage.classList.add("duel-swap");
+        if (app.sound) sfxWhoosh();
+      }
+      stage.dataset.active = String(active);
+    }
+    var switchRow = $(".duel-switch");
+    /* Düzen yeniden kurulmadan mod değişirse (sırayla -> aynı anda) seçici
+       satırı DOM'da eksik kalır; burada tamamlanır ya da kaldırılır. */
+    var wantSwitch = !s.turnBased && !app.online && s.phase === "playing";
+    if (wantSwitch && !switchRow) {
+      var duelEl = $(".duel");
+      var bannerEl = $("#duel-turn");
+      if (duelEl && bannerEl) {
+        bannerEl.insertAdjacentHTML("afterend", duelSwitchHTML(s));
+        switchRow = $(".duel-switch");
+      }
+    } else if (!wantSwitch && switchRow) {
+      switchRow.remove();
+      switchRow = null;
+    }
+    if (switchRow) {
+      $$(".duel-switch-btn", switchRow).forEach(function (btn) {
+        var on = Number(btn.dataset.pick) === (app.localActor === 1 ? 1 : 0);
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
     var banner = $("#duel-turn");
     if (banner) {
       var info = duelBanner(s);
@@ -2215,6 +2409,7 @@
     app.rendering = false;
     hidePreview();
     renderScoreboard();
+    refreshGameAvatars();
     var table = $("#table-area");
     var interactive = canPlay();
     var layout = s.mode === "coop" ? "coop"
@@ -2232,6 +2427,7 @@
           (shared.combo > 1 ? ' · combo ×' + shared.combo : "")) +
         '</div>';
       html += trayHTML(shared.tray, interactive);
+      html += emoteOpenButtonHTML();
       html += '</div>';
     } else if (s.mode === "solo") {
       var soloPlayer = s.players[0];
@@ -2370,6 +2566,18 @@
     return art ? art.innerHTML : "";
   }
 
+  function emoteOpenButtonHTML() {
+    if (!emoteAllowed()) return "";
+    return '<button class="btn btn-outline btn-sm emote-open" id="emote-btn" type="button" ' +
+      'aria-label="Emote gönder" aria-expanded="false" aria-controls="emote-tray">' +
+      '<svg class="emote-open-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+        '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>' +
+        '<circle cx="8.6" cy="10" r="1.4" fill="currentColor"/>' +
+        '<circle cx="15.4" cy="10" r="1.4" fill="currentColor"/>' +
+        '<path d="M7.8 14q4.2 4 8.4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
+      '</svg></button>';
+  }
+
   function updateEmoteButton() {
     var btn = $("#emote-btn");
     if (!btn) return;
@@ -2377,6 +2585,17 @@
     var show = app.screen === "game" && emoteAllowed() && (!overlay || overlay.hidden);
     btn.hidden = !show;
     if (!show) closeEmoteTray();
+    updateEmoteAvailability();
+  }
+
+  /* Reklamla açılan emotelar kilitliyken görünmez. */
+  function updateEmoteAvailability() {
+    $$("#emote-tray [data-emote]").forEach(function (chip) {
+      var kind = chip.dataset.emote;
+      var key = "emote:" + kind;
+      var locked = PUBLIC_EMOTES.indexOf(kind) < 0 && !isUnlocked(key);
+      chip.hidden = locked;
+    });
   }
 
   function closeEmoteTray() {
@@ -2461,7 +2680,10 @@
     var name = player ? player.name : "";
     showEmoteBubble(kind, name, by);
     sfxEmote(kind);
-    if (FX && app.vibrate && !mine) FX.vibrate(kind === "angry" ? 45 : 24);
+    if (FX && app.vibrate && !mine) {
+      var emoteBuzz = { laugh: 18, clap: 22, cry: 14, angry: 50, love: 26, cool: 20 };
+      FX.vibrate(emoteBuzz[kind] || 18);
+    }
     var status = $("#emote-status");
     if (status) {
       status.textContent = name ? name + ": " + emoteLabel(kind) : emoteLabel(kind);
@@ -2488,6 +2710,8 @@
     if (!emoteAllowed()) return "";
     return '<div class="result-emotes" role="group" aria-label="Emote gönder">' +
       EMOTES.map(function (kind) {
+        var locked = PUBLIC_EMOTES.indexOf(kind) < 0 && !isUnlocked("emote:" + kind);
+        if (locked) return "";
         return '<button class="emote-chip emote-chip-sm emote-' + kind + '" type="button" data-emote="' +
           kind + '" aria-label="' + esc(EMOTE_LABELS[kind]) + '">' +
           '<span class="emote-chip-art" aria-hidden="true">' + emoteArtHTML(kind) + '</span></button>';
@@ -2503,6 +2727,13 @@
     if (tray) {
       tray.addEventListener("pointerdown", onTrayPointerDown);
       tray.addEventListener("keydown", onTrayKeyDown);
+    }
+    var emoteBtn = $("#emote-btn");
+    if (emoteBtn) {
+      emoteBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        toggleEmoteTray();
+      });
     }
     $$(".board").forEach(function (boardEl) {
       if (boardEl.classList.contains("readonly")) return;
@@ -3208,6 +3439,17 @@
           FX.shockwave(rect.left + (first[1] + 0.5) * pitch,
             rect.top + (first[0] + 0.5) * pitch, "paper", pitch * 0.5, pitch * 2.4, 0.45);
         }
+        if (cells.length) {
+          var sumX = 0;
+          var sumY = 0;
+          cells.forEach(function (cell) {
+            sumX += rect.left + (cell[1] + 0.5) * pitch;
+            sumY += rect.top + (cell[0] + 0.5) * pitch;
+          });
+          if (typeof FX.clearBurst === "function") {
+            FX.clearBurst(sumX / cells.length, sumY / cells.length, cross || last.lines >= 3);
+          }
+        }
         FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.28,
           grade, gradeClass);
         FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.42,
@@ -3349,6 +3591,7 @@
     document.body.style.overflow = "hidden";
     hideToast();
     syncBannerVisibility();
+    updateEmoteButton();
     var first = sheet.querySelector("[data-autofocus]") || sheet.querySelector("button");
     if (first) setTimeout(function () { first.focus(); }, 30);
     fitOverlaySheet();
@@ -3542,12 +3785,6 @@
       if (reward.newRecord) rewardHTML += '<span class="reward-badge">yeni rekor</span>';
       if (reward.levelUp) rewardHTML += '<span class="reward-badge level">seviye ' + reward.levelAfter + '</span>';
       rewardHTML += '</div>';
-      if (reward.unlocked && reward.unlocked.length) {
-        rewardHTML += '<div class="reward-unlock"><span class="tiny">Yeni başarım</span>' +
-          reward.unlocked.map(function (item) {
-            return '<span class="unlock-chip">' + item.title + '</span>';
-          }).join("") + '</div>';
-      }
     }
 
     var canRematch = !app.online || app.me === s.host;
@@ -3769,9 +4006,12 @@
     pendingCoins: 0,
     pendingKey: null,
     grantedKey: null,
+    pendingUnlock: null,
     free: read(LS_ADS_FREE) === "1",
     billing: false,
-    bannerShown: false
+    /* null: sayfa yeni açıldı, banner'ın native durumu bilinmiyor. İlk
+       senkronda her hâlükârda hide/show uygulanır. */
+    bannerShown: null
   };
 
   /* Sunucu adresini (APK'da gömülü adres, webde aynı köken) koruyarak yol üretir. */
@@ -3885,20 +4125,30 @@
       }).join("") + '</div>';
   }
 
+  function profilePhotoHTML() {
+    var photo = read(LS_PHOTO) || "";
+    var initial = accountInitial(accountName());
+    return '<span class="profile-photo' + (photo ? " has-photo" : "") + '"' +
+      (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : "") + '>' +
+      (photo ? "" : esc(initial)) + '</span>';
+  }
+
   function themePaneHTML() {
     var active = currentTheme();
     return '<div class="profile-pane" role="tabpanel" data-profile-pane="theme" aria-label="' + esc(tr("Tema")) + '">' +
       '<div class="theme-grid">' +
       THEMES.map(function (theme) {
         var on = theme.id === active;
-        return '<button class="theme-pick' + (on ? " is-active" : "") + '" type="button"' +
-          ' data-theme-pick="' + theme.id + '" aria-pressed="' + (on ? "true" : "false") + '">' +
+        var locked = !themeUnlocked(theme);
+        return '<button class="theme-pick' + (on ? " is-active" : "") + (locked ? " is-locked" : "") + '" type="button"' +
+          ' data-theme-pick="' + theme.id + '" aria-pressed="' + (on ? "true" : "false") + '"' +
+          (locked ? ' data-theme-unlock="' + theme.unlock + '"' : '') + '>' +
           '<span class="theme-swatch" aria-hidden="true">' +
             theme.swatch.map(function (color) {
               return '<i style="background:' + color + '"></i>';
             }).join("") +
           '</span>' +
-          '<span class="theme-name">' + esc(tr(theme.name)) + '</span>' +
+          '<span class="theme-name">' + esc(tr(theme.name)) + (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span>' +
           '</button>';
       }).join("") +
       '</div></div>';
@@ -3909,10 +4159,13 @@
       '<p class="profile-note">' + esc(tr("Oyun sırasında ya da tur bittiğinde rakibine gülme, alkış, ağlama ve kızma gönderebilirsin.")) + '</p>' +
       '<div class="profile-emotes" role="group" aria-label="' + esc(tr("Emote seç")) + '">' +
       EMOTES.map(function (kind) {
-        return '<button class="profile-emote emote-' + kind + '" type="button" data-profile-emote="' +
-          kind + '" aria-label="' + esc(tr(EMOTE_LABELS[kind])) + '">' +
+        var locked = PUBLIC_EMOTES.indexOf(kind) < 0 && !isUnlocked("emote:" + kind);
+        return '<button class="profile-emote emote-' + kind + (locked ? " is-locked" : "") + '" type="button" ' +
+          (locked ? 'data-emote-unlock="emote:' + kind + '"' : 'data-profile-emote="' + kind + '"') +
+          ' aria-label="' + esc(tr(EMOTE_LABELS[kind])) + '">' +
           '<span class="emote-chip-art" aria-hidden="true">' + emoteArtHTML(kind) + '</span>' +
-          '<span class="profile-emote-name">' + esc(tr(EMOTE_LABELS[kind])) + '</span></button>';
+          '<span class="profile-emote-name">' + esc(tr(EMOTE_LABELS[kind])) +
+            (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span></button>';
       }).join("") +
       '</div></div>';
   }
@@ -3922,6 +4175,22 @@
     var ready = !!ads.rewarded;
     var html = '<div class="profile-pane" role="tabpanel" data-profile-pane="store" aria-label="' + esc(tr("Mağaza")) + '" hidden>' +
       '<div class="store-balance"><b>' + fmt(p ? p.coins : 0) + '</b><span class="tiny">coin</span></div>' +
+      '<div class="store-unlocks">' +
+      STORE_ITEMS.map(function (item) {
+        var owned = isUnlocked(item.id);
+        return '<div class="store-unlock' + (owned ? " is-owned" : "") + '">' +
+          '<span class="store-unlock-icon" aria-hidden="true">' +
+            (item.kind === "theme" ? "🎨" : (item.kind === "emote" ? "😀" : "✨")) + '</span>' +
+          '<span class="store-unlock-copy"><b>' + esc(tr(item.name)) + '</b>' +
+            '<span class="tiny">' + esc(tr(item.desc)) + '</span></span>' +
+          (owned
+            ? '<span class="store-owned">' + esc(tr("Açık")) + '</span>'
+            : '<button class="btn btn-ink btn-sm" type="button" data-unlock="' + item.id + '"' +
+              (ready ? "" : " disabled") + '>' + esc(tr("Reklam izle")) + '</button>') +
+          '</div>';
+      }).join("") +
+      '</div>' +
+      '<p class="profile-note">' + esc(tr("Yeni içerikler reklam izleyerek açılır. Oyun içi coinlerle değil.")) + '</p>' +
       '<div class="store-offers">' +
       [80, 200].map(function (coins) {
         return '<div class="store-offer">' +
@@ -3961,6 +4230,13 @@
       '<span class="result-badge">Profil</span>' +
       '<h2 class="profile-name">' + esc(name) + '</h2>' +
       '<p class="profile-meta">' + esc(meta) + '</p>' +
+      '<div class="profile-photo-row">' + profilePhotoHTML() +
+        '<div class="profile-photo-actions">' +
+          '<button class="btn btn-outline btn-sm" type="button" data-photo-pick>' + esc(tr("Fotoğraf seç")) + '</button>' +
+          (read(LS_PHOTO) ? '<button class="btn btn-ghost btn-sm" type="button" data-photo-clear>' + esc(tr("Kaldır")) + '</button>' : '') +
+          '<input class="photo-input" id="photo-input" type="file" accept="image/*" hidden>' +
+        '</div>' +
+      '</div>' +
       profileTabsHTML(active) +
       themePaneHTML() +
       emotePaneHTML() +
@@ -4024,16 +4300,32 @@
   function refreshProfileSheet() {
     if (!app.profileOpen) return;
     var overlay = $("#overlay");
+    if (!overlay || overlay.hidden) return;
     var pane = $('[data-profile-pane="store"]', overlay);
     if (!pane) return;
     /* Pencereyi yeniden kurmak odağı ve açan öğeyi kaybettirir; yalnızca
-       mağaza bölümünü yerinde tazela. */
-    var wasHidden = pane.hidden;
-    var template = document.createElement("div");
-    template.innerHTML = profileStorePaneHTML();
-    var next = template.firstElementChild;
-    next.hidden = wasHidden;
-    pane.replaceWith(next);
+       içerik bölümlerini yerinde tazela. */
+    [["theme", themePaneHTML], ["emote", emotePaneHTML], ["store", profileStorePaneHTML]].forEach(function (entry) {
+      var current = $('[data-profile-pane="' + entry[0] + '"]', overlay);
+      if (!current) return;
+      var wasHidden = current.hidden;
+      var template = document.createElement("div");
+      template.innerHTML = entry[1]();
+      var next = template.firstElementChild;
+      if (!next) return;
+      next.hidden = wasHidden;
+      current.replaceWith(next);
+    });
+    var photoRow = $(".profile-photo-row", overlay);
+    if (photoRow) {
+      var template = document.createElement("div");
+      template.innerHTML = '<div class="profile-photo-row">' + profilePhotoHTML() + '</div>';
+      var photo = template.firstElementChild ? template.firstElementChild.firstElementChild : null;
+      if (photo) {
+        var old = $(".profile-photo", photoRow);
+        if (old) old.replaceWith(photo);
+      }
+    }
     var p = app.profile;
     var info = p ? PROGRESS.levelInfo(p.xp) : null;
     var meta = $(".profile-meta", overlay);
@@ -4059,10 +4351,15 @@
       avatar.appendChild(initial);
     }
     var name = accountName();
+    var localPhoto = read(LS_PHOTO) || "";
     avatar.style.backgroundImage = "";
     avatar.classList.remove("has-photo");
     initial.textContent = accountInitial(name);
-    if (profile && profile.picture) {
+    if (localPhoto) {
+      initial.textContent = "";
+      avatar.classList.add("has-photo");
+      avatar.style.backgroundImage = 'url("' + String(localPhoto).replace(/["\\]/g, "") + '")';
+    } else if (profile && profile.picture) {
       initial.textContent = "";
       avatar.classList.add("has-photo");
       avatar.style.backgroundImage = 'url("' + String(profile.picture).replace(/["\\]/g, "") + '")';
@@ -4070,6 +4367,35 @@
     if (signout) signout.hidden = !profile;
     if (slot) slot.hidden = !!profile || googleAccount.native || !googleAccount.ready;
     if (nativeBtn) nativeBtn.hidden = !!profile || !googleAccount.native;
+    refreshGameAvatars();
+  }
+
+  /* Profil fotoğrafı yerel olarak saklanır (data URL). Oyun içi skor
+     kartlarındaki avatarlar da aynı kaynağı kullanır. */
+  function renderAvatar() { renderAccount(); }
+
+  function playerAvatarHTML(index, player) {
+    var name = (player && player.name) || "?";
+    var initial = accountInitial(name);
+    var photo = "";
+    if (index === app.me || (!app.online && index === 0)) photo = read(LS_PHOTO) || "";
+    return '<span class="score-avatar p' + (index + 1) + (photo ? " has-photo" : "") + '"' +
+      (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : "") +
+      ' aria-hidden="true">' + (photo ? "" : esc(initial)) + '</span>';
+  }
+
+  function refreshGameAvatars() {
+    $$(".score-avatar").forEach(function (el) {
+      var index = Number(el.dataset.avatarIndex || 0);
+      var player = app.state && app.state.players ? app.state.players[index] : null;
+      if (!player) return;
+      var name = player.name || "?";
+      var photo = "";
+      if (index === app.me || (!app.online && index === 0)) photo = read(LS_PHOTO) || "";
+      el.textContent = photo ? "" : accountInitial(name);
+      el.classList.toggle("has-photo", !!photo);
+      el.style.backgroundImage = photo ? 'url("' + photo.replace(/["\\]/g, "") + '")' : "";
+    });
   }
 
   function applyGoogleProfile(profile, options) {
@@ -4418,9 +4744,30 @@
       return;
     }
     if (name.indexOf("rewarded:") === 0) {
-      grantPendingCoins();
+      if (ads.pendingUnlock) {
+        var unlockKey = ads.pendingUnlock;
+        ads.pendingUnlock = null;
+        if (unlockContent(unlockKey)) {
+          if (app.sound) sfxUnlock();
+          if (app.vibrate && FX) FX.vibrate([0, 18, 30, 18]);
+          toast("İçerik açıldı!");
+          refreshProfileSheet();
+          updateEmoteAvailability();
+          if (unlockKey.indexOf("theme:") === 0) {
+            var themeId = unlockKey.slice(6);
+            applyTheme(themeId);
+          }
+        } else {
+          toast("Bu içerik zaten açık.");
+        }
+      } else {
+        grantPendingCoins();
+      }
     } else if (name === "rewarded-closed" || name === "rewarded-failed") {
-      if (ads.pendingCoins) {
+      if (ads.pendingUnlock) {
+        ads.pendingUnlock = null;
+        toast("Reklam tamamlanmadı; içerik açılmadı.");
+      } else if (ads.pendingCoins) {
         ads.pendingCoins = 0;
         ads.pendingKey = null;
         toast("Reklam tamamlanmadı; coin eklenmedi.");
@@ -4457,11 +4804,33 @@
     }
     ads.pendingCoins = coins;
     ads.pendingKey = key || null;
+    ads.pendingUnlock = null;
     try {
       window.BlokAds.showRewarded();
     } catch (error) {
       ads.pendingCoins = 0;
       ads.pendingKey = null;
+      toast("Reklam açılamadı.");
+    }
+  }
+
+  function watchRewardedUnlock(key) {
+    if (!key) return;
+    if (isUnlocked(key)) {
+      toast("Bu içerik zaten açık.");
+      return;
+    }
+    if (!ads.rewarded) {
+      toast("Reklam şu an hazır değil.");
+      return;
+    }
+    ads.pendingUnlock = key;
+    ads.pendingCoins = 0;
+    ads.pendingKey = null;
+    try {
+      window.BlokAds.showRewarded();
+    } catch (error) {
+      ads.pendingUnlock = null;
       toast("Reklam açılamadı.");
     }
   }
@@ -5094,12 +5463,12 @@
         var mode = value === "daily" ? "daily"
           : (value === "coop" ? "coop" : (value === "solo" ? "solo" : "versus"));
         var pace = button.dataset.pace;
-        if (mode === "versus" && pace) app.localPace = pace === "live" ? "live" : "turn";
-        startLocal(mode, {
-          timeMode: mode === "solo" || mode === "daily" ? "none" : app.timeMode,
-          pace: app.localPace,
-          timeLimit: app.timeLimit,
-          turnLimit: app.turnLimit
+        if (mode === "solo" || mode === "daily") {
+          startLocal(mode, { timeMode: "none" });
+          return;
+        }
+        showMatchSetup(mode, {
+          pace: mode === "versus" && pace ? pace : app.localPace
         });
       });
     });
@@ -5107,7 +5476,7 @@
     $$("[data-host]").forEach(function (button) {
       button.addEventListener("click", function () {
         audio();
-        createRoom(button.dataset.host === "coop" ? "coop" : "versus");
+        showMatchSetup(button.dataset.host === "coop" ? "coop" : "versus", { online: true });
       });
     });
 
@@ -5189,11 +5558,30 @@
       });
     });
 
-    $("#game-menu").addEventListener("click", showMenu);
+    var gameMenuBtn = $("#game-menu-btn");
+    if (gameMenuBtn) gameMenuBtn.addEventListener("click", showMenu);
 
-    $("#emote-btn").addEventListener("click", function (event) {
-      event.stopPropagation();
-      toggleEmoteTray();
+    document.addEventListener("change", function (event) {
+      var input = event.target;
+      if (!input || input.id !== "photo-input" || !input.files || !input.files[0]) return;
+      var file = input.files[0];
+      if (!/^image\//.test(file.type)) {
+        toast("Lütfen bir görsel seç.");
+        return;
+      }
+      if (file.size > 2.5 * 1024 * 1024) {
+        toast("Görsel çok büyük (en fazla 2,5 MB).");
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        save(LS_PHOTO, String(reader.result || ""));
+        renderAccount();
+        refreshProfileSheet();
+        toast("Profil fotoğrafı güncellendi.");
+      };
+      reader.onerror = function () { toast("Görsel okunamadı."); };
+      reader.readAsDataURL(file);
     });
 
     $("#emote-tray").addEventListener("click", function (event) {
@@ -5223,6 +5611,34 @@
 
       if (target.hasAttribute("data-close")) {
         closeOverlay();
+        return;
+      }
+      if (target.hasAttribute("data-setup-pace")) {
+        updateSetupDraft("pace", target.dataset.setupPace);
+        return;
+      }
+      if (target.hasAttribute("data-setup-time")) {
+        updateSetupDraft("time", target.dataset.setupTime);
+        return;
+      }
+      if (target.hasAttribute("data-setup-step")) {
+        updateSetupDraft("step", target.dataset.setupStep);
+        return;
+      }
+      if (target.hasAttribute("data-setup-start")) {
+        startSetupMatch();
+        return;
+      }
+      if (target.hasAttribute("data-photo-pick")) {
+        var photoInput = $("#photo-input");
+        if (photoInput) photoInput.click();
+        return;
+      }
+      if (target.hasAttribute("data-photo-clear")) {
+        remove(LS_PHOTO);
+        renderAccount();
+        refreshProfileSheet();
+        toast("Profil fotoğrafı kaldırıldı.");
         return;
       }
       if (target.hasAttribute("data-emote")) {
@@ -5269,13 +5685,25 @@
         return;
       }
       if (target.hasAttribute("data-theme-pick")) {
+        if (target.hasAttribute("data-theme-unlock")) {
+          watchRewardedUnlock(target.dataset.themeUnlock);
+          return;
+        }
         var themeId = applyTheme(target.dataset.themePick);
         $$("[data-theme-pick]", $("#overlay")).forEach(function (pick) {
           var on = pick.dataset.themePick === themeId;
           pick.classList.toggle("is-active", on);
           pick.setAttribute("aria-pressed", on ? "true" : "false");
         });
-        sfxPlace();
+        if (app.sound) sfxTap();
+        return;
+      }
+      if (target.hasAttribute("data-unlock")) {
+        watchRewardedUnlock(target.dataset.unlock);
+        return;
+      }
+      if (target.hasAttribute("data-emote-unlock")) {
+        watchRewardedUnlock(target.dataset.emoteUnlock);
         return;
       }
       if (target.hasAttribute("data-profile-emote")) {

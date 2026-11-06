@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#332B5E"/>
+      <stop offset="0.72" stop-color="#191731"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#F97A6A"/>
+      <stop offset="1" stop-color="#EF6A5B"/>
+    </linearGradient>
+    <linearGradient id="cobalt" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#5C77E8"/>
+      <stop offset="1" stop-color="#3F5BD6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.5">
+      <stop offset="0" stop-color="#F4B72A" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#F4B72A" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0A0914" flood-opacity="0.45"/>
+    </filter>
+    <filter id="spark" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#F4B72A" flood-opacity="0.85"/>
+    </filter>
+  </defs><rect x="0" y="0" width="512" height="512" rx="116" fill="url(#tile)"/><circle cx="256" cy="252" r="170" fill="url(#glow)"/>
+  <g filter="url(#soft)">
+    <g fill="url(#coral)" stroke="#11101F" stroke-width="7" paint-order="stroke fill">
+      <rect x="86" y="132" width="62" height="62" rx="13"/>
+      <rect x="150" y="132" width="62" height="62" rx="13"/>
+      <rect x="86" y="196" width="62" height="62" rx="13"/>
+      <rect x="150" y="196" width="62" height="62" rx="13"/>
+    </g>
+    <g fill="url(#cobalt)" stroke="#11101F" stroke-width="7" paint-order="stroke fill">
+      <rect x="292" y="196" width="62" height="62" rx="13"/>
+      <rect x="292" y="260" width="62" height="62" rx="13"/>
+      <rect x="292" y="324" width="62" height="62" rx="13"/>
+      <rect x="356" y="324" width="62" height="62" rx="13"/>
+    </g>
+  </g>
+  <g filter="url(#spark)">
+    <path d="M262 152 276 208 332 222 276 236 262 292 248 236 192 222 248 208Z" fill="#FFF4DE"/>
+    <circle cx="262" cy="222" r="74" fill="none" stroke="#F4B72A" stroke-width="9" stroke-opacity="0.75"/>
+    <circle cx="262" cy="222" r="26" fill="#F4B72A"/>
+  </g>
+  <g>
+    <rect x="150" y="60" width="24" height="24" rx="6" fill="#EF6A5B" transform="rotate(18 162 72)"/>
+    <rect x="330" y="392" width="22" height="22" rx="6" fill="#4FAE8B" transform="rotate(-14 341 403)"/>
+    <rect x="398" y="72" width="18" height="18" rx="5" fill="#F4B72A"/>
+    <rect x="72" y="382" width="16" height="16" rx="4" fill="#8FC93A"/>
+  </g></svg>

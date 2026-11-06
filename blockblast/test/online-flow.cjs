@@ -230,8 +230,13 @@ async function main() {
   const created = await a.evaluate(`(async () => {
     document.getElementById('player-name').value = 'Ada';
     document.querySelector('[data-host="coop"]').click();
+    await new Promise(r => setTimeout(r, 250));
+    /* Oda ayarları artık oda açılırken sorulur: pencereyi onayla. */
+    const start = document.querySelector('[data-setup-start]');
+    if (start) start.click();
     await new Promise(r => setTimeout(r, 1200));
     return { screen: document.getElementById('screen-lobby').hidden ? 'home' : 'lobby',
+             setup: !!document.querySelector('[data-setup-start]'),
              code: document.getElementById('lobby-code').textContent };
   })()`);
   ok("oda oluşturuldu", created.screen === "lobby" && /^[A-Z0-9]{5}$/.test(created.code), created);
@@ -515,8 +520,10 @@ async function main() {
 
   const versusRoom = await a.evaluate(`(async () => {
     document.querySelector('[data-host="versus"]').click();
+    await new Promise(r => setTimeout(r, 250));
+    const start = document.querySelector('[data-setup-start]');
+    if (start) start.click();
     await new Promise(r => setTimeout(r, 1200));
-    document.getElementById('start-btn');
     return { code: document.getElementById('lobby-code').textContent,
              lobby: !document.getElementById('screen-lobby').hidden };
   })()`);
@@ -619,18 +626,25 @@ async function main() {
     const mr = mine.getBoundingClientRect();
     const rr = rival.getBoundingClientRect();
     const ar = area.getBoundingClientRect();
+    const front = document.querySelector('#duel-stage .duel-card.is-front');
+    const back = document.querySelector('#duel-stage .duel-card.is-back');
     return {
       exists: true,
+      /* İki tahta aynı sahnede üst üste durur; sıradaki öne gelir. */
+      sameStage: !!mine.closest('.duel-stage') && mine.closest('.duel-stage') === rival.closest('.duel-stage'),
+      centered: Math.abs((mr.left + mr.width / 2) - (rr.left + rr.width / 2)) <= 8,
       sideBySide: Math.abs(mr.top - rr.top) <= 10 && (mr.right <= rr.left + 1 || rr.right <= mr.left + 1),
-      similar: Math.abs(mr.width - rr.width) <= 4,
-      inside: mr.left >= ar.left - 2 && rr.right <= ar.right + 2,
+      frontBoard: front ? (front.querySelector('.board') || {}).id : '',
+      backHidden: back ? getComputedStyle(back).opacity === "0" : false,
+      inside: mr.left >= ar.left - 2 && mr.right <= ar.right + 2,
       rivalCells: rival.querySelectorAll('.on').length,
       banner: banner ? banner.textContent : '',
       turn: window.BlokDebug.snapshot().turn
     };
   })()`);
-  ok("iki tahta yan yana, sıra bandı doğru oyuncuyu gösteriyor",
-    peerView.exists && peerView.sideBySide && peerView.similar && peerView.inside &&
+  ok("tahtalar aynı sahnede üst üste, sıradaki önde ve bant doğru oyuncuyu gösteriyor",
+    peerView.exists && peerView.sameStage && peerView.centered && !peerView.sideBySide && peerView.inside &&
+    peerView.frontBoard === "board-me" && peerView.backHidden &&
     peerView.rivalCells === rivalView.rivalCells && /Sıra sende/.test(peerView.banner), peerView);
 
   /* ---- emote: oyun sırasında dört ifade, karşı tarafa canlı ulaşır ---- */
@@ -651,7 +665,8 @@ async function main() {
     btn.click();
     await new Promise(r => setTimeout(r, 140));
     const tray = document.getElementById('emote-tray');
-    const chips = [...tray.querySelectorAll('[data-emote]')].map(x => x.dataset.emote);
+    const chips = [...tray.querySelectorAll('[data-emote]')]
+      .filter((x) => !x.hidden).map(x => x.dataset.emote);
     const expanded = btn.getAttribute('aria-expanded');
     const openBefore = !tray.hidden;
     tray.querySelector('[data-emote="laugh"]').click();
@@ -689,6 +704,10 @@ async function main() {
 
   const winnerText = await a.evaluate(`(async () => {
     document.querySelector('[data-local="versus"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    /* Aynı cihazda da maç ayarları oyun başlarken sorulur. */
+    const start = document.querySelector('[data-setup-start]');
+    if (start) start.click();
     await new Promise(r => setTimeout(r, 600));
     window.BlokDebug.finish(0, 'Oyuncu 1 kazandı.');
     await new Promise(r => setTimeout(r, 250));
@@ -828,7 +847,7 @@ async function main() {
 
   /* ---- oyun içi menüden ad değiştirme ---- */
   const rename = await a.evaluate(`(async () => {
-    document.getElementById('game-menu').click();
+    document.getElementById('game-menu-btn').click();
     await new Promise(r => setTimeout(r, 250));
     const hasEntry = !!document.querySelector('#overlay [data-rename]');
     document.querySelector('#overlay [data-rename]').click();
@@ -952,15 +971,23 @@ async function main() {
   const matched = await Promise.all([a, b].map((page) => page.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 400));
     const s = window.BlokDebug.snapshot();
+    const stage = document.getElementById('duel-stage');
     return { game: !document.getElementById('screen-game').hidden, mode: s.mode,
              players: s.players.length, room: window.BlokDebug.status().room,
-             peer: !!document.getElementById('board-rival') };
+             peer: !!document.getElementById('board-rival'),
+             stage: !!stage,
+             cards: stage ? stage.querySelectorAll('.duel-card').length : 0,
+             front: stage ? stage.querySelectorAll('.duel-card.is-front').length : 0 };
   })()`)));
   ok("rastgele eşleşme iki oyuncuyu aynı oyuna koydu",
     matched[0].game && matched[1].game && matched[0].mode === "versus" &&
     matched[0].players === 2 && matched[1].players === 2 &&
     matched[0].room && matched[0].room === matched[1].room, matched);
-  ok("eşleşen oyunda iki tahta yan yana görünüyor", matched[0].peer && matched[1].peer, matched);
+  ok("eşleşen oyunda iki tahta tek sahnede, sıradaki önde görünüyor",
+    matched[0].peer && matched[1].peer &&
+    matched[0].stage && matched[1].stage &&
+    matched[0].cards === 2 && matched[1].cards === 2 &&
+    matched[0].front === 1 && matched[1].front === 1, matched);
 
   a.close();
   b.close();

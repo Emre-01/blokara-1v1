@@ -24,9 +24,22 @@
   var raf = 0;
   var dpr = 1;
   var texts = [];
+  var theme = "workshop";
+  var unlocks = {};
   var motionQuery = typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(prefers-reduced-motion: reduce)")
     : null;
+
+  /* Tema efekt renkleri: sonbaharda yaprak tonları, pamuk şekerde pastel
+     pembe/mavi, diğer temalarda kendi vurgu renkleri. */
+  var THEME_COLORS = {
+    workshop: ["#f2553d", "#f4b72a", "#2da98d"],
+    mint: ["#2da98d", "#7fd6b8", "#f4b72a"],
+    ocean: ["#2f55e8", "#23c3b0", "#8fd6f2"],
+    sunset: ["#e8485b", "#f4a12a", "#8c5bff"],
+    autumn: ["#c9662f", "#e0a13a", "#7c4a2d", "#a8442a", "#d9b46a"],
+    cotton: ["#ef79b9", "#f7a8d4", "#8fd6f2", "#fbe4f1", "#c9a6f2"]
+  };
 
   /* Hareket duyarlılığı olan kullanıcılar için parçacık sayısını kıs. */
   function reducedMotion() {
@@ -35,6 +48,91 @@
 
   function color(name) {
     return COLORS[name] || name || COLORS.ink;
+  }
+
+  function setTheme(id) {
+    theme = THEME_COLORS[id] ? id : "workshop";
+  }
+
+  function setUnlocks(map) {
+    unlocks = map && typeof map === "object" ? map : {};
+  }
+
+  function hasUnlock(key) {
+    return !!(key && unlocks[key]);
+  }
+
+  function themePalette() {
+    return THEME_COLORS[theme] || THEME_COLORS.workshop;
+  }
+
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  /* Temaya özel parçacıklar: sonbahar yaprakları, pamuk şeker bulutları.
+     Diğer temalarda renkli kıvılcım ekler. */
+  function themeExtras(x, y, power, delay) {
+    if (theme !== "autumn" && theme !== "cotton") {
+      var palette = themePalette();
+      var total = reducedMotion() ? 1 : 4;
+      for (var i = 0; i < total; i++) {
+        var life = 0.6 + Math.random() * 0.5;
+        spawn({
+          x: x, y: y,
+          vx: (Math.random() - 0.5) * 150 * power,
+          vy: -(40 + Math.random() * 140) * power,
+          gravity: 520,
+          size: 2 + Math.random() * 3,
+          color: pick(palette),
+          life: life, maxLife: life,
+          round: true,
+          glow: true,
+          drag: 0.97,
+          delay: delay || 0
+        });
+      }
+      return;
+    }
+    var count = reducedMotion() ? 1 : (theme === "autumn" ? 7 : 8);
+    for (var j = 0; j < count; j++) {
+      var life2 = 0.9 + Math.random() * 0.9;
+      if (theme === "autumn") {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = (40 + Math.random() * 130) * power;
+        spawn({
+          x: x, y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 70,
+          gravity: 190,
+          size: 6 + Math.random() * 7,
+          color: pick(THEME_COLORS.autumn),
+          life: life2, maxLife: life2,
+          leaf: true,
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 5,
+          drag: 0.985,
+          delay: (delay || 0) + Math.random() * 0.12
+        });
+      } else {
+        spawn({
+          x: x + (Math.random() - 0.5) * 34,
+          y: y + (Math.random() - 0.5) * 20,
+          vx: (Math.random() - 0.5) * 60,
+          vy: -(30 + Math.random() * 90),
+          gravity: -18,
+          size: 7 + Math.random() * 9,
+          color: pick(THEME_COLORS.cotton),
+          life: life2, maxLife: life2,
+          round: true,
+          glow: true,
+          wobble: 1 + Math.random() * 2,
+          phase: Math.random() * Math.PI * 2,
+          drag: 0.995,
+          delay: (delay || 0) + Math.random() * 0.1
+        });
+      }
+    }
   }
 
   function init() {
@@ -179,6 +277,54 @@
         drag: 0.995
       });
     }
+  }
+
+  /*Patlama anında tema efektlerini ve reklamla açılan süsleri birleştirir.*/
+  function clearBurst(x, y, strong) {
+    init();
+    var power = strong ? 1.35 : 1;
+    var palette = themePalette();
+    if (!reducedMotion()) {
+      for (var i = 0; i < (strong ? 16 : 9); i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = (70 + Math.random() * 210) * power;
+        var life = 0.5 + Math.random() * 0.5;
+        spawn({
+          x: x, y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 40,
+          gravity: 520,
+          size: 3 + Math.random() * 4,
+          color: pick(palette),
+          life: life, maxLife: life,
+          round: true,
+          glow: true,
+          drag: 0.98
+        });
+      }
+    }
+    themeExtras(x, y, power);
+    if (hasUnlock("fx:gold")) {
+      var goldCount = reducedMotion() ? 2 : (strong ? 22 : 12);
+      for (var g = 0; g < goldCount; g++) {
+        var ga = Math.random() * Math.PI * 2;
+        var gs = 90 + Math.random() * 300;
+        var gl = 0.7 + Math.random() * 0.7;
+        spawn({
+          x: x, y: y,
+          vx: Math.cos(ga) * gs,
+          vy: Math.sin(ga) * gs - 80,
+          gravity: 520,
+          size: 3 + Math.random() * 4,
+          color: Math.random() < 0.7 ? "#f4b72a" : "#fff3c4",
+          life: gl, maxLife: gl,
+          round: true,
+          glow: true,
+          drag: 0.96
+        });
+      }
+    }
+    if (hasUnlock("fx:confetti") && strong) confetti();
   }
 
   /* Merkezden yayılan altın ışık huzmeleri (DOM katmanı). Zafer anında
@@ -355,6 +501,10 @@
       }
       p.vx *= p.drag == null ? 0.99 : p.drag;
       p.vy += (p.gravity || 0) * dt;
+      if (p.wobble) {
+        p.phase += dt * 2.2;
+        p.x += Math.sin(p.phase) * p.wobble * dt * 22;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       if (p.rot != null) p.rot += (p.vr || 0) * dt;
@@ -377,7 +527,21 @@
         continue;
       }
       ctx.fillStyle = p.color;
-      if (p.round) {
+      if (p.leaf) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size * 0.5, p.size * 0.26, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(28, 27, 46, 0.22)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-p.size * 0.46, 0);
+        ctx.lineTo(p.size * 0.46, 0);
+        ctx.stroke();
+        ctx.restore();
+      } else if (p.round) {
         if (p.glow) {
           ctx.save();
           ctx.shadowColor = p.color;
@@ -477,6 +641,9 @@
     shockwave: shockwave,
     ghostCell: ghostCell,
     confetti: confetti,
+    clearBurst: clearBurst,
+    setTheme: setTheme,
+    setUnlocks: setUnlocks,
     victory: victory,
     rays: rays,
     defeat: defeat,
