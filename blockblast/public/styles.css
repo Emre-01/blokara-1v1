@@ -317,156 +317,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   min-width: 0;
 }
 
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  background: none;
-  border: 0;
-  padding: 4px;
-  margin: -4px;
-  border-radius: 12px;
-}
-
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 3px;
-  background: linear-gradient(160deg, #2e2755, #171528 72%);
-  border: 2px solid var(--ink);
-  border-radius: 10px;
-  transform: rotate(-4deg);
-  box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.35);
-}
-.brand-mark svg { width: 100%; height: 100%; overflow: visible; }
-.brand-mark .piece-warm rect { fill: var(--coral); }
-.brand-mark .piece-cool rect { fill: var(--cobalt); }
-.brand-mark .piece rect {
-  stroke: #171428;
-  stroke-width: 9;
-  paint-order: stroke fill;
-}
-
-/* Çarpışma efekti: parçalar ortada tokuşur, yıldız patlar. */
-.brand-mark .piece { transform-box: fill-box; transform-origin: center; }
-.brand-mark .piece-warm { animation: clash-warm 3.8s cubic-bezier(.2, .8, .3, 1) infinite; }
-.brand-mark .piece-cool { animation: clash-cool 3.8s cubic-bezier(.2, .8, .3, 1) infinite; }
-.brand-mark .impact { transform-box: fill-box; transform-origin: center; animation: clash-flash 3.8s ease-out infinite; }
-.brand-mark .burst { fill: var(--paper); filter: drop-shadow(0 0 10px rgba(244, 183, 42, 0.95)); }
-.brand-mark .burst-ring {
-  fill: none;
-  stroke: var(--mustard);
-  stroke-width: 9;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: clash-ring 3.8s ease-out infinite;
-}
-.brand-mark .burst-core { fill: var(--mustard); }
-.brand-mark .shard-a,
-.brand-mark .shard-c { fill: var(--coral); }
-.brand-mark .shard-b,
-.brand-mark .shard-e { fill: var(--mint); }
-.brand-mark .shard-d { fill: var(--mustard); }
-.brand-mark .shard-a { animation: clash-shard-a 3.8s ease-out infinite; }
-.brand-mark .shard-b { animation: clash-shard-b 3.8s ease-out infinite; }
-.brand-mark .shard-c { animation: clash-shard-c 3.8s ease-out infinite; }
-.brand-mark .shard-d { animation: clash-shard-a 3.8s ease-out infinite; }
-.brand-mark .shard-e { animation: clash-shard-b 3.8s ease-out infinite; }
-
-/* Hız çizgileri parçaların arkasından merkeze doğru akar. */
-.brand-mark .speed-lines {
-  stroke: var(--paper);
-  stroke-width: 16;
-  stroke-linecap: round;
-  fill: none;
-}
-.brand-mark .speed-cool { stroke: var(--mint); }
-.brand-mark .speed { animation: clash-speed 3.8s ease-out infinite; }
-.brand-mark .speed-cool { animation-name: clash-speed-cool; }
-
-@keyframes clash-speed {
-  0%, 40% { transform: translateX(-26px); opacity: 0; }
-  46% { transform: translateX(0); opacity: 0.8; }
-  56%, 100% { transform: translateX(30px); opacity: 0; }
-}
-@keyframes clash-speed-cool {
-  0%, 40% { transform: translateX(26px); opacity: 0; }
-  46% { transform: translateX(0); opacity: 0.8; }
-  56%, 100% { transform: translateX(-30px); opacity: 0; }
-}
-
-@keyframes clash-warm {
-  0%, 40%, 100% { transform: translateX(-27px) rotate(-8deg); }
-  47% { transform: translateX(32px) rotate(-2deg); }
-  53% { transform: translateX(6px) rotate(-8deg); }
-  60% { transform: translateX(-5px) rotate(-6deg); }
-  72% { transform: translateX(-27px) rotate(-8deg); }
-}
-@keyframes clash-cool {
-  0%, 40%, 100% { transform: translateX(27px) rotate(8deg); }
-  47% { transform: translateX(-32px) rotate(2deg); }
-  53% { transform: translateX(-6px) rotate(8deg); }
-  60% { transform: translateX(5px) rotate(6deg); }
-  72% { transform: translateX(27px) rotate(8deg); }
-}
-@keyframes clash-flash {
-  0%, 52%, 100% { transform: scale(0.72); opacity: 0.65; }
-  58% { transform: scale(1.18); opacity: 1; }
-  66% { transform: scale(0.92); opacity: 0.92; }
-  76% { transform: scale(0.8); opacity: 0.74; }
-}
-@keyframes clash-ring {
-  0%, 51% { transform: scale(0.3); opacity: 0; }
-  57% { transform: scale(0.92); opacity: 0.95; }
-  74% { transform: scale(1.5); opacity: 0; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-@keyframes clash-shard-a {
-  0%, 52%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.8; }
-  58% { transform: translate(-10px, -18px) rotate(26deg); opacity: 1; }
-  72% { transform: translate(-20px, -33px) rotate(48deg); opacity: 0; }
-}
-@keyframes clash-shard-b {
-  0%, 52%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.8; }
-  58% { transform: translate(13px, 20px) rotate(-28deg); opacity: 1; }
-  72% { transform: translate(24px, 38px) rotate(-56deg); opacity: 0; }
-}
-@keyframes clash-shard-c {
-  0%, 52%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.75; }
-  58% { transform: translate(15px, -13px) rotate(20deg); opacity: 1; }
-  72% { transform: translate(28px, -24px) rotate(42deg); opacity: 0; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .brand-mark .piece,
-  .brand-mark .impact,
-  .brand-mark .burst-ring,
-  .brand-mark .shard,
-  .brand-mark .speed { animation: none; }
   .duel-turn.turn-swap { animation: none; }
-}
-.brand:hover .brand-mark { transform: rotate(2deg) scale(1.04); }
-.brand-mark { transition: transform 0.18s ease; }
-
-.brand-word {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 20px;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  /* Dar ekranlarda üst bar taşmasın: yazı gerekirse kısalır. */
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.brand-word em {
-  font-style: normal;
-  color: var(--coral);
-  margin-left: 3px;
-  letter-spacing: -0.02em;
 }
 
 .top-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
@@ -527,11 +379,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   text-overflow: ellipsis;
 }
 
-/* ---------- üst bardaki profil + seviye şeridi ---------- */
+/* ---------- üst bar: profil (logonun yerinde) ---------- */
 .topbar-profile {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 .topbar-profile .account-strip,
@@ -545,14 +398,14 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .topbar-profile .account-strip {
   flex: 1 1 auto;
   gap: 7px;
-  padding: 4px 9px;
+  padding: 4px 10px;
   background: var(--card);
   min-width: 0;
 }
 .topbar-profile .account-avatar {
   width: 30px;
   height: 30px;
-  font-size: 15px;
+  font-size: 14px;
 }
 /* Etiket görsel olarak gizlenir ama ekran okuyucu adı korunur. */
 .topbar-profile .account-label {
@@ -574,34 +427,16 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   text-overflow: ellipsis;
 }
 .topbar-profile .account-actions { display: none; }
+/* Coin + rekor: çerçevesiz ince şerit; üst barı şişirmez. */
 .topbar-profile .profile-strip {
   flex: 0 0 auto;
-  gap: 7px;
-  padding: 4px 9px;
+  gap: 9px;
+  padding: 4px 2px 4px 4px;
   flex-wrap: nowrap;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
-.topbar-profile .profile-level { min-width: 0; gap: 8px; }
-.topbar-profile .level-badge {
-  width: 30px;
-  height: 30px;
-  font-size: 14px;
-  border-radius: 9px;
-  box-shadow: 1.5px 1.5px 0 var(--mustard);
-}
-.topbar-profile .level-meta {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  flex: 0 0 auto;
-  width: 74px;
-}
-.topbar-profile .level-title {
-  font-size: 9.5px;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-.topbar-profile .xp-bar { height: 5px; border-width: 1.2px; }
-.topbar-profile .xp-label { display: none; }
 .topbar-profile .profile-coin,
 .topbar-profile .profile-best {
   display: inline-flex;
@@ -623,6 +458,16 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   font-weight: 700;
   color: var(--ink-soft);
 }
+.topbar-profile .profile-coin::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--mustard);
+  border: 1.4px solid var(--ink);
+  align-self: center;
+  margin-right: 1px;
+}
 
 /* Oyun ve lobide tahtaya yer açmak için profil şeridi gizlenir. */
 body[data-screen="game"] .topbar-profile,
@@ -636,17 +481,12 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   .topbar-profile .account-strip { padding: 3px 7px; gap: 5px; }
   .topbar-profile .account-avatar { width: 26px; height: 26px; font-size: 13px; }
   .topbar-profile .account-input { font-size: 12.5px; }
-  .topbar-profile .level-meta { width: 56px; }
-  .topbar-profile .profile-strip { padding: 3px 7px; gap: 5px; }
-  .topbar-profile .profile-coin em { display: none; }
+  .topbar-profile .profile-strip { padding: 3px 0 3px 2px; gap: 7px; }
 }
 @media (max-width: 344px) {
   .room-badge { font-size: 10.5px; padding: 3px 7px; letter-spacing: 0.03em; max-width: 38vw; }
-}
-
-/* Oda kodu görünürken dar ekranda marka yazısı kısalır; üst bar taşmaz. */
-@media (max-width: 420px) {
-  .topbar:has(.room-badge:not([hidden])) .brand-word { display: none; }
+  /* Reklam düğmesi görünürken dar ekranda coin yazısı yer kaplamasın. */
+  .topbar-profile .profile-coin em { display: none; }
 }
 
 /* ---------------------------- ekranlar ---------------------------- */
@@ -853,7 +693,6 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   overflow: hidden;
 }
 .coop-art { background: #f7d47b; }
-.versus-art { background: #a9b8ff; }
 .solo-art { background: #a9e0c4; }
 
 .mode-art::before {
@@ -881,7 +720,6 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   box-shadow: 4px 4px 0 rgba(28, 27, 46, 0.35);
   z-index: 1;
 }
-.mini-board.right { transform: rotate(5deg); }
 .mini-board .mb {
   grid-row: var(--mr);
   grid-column: var(--mc);
@@ -918,20 +756,29 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   letter-spacing: 0.08em;
 }
 
-.vs-stamp {
-  position: relative;
-  z-index: 2;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 18px;
-  background: var(--coral);
-  color: #fff;
-  border: 2px solid var(--ink);
-  border-radius: 10px;
-  padding: 5px 8px;
-  transform: rotate(-8deg);
-  box-shadow: 2px 2px 0 var(--ink);
+/* Başlığın yanındaki oyuncu rozetleri: hangi kutu kaç kişilik, anında belli. */
+.players-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
+.players-chip i {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 2px 4px;
+  color: #fff;
+  background: var(--cobalt);
+  border: 1.4px solid var(--ink);
+  border-radius: 5px;
+  box-shadow: 1px 1px 0 rgba(28, 27, 46, 0.35);
+}
+.players-chip i:nth-child(2) { background: var(--coral); }
+.mode-card.solo .players-chip i { background: var(--mint); }
 
 .mode-body {
   padding: clamp(16px, 2.4vw, 24px);
@@ -2121,11 +1968,47 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   0%, 100% { transform: translateX(0) rotate(0); }
   50% { transform: translateX(-2px) rotate(8deg); }
 }
-.emote-cry .em-tear { animation: emote-drop 0.9s ease-in infinite; }
+/* Ağlamada gözyaşları gözden çeneye doğru akar; iki damla sırayla düşer. */
+.emote-art .em-tear {
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+.emote-cry .em-tear-a { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) infinite; }
+.emote-cry .em-tear-b { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) 0.42s infinite; }
 @keyframes emote-drop {
-  0% { opacity: 0.35; transform: translateY(-2px); }
-  60% { opacity: 1; }
-  100% { opacity: 0.2; transform: translateY(3px); }
+  0% { opacity: 0; transform: translateY(-3px) scaleY(0.55); }
+  18% { opacity: 1; transform: translateY(1px) scaleY(1); }
+  70% { opacity: 1; transform: translateY(9px) scaleY(1.15); }
+  100% { opacity: 0; transform: translateY(15px) scaleY(0.85); }
+}
+/* Ağız hıçkırarak titrer. */
+.emote-cry .em-mouth-sob {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: emote-sob-mouth 0.62s ease-in-out infinite;
+}
+@keyframes emote-sob-mouth {
+  0%, 100% { transform: translateY(0) scaleY(0.82); }
+  50% { transform: translateY(1.4px) scaleY(1.12); }
+}
+/* Gülmede ağız açılıp kapanır, gözler kısılır: kahkaha gerçekten görünür. */
+.emote-art .em-mouth {
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+.emote-laugh .em-mouth { animation: emote-laugh-mouth 0.36s ease-in-out infinite; }
+@keyframes emote-laugh-mouth {
+  0%, 100% { transform: scaleY(0.6) translateY(-1px); }
+  45% { transform: scaleY(1.18) translateY(1px); }
+}
+.emote-laugh .em-line {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: emote-laugh-eyes 0.36s ease-in-out infinite;
+}
+@keyframes emote-laugh-eyes {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(1.4px) scaleY(0.72); }
 }
 .emote-angry .em-steam { animation: emote-steam 0.9s ease-out infinite; }
 @keyframes emote-steam {
@@ -3088,56 +2971,6 @@ body[data-screen="lobby"] .topbar-profile { display: none; }
   border-radius: 16px;
   box-shadow: 3px 3px 0 rgba(28, 27, 46, 0.14);
 }
-.profile-level { display: flex; align-items: center; gap: 12px; min-width: 210px; flex: 1; }
-.level-badge {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 22px;
-  box-shadow: 2px 2px 0 var(--mustard);
-}
-.level-meta { display: grid; gap: 3px; flex: 1; min-width: 0; }
-.level-title { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
-.level-title b { color: var(--ink); }
-.xp-bar {
-  height: 8px;
-  background: var(--paper-deep);
-  border: 1.5px solid var(--ink);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.xp-bar i {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, var(--mint), var(--sky));
-  transition: width 0.4s ease;
-}
-.profile-stats { display: flex; gap: 18px; flex-wrap: wrap; }
-.profile-stats span {
-  display: grid;
-  gap: 1px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-.profile-stats b {
-  font-family: var(--font-display);
-  font-size: 19px;
-  line-height: 1.05;
-  color: var(--ink);
-  letter-spacing: -0.02em;
-}
-
 /* Google hesabı şeridi */
 .account-strip {
   display: flex;
@@ -3793,13 +3626,6 @@ html.screen-shake { animation: screen-shake 0.46s cubic-bezier(0.36, 0.07, 0.19,
     gap: 8px;
     flex-wrap: nowrap;
   }
-  .profile-level { flex: 1; gap: 8px; }
-  .level-badge { width: 34px; height: 34px; font-size: 16px; }
-  .level-title { font-size: 12px; }
-  .xp-bar { height: 7px; }
-  .profile-stats { gap: 10px; }
-  .profile-stats span { font-size: 10px; }
-  .profile-stats b { font-size: 14px; }
 
   .quick-card {
     margin-top: 0;
@@ -3954,12 +3780,9 @@ body {
 }
 .home-col-side { overflow: hidden; }
 
-/* Sol sütun: kısa tanıtım + arkadaşla oyna */
-.home-col-main .home-hero {
-  display: block;
-  padding: 0;
-}
-.home-col-main .home-hero .hero-art { display: none; }
+/* Sol sütun: çevrimiçi oyun ön planda. Tanıtım bloğu uygulama içinde
+   yer kaplamasın; ana odak doğrudan oda kurma panelinde. */
+.home-col-main .home-hero { display: none; }
 .home-col-main .home-copy h1 {
   font-size: clamp(30px, 3.6vw, 46px);
   margin: 10px 0 8px;
@@ -4013,8 +3836,11 @@ body {
   min-height: 0;
   margin: 0;
   grid-template-columns: 1fr;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  /* İki kutu artık üçüncü kartı doldurmak için şişmez: rahat bir
+     yükseklikte kalır, sütun ortasında dengelenir. */
+  grid-template-rows: repeat(2, minmax(0, clamp(150px, 22vh, 220px)));
+  align-content: center;
+  gap: 10px;
 }
 .home-col-side .mode-card { border-radius: 16px; box-shadow: 3px 3px 0 var(--ink); }
 .home-col-side .mode-card:hover { transform: none; box-shadow: 3px 3px 0 var(--ink); }
@@ -4062,7 +3888,8 @@ body {
   .screen.home {
     display: flex;
     flex-direction: column;
-    /* Uzun ekranlarda içerik dikeyde dengelenir; sığmazsa üstten hizalanır. */
+    /* Çevrimiçi panel en üstte; içerik grubu uzun ekranlarda dikeyde
+       dengelenir, sığmayan kısa ekranlarda üstten hizalanır. */
     justify-content: safe center;
     gap: 7px;
     padding: 7px 11px 4px;
@@ -4070,10 +3897,9 @@ body {
   .home-col { display: contents; }
   .screen.home .home-hero { display: none; }
 
-  .home-label { order: 3; display: flex; }
-  .mode-grid { order: 4; }
-  .screen.home .mode-grid { flex: 0 0 auto; }
-  .online-card { order: 5; }
+  /* Çevrimiçi oyun en üstte: ana odak oda kurma paneli. Aynı cihaz
+     seçenekleri onun altında ikincil kalır. */
+  .online-card { order: 1; }
   .screen.home .online-card {
     flex: 0 0 auto;
     min-height: 0;
@@ -4081,19 +3907,22 @@ body {
     align-content: start;
     justify-content: start;
   }
-  .ach-card { order: 6; flex: 0 0 auto; }
+  .home-label { order: 2; display: flex; }
+  .mode-grid { order: 3; }
+  /* İki mod kutusu rahat dokunma yüksekliğinde kalır; artan boşluk
+     ekranın üstünde ve altında dengelenir, kutular şişmez. */
+  .screen.home .mode-grid { flex: 0 0 auto; }
+  .ach-card { order: 4; flex: 0 0 auto; }
   .home-col-side .ach-card { margin-top: 0; }
   .site-foot { display: none; }
 
-  /* Üç mod kutusu birebir aynı ölçüde: satır yükseklikleri eşitlenir,
+  /* İki mod kutusu birebir aynı ölçüde: satır yükseklikleri eşitlenir,
      böylece görsel ve başlıklar aynı hizada durur. */
   .screen.home .mode-grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
-    /* Satırlar kalan yüksekliği eşit paylaşır: ne boşluk kalır ne kaydırma
-       oluşur. İçerik en küçük boyutun altına inemez. */
-    grid-auto-rows: minmax(0, 1fr);
-    flex: 1 1 auto;
+    /* Dokunması rahat kart yüksekliği: ne minicik ne ekranı boş bırakır. */
+    grid-auto-rows: clamp(96px, 14.6vh, 150px);
     min-height: 0;
     gap: clamp(5px, 0.9vh, 8px);
   }
@@ -4111,22 +3940,22 @@ body {
   }
   .screen.home .mode-art {
     display: flex;
-    flex: 0 0 clamp(70px, 9.6vh, 104px);
-    width: clamp(70px, 9.6vh, 104px);
+    flex: 0 0 clamp(62px, 8.2vh, 92px);
+    width: clamp(62px, 8.2vh, 92px);
     height: auto;
     align-self: stretch;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    padding: 5px;
+    padding: 4px;
     border-bottom: 0;
     border-right: 2px solid var(--ink);
     overflow: hidden;
   }
   .screen.home .mode-art::before { opacity: 0.5; }
   .screen.home .mini-board {
-    width: clamp(48px, 6.8vh, 72px);
-    padding: 4px;
+    width: clamp(42px, 5.8vh, 64px);
+    padding: 3px;
     gap: 1.5px;
     border-width: 1.5px;
     border-radius: 7px;
@@ -4134,55 +3963,16 @@ body {
     transform: rotate(-4deg);
     align-self: center;
   }
-  .screen.home .mini-board.right { transform: rotate(5deg); }
   .screen.home .mini-board .mb { border-radius: 1.5px; }
 
-  /* Rakip kartı da diğerleriyle aynı genişlikte görsel kutusu kullanır.
-     İki tahta çapraz yerleşir (sadece köşelerden bindirilir), "VS" damgası
-     tam ortada durur; böylece kapışma hissi net kalır. */
-  .screen.home .versus-art {
-    flex-basis: clamp(70px, 9.6vh, 104px);
-    width: clamp(70px, 9.6vh, 104px);
-    position: relative;
-    gap: 0;
-  }
-  .screen.home .versus-art .mini-board {
-    position: absolute;
-    width: 55%;
-    padding: 3px;
-    gap: 1px;
-    box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.3);
-  }
-  .screen.home .versus-art .mini-board.left {
-    top: 7%;
-    left: 5%;
-    transform: rotate(-6deg);
-  }
-  .screen.home .versus-art .mini-board.right {
-    right: 5%;
-    bottom: 7%;
-    transform: rotate(5deg);
-  }
-  .screen.home .vs-stamp {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%) rotate(-8deg);
-    z-index: 3;
-    font-size: clamp(8px, 1.1vh, 10px);
-    padding: 1px 4px;
-    border-width: 1.5px;
-    border-radius: 5px;
-    box-shadow: 1px 1px 0 var(--ink);
-  }
   .screen.home .mode-art .tag { display: none; }
   .screen.home .mode-body {
     flex: 1 1 auto;
     min-width: 0;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
-    padding: clamp(5px, 0.9vh, 9px) 10px;
+    gap: 7px;
+    padding: clamp(4px, 0.7vh, 7px) 9px;
   }
   .screen.home .mode-body h2 {
     font-size: clamp(14px, 1.95vh, 17px);
@@ -4200,8 +3990,8 @@ body {
     justify-content: flex-end;
   }
   .screen.home .mode-actions .btn {
-    width: clamp(38px, 5.2vh, 52px);
-    height: clamp(38px, 5.2vh, 52px);
+    width: clamp(34px, 4.5vh, 46px);
+    height: clamp(34px, 4.5vh, 46px);
     min-height: 0;
     padding: 0;
     border-radius: 50%;
@@ -4226,7 +4016,6 @@ body {
 
   /* Profil, hesap ve başarımlar da yüksekliğe göre nefes alır. */
   .screen.home .profile-strip { padding: clamp(5px, 0.9vh, 10px) 12px; }
-  .screen.home .level-badge { width: clamp(30px, 4.4vh, 42px); height: clamp(30px, 4.4vh, 42px); }
   .screen.home .account-strip { padding: clamp(5px, 0.9vh, 10px) 12px; }
   .screen.home .account-avatar { width: clamp(30px, 4.4vh, 40px); height: clamp(30px, 4.4vh, 40px); }
   .screen.home .ach-card { min-height: clamp(44px, 6.2vh, 64px); }
@@ -4234,9 +4023,12 @@ body {
 }
 
 @media (max-width: 380px) {
-  .screen.home .mode-art { flex-basis: clamp(66px, 9.2vh, 88px); width: clamp(66px, 9.2vh, 88px); padding: 4px; }
-  .screen.home .mini-board { width: clamp(46px, 6.4vh, 62px); }
-  .screen.home .mode-body { padding: clamp(4px, 0.8vh, 8px) 8px; gap: 6px; }
+  .screen.home .mode-art { flex-basis: clamp(56px, 7.8vh, 78px); width: clamp(56px, 7.8vh, 78px); padding: 3px; }
+  .screen.home .mini-board { width: clamp(38px, 5.4vh, 56px); }
+  .screen.home .mode-body { padding: clamp(4px, 0.7vh, 7px) 8px; gap: 6px; }
+  .screen.home .mode-body h2 { font-size: clamp(13px, 1.8vh, 16px); }
+  .players-chip { margin-left: 4px; gap: 2px; }
+  .players-chip i { font-size: 8px; padding: 1.5px 3px; }
 }
 
 /* Geniş portre ekranlar (9:16; mağaza görselleri bu oranda çizilir):
@@ -4287,16 +4079,12 @@ body {
   .top-actions { gap: 4px; }
   .icon-btn { width: 34px; height: 34px; }
   .icon-btn svg { width: 19px; height: 19px; }
-  .brand-word { font-size: 18px; }
 }
 
 /* Çok dar / büyük görüntü ölçekli cihazlar (ör. 320 dp, ekran zoomu):
    üst bar ekranı yana doğru genişletmesin. */
 @media (max-width: 344px) {
   .topbar { padding-inline: 8px; gap: 4px; }
-  .brand { gap: 5px; padding: 2px; margin: -2px; }
-  .brand-mark { width: 28px; height: 28px; border-radius: 8px; }
-  .brand-word { font-size: 15px; }
   .top-actions { gap: 3px; }
   .icon-btn { width: 29px; height: 29px; border-width: 1.5px; box-shadow: 1.5px 1.5px 0 var(--ink); }
   .icon-btn svg { width: 16px; height: 16px; }
@@ -4306,13 +4094,11 @@ body {
 @media (max-width: 720px) and (max-height: 700px) {
   .screen.home { gap: 4px; padding-top: 4px; padding-bottom: 4px; }
   .screen.home .profile-strip { min-height: 0; padding: 5px 9px; }
-  .screen.home .level-badge { width: 30px; height: 30px; font-size: 14px; }
   .screen.home .account-strip { min-height: 0; padding: 5px 9px; }
   .screen.home .mode-grid { gap: 5px; }
-  .screen.home .mode-card { min-height: 58px; }
-  .screen.home .mode-art { flex-basis: 68px; width: 68px; padding: 3px; }
-  .screen.home .mini-board { width: 48px; padding: 3px; }
-  .screen.home .vs-stamp { font-size: 8px; padding: 1px 3px; }
+  .screen.home .mode-card { min-height: 0; }
+  .screen.home .mode-art { flex-basis: 54px; width: 54px; padding: 3px; }
+  .screen.home .mini-board { width: 38px; padding: 2px; }
   .screen.home .mode-body { padding: 5px 8px; gap: 5px; }
   .screen.home .mode-body h2 { font-size: 13px; }
   .screen.home .mode-actions .btn { width: 36px; height: 36px; }
@@ -4341,7 +4127,6 @@ body {
 }
 
 /* ---------- RTL: sayı / oran metinleri ters dönmesin ---------- */
-#xp-label,
 .ach-count,
 .score-time,
 .tp-time,
@@ -4368,19 +4153,14 @@ body {
     gap: 8px;
     border-radius: 12px;
   }
-  .screen.home .level-badge { width: 28px; height: 28px; font-size: 13px; border-radius: 9px; }
-  .screen.home .level-title { font-size: 11.5px; }
-  .screen.home .level-meta { gap: 1px; }
-  .screen.home .xp-bar { height: 6px; }
-  .screen.home .profile-stats span { font-size: 9.5px; }
   .screen.home .account-strip { padding: 4px 8px; gap: 6px; border-radius: 12px; }
   .screen.home .account-avatar { width: 28px; height: 28px; font-size: 13px; }
   .screen.home .account-label { font-size: 9px; }
   .screen.home .account-input { font-size: 13px; padding: 4px 8px; }
-  .screen.home .mode-grid { gap: 4px; }
-  .screen.home .mode-card { min-height: 46px; border-radius: 12px; }
-  .screen.home .mode-art { flex-basis: 58px; width: 58px; padding: 3px; }
-  .screen.home .mini-board { width: 42px; padding: 3px; }
+  .screen.home .mode-grid { gap: 4px; grid-auto-rows: clamp(74px, 11.6vh, 108px); }
+  .screen.home .mode-card { min-height: 0; border-radius: 12px; }
+  .screen.home .mode-art { flex-basis: 50px; width: 50px; padding: 2px; }
+  .screen.home .mini-board { width: 36px; padding: 2px; }
   .screen.home .mode-body { padding: 4px 8px; gap: 5px; }
   .screen.home .mode-body h2 { font-size: 13.5px; }
   .screen.home .mode-actions .btn { width: 32px; height: 32px; }

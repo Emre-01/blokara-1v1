@@ -864,15 +864,6 @@
     if (!PROGRESS || !app.profile) return;
     updatePurchaseStrip();
     var p = app.profile;
-    var info = PROGRESS.levelInfo(p.xp);
-    var badge = $("#level-badge");
-    if (badge) badge.textContent = info.level;
-    var num = $("#level-num");
-    if (num) num.textContent = info.level;
-    var fill = $("#xp-fill");
-    if (fill) fill.style.width = info.percent + "%";
-    var label = $("#xp-label");
-    if (label) label.textContent = info.into + " / " + info.need + " XP";
     var coins = $("#stat-coins");
     if (coins) coins.textContent = fmt(p.coins);
     var best = $("#stat-best");
@@ -4033,7 +4024,10 @@
     billing: false,
     /* null: sayfa yeni açıldı, banner'ın native durumu bilinmiyor. İlk
        senkronda her hâlükârda hide/show uygulanır. */
-    bannerShown: null
+    bannerShown: null,
+    /* Banner köprüsü değişirse (ör. native köprü yeniden bağlanırsa)
+       önbellek geçersiz sayılır ve durum yeniden uygulanır. */
+    bannerBridge: null
   };
 
   /* Sunucu adresini (APK'da gömülü adres, webde aynı köken) koruyarak yol üretir. */
@@ -4721,6 +4715,10 @@
     var bridge = window.BlokAds;
     if (!bridge || typeof bridge.showBanner !== "function" ||
         typeof bridge.hideBanner !== "function") return;
+    if (bridge !== ads.bannerBridge) {
+      ads.bannerBridge = bridge;
+      ads.bannerShown = null;
+    }
     var overlayOpen = $("#overlay") && !$("#overlay").hidden;
     var show = !!ads.banner && !ads.free && app.screen === "game" && !overlayOpen;
     if (show === ads.bannerShown) return;
@@ -4890,9 +4888,10 @@
   function updatePurchaseStrip() {
     var button = $("#buy-remove-ads");
     if (!button) return;
-    /* Düğme yalnızca reklamlar hâlâ açıkken ve uygulama satın alma
-       köprüsüne sahipken görünür; satın alma tamamlanınca kaybolur. */
-    var canBuy = !!window.BlokBilling;
+    /* Düğme yalnızca reklamlar hâlâ açıkken, reklam köprüsü varken ve
+       uygulama satın alma köprüsüne sahipken görünür. Reklamsız derlemede
+       (BlokAds yok) düğme hiç görünmez; satın alma tamamlanınca kaybolur. */
+    var canBuy = !!window.BlokBilling && !!window.BlokAds;
     button.hidden = ads.free || !canBuy;
     button.classList.toggle("is-owned", !!ads.free);
     button.setAttribute("aria-pressed", ads.free ? "true" : "false");
@@ -5454,11 +5453,6 @@
   }
 
   function bindStaticEvents() {
-    $("#brand").addEventListener("click", function () {
-      if (app.screen === "home") return;
-      leaveToHome(true);
-    });
-
     /* Aynı cihazda "aynı anda" modunda oyuncu, oynamak istediği tahtayı
        etiketindeki düğmeyle seçer. */
     $("#table-area").addEventListener("click", function (event) {

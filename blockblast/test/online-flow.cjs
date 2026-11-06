@@ -703,11 +703,9 @@ async function main() {
   }
 
   const winnerText = await a.evaluate(`(async () => {
-    document.querySelector('[data-local="versus"]').click();
-    await new Promise(r => setTimeout(r, 300));
-    /* Aynı cihazda da maç ayarları oyun başlarken sorulur. */
-    const start = document.querySelector('[data-setup-start]');
-    if (start) start.click();
+    /* Aynı cihazda iki tahtalı kart artık yok; rakip motoru yalnızca
+       çevrimiçi oyunda kullanılıyor. Sonuç akışını doğrudan başlat. */
+    window.BlokDebug.start('versus');
     await new Promise(r => setTimeout(r, 600));
     window.BlokDebug.finish(0, 'Oyuncu 1 kazandı.');
     await new Promise(r => setTimeout(r, 250));

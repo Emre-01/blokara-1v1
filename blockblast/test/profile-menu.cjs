@@ -159,33 +159,37 @@ async function main() {
   ok("avatar menü açacağını bildiriyor", avatar.popup === "dialog", avatar);
   ok("avatar ekran okuyucudan gizli değil", avatar.hidden === null, avatar);
 
-  /* ---- profil + seviye üst barda ---- */
+  /* ---- profil tek satır üst barda, çevrimiçi oyun en üstte ---- */
   const topBar = await page.evaluate(`(() => {
     const bar = document.querySelector('.topbar');
     const profile = document.getElementById('top-profile');
     const account = document.getElementById('account-strip');
-    const level = document.getElementById('profile-strip');
+    const stats = document.getElementById('profile-strip');
     const row = document.querySelector('.topbar-row');
-    const icons = document.querySelector('.top-actions');
-    const versusCard = document.querySelector('#screen-home .mode-card.versus');
+    const online = document.getElementById('online-card');
+    const modes = document.querySelector('#screen-home .mode-grid');
     return {
       profileInBar: bar.contains(profile),
       accountInProfile: profile.contains(account),
-      levelInProfile: profile.contains(level),
-      belowLogoRow: profile.getBoundingClientRect().top >= row.getBoundingClientRect().bottom - 1,
-      besideIcons: profile.getBoundingClientRect().top > icons.getBoundingClientRect().top,
-      removedFromHome: !document.getElementById('screen-home').contains(level),
+      statsInProfile: profile.contains(stats),
+      inTopRow: row.contains(profile),
+      removedFromHome: !document.getElementById('screen-home').contains(stats),
       nameInBar: bar.contains(document.getElementById('player-name')),
-      level: document.getElementById('level-num').textContent,
-      xp: document.getElementById('xp-label').textContent,
-      versusButtons: [...versusCard.querySelectorAll('.mode-actions .btn')].length
+      levelGone: !document.getElementById('level-num') && !document.getElementById('level-badge'),
+      modeCards: [...document.querySelectorAll('#screen-home .mode-card')].length,
+      versusGone: !document.querySelector('#screen-home .mode-card.versus'),
+      onlineOnTop: online.getBoundingClientRect().top < modes.getBoundingClientRect().top,
+      onlineOrder: getComputedStyle(online).order
     };
   })()`);
-  ok("profil ve seviye üst bantta, logonun altında",
-    topBar.profileInBar && topBar.accountInProfile && topBar.levelInProfile && topBar.belowLogoRow, topBar);
+  ok("profil üst barda, ikonların yanında tek satır",
+    topBar.profileInBar && topBar.accountInProfile && topBar.statsInProfile && topBar.inTopRow, topBar);
   ok("profil şeridi eski yerinden (ana ekran gövdesi) kaldırıldı", topBar.removedFromHome === true, topBar);
-  ok("seviye ve XP üst bantta dolu", topBar.level === "1" && /XP/.test(topBar.xp), topBar);
-  ok("versus kartındaki fazladan hız düğmesi kaldırıldı", topBar.versusButtons === 1, topBar);
+  ok("seviye ve XP alanları ana ekrandan tamamen kaldırıldı", topBar.levelGone === true, topBar);
+  ok("aynı cihazda iki tahtalı rakip kartı kaldırıldı",
+    topBar.modeCards === 2 && topBar.versusGone, topBar);
+  ok("çevrimiçi oyun ana ekranda en üstte",
+    topBar.onlineOnTop && topBar.onlineOrder === "1", topBar);
 
   const screenSwitch = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -337,6 +341,16 @@ async function main() {
   const purchaseFlow = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const calls = [];
+    /* Reklam köprüsü olmadan düğme görünmez (reklamsız test sürümü);
+       satın alma akışını sınamak için iki köprü de tanımlanır. */
+    window.__banner = [];
+    window.BlokAds = {
+      available: () => true,
+      hasRewarded: () => true,
+      hasBanner: () => true,
+      showBanner: () => window.__banner.push('show'),
+      hideBanner: () => window.__banner.push('hide')
+    };
     window.BlokBilling = {
       available: () => true,
       owned: () => false,
@@ -366,7 +380,9 @@ async function main() {
 
   const owned = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const banner = [];
+    const banner = window.__banner || (window.__banner = []);
+    banner.length = 0;
+    /* Yeni köprü nesnesi: uygulama banner durumunu yeniden uygular. */
     window.BlokAds = {
       available: () => true,
       hasRewarded: () => true,

@@ -28,7 +28,7 @@
         xp: profile.xp, coins: profile.coins, games: profile.games,
         wins: profile.wins, best: profile.best, bestAny: profile.bestAny
       },
-      level: document.getElementById("level-num").textContent,
+      levelGone: !document.getElementById("level-num") && !document.getElementById("level-badge"),
       homeCoins: document.getElementById("stat-coins").textContent
     };
   })();

@@ -23,45 +23,30 @@
 
 <header class="topbar">
   <div class="topbar-row">
-  <button class="brand" id="brand" type="button" aria-label="Ana menüye dön">
-    <span class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 512 512" role="img" aria-hidden="true">
-        <!-- Hız çizgileri: iki parça merkeze doğru savruluyor. -->
-        <g class="speed-lines">
-          <path class="speed speed-warm" d="M18 176h54M12 212h46M22 248h40"/>
-          <path class="speed speed-cool" d="M494 176h-54M500 212h-46M490 248h-40"/>
-        </g>
-        <!-- Kare parça: sol üstten merkeze dalar. -->
-        <g class="piece piece-warm">
-          <rect x="86" y="132" width="62" height="62" rx="13"/>
-          <rect x="150" y="132" width="62" height="62" rx="13"/>
-          <rect x="86" y="196" width="62" height="62" rx="13"/>
-          <rect x="150" y="196" width="62" height="62" rx="13"/>
-        </g>
-        <!-- L parça: sağ alttan karşıdan gelir. -->
-        <g class="piece piece-cool">
-          <rect x="292" y="196" width="62" height="62" rx="13"/>
-          <rect x="292" y="260" width="62" height="62" rx="13"/>
-          <rect x="292" y="324" width="62" height="62" rx="13"/>
-          <rect x="356" y="324" width="62" height="62" rx="13"/>
-        </g>
-        <!-- Tokuşma noktası: dört kollu kıvılcım, halka ve sıcak çekirdek. -->
-        <g class="impact">
-          <path class="burst" d="M262 152 276 208 332 222 276 236 262 292 248 236 192 222 248 208Z"/>
-          <circle class="burst-ring" cx="262" cy="222" r="74"/>
-          <circle class="burst-core" cx="262" cy="222" r="26"/>
-        </g>
-        <!-- Çarpışmadan fırlayan kıymıklar -->
-        <g class="shards">
-          <rect class="shard shard-a" x="150" y="60" width="26" height="26" rx="6"/>
-          <rect class="shard shard-b" x="330" y="392" width="24" height="24" rx="6"/>
-          <rect class="shard shard-c" x="398" y="72" width="20" height="20" rx="5"/>
-          <rect class="shard shard-d" x="72" y="382" width="18" height="18" rx="4"/>
-        </g>
-      </svg>
-    </span>
-    <span class="brand-word">Blokara<em>1v1</em></span>
-  </button>
+  <!-- Logonun yerinde artık profil var: üst bar tek satır, daha az yer kaplar. -->
+  <div class="topbar-profile" id="top-profile">
+    <section class="account-strip" id="account-strip" aria-label="Hesap">
+      <button class="account-avatar" id="account-avatar" type="button"
+              aria-label="Profil" aria-haspopup="dialog">
+        <span class="account-avatar-initial">?</span>
+      </button>
+      <div class="account-meta">
+        <label class="account-label" for="player-name">Adın</label>
+        <input id="player-name" class="account-input" name="name" type="text" maxlength="16"
+               autocomplete="nickname" placeholder="Misafir oyuncu" enterkeyhint="done">
+      </div>
+      <div class="account-actions">
+        <div class="google-slot" id="google-slot"></div>
+        <button class="btn btn-outline btn-sm" id="google-native" type="button" hidden>Google ile giriş</button>
+        <button class="btn btn-outline btn-sm" id="google-signout" type="button" hidden>Çıkış yap</button>
+      </div>
+    </section>
+
+    <section class="profile-strip" id="profile-strip" aria-label="Oyun bilgileri">
+      <span class="profile-coin"><b id="stat-coins">0</b><em>coin</em></span>
+      <span class="profile-best"><b id="stat-best">0</b><em>rekor</em></span>
+    </section>
+  </div>
   <div class="top-actions">
     <span class="room-badge" id="room-badge" hidden></span>
     <button class="icon-btn" id="friends-btn" type="button" aria-label="Arkadaşlar">
@@ -90,38 +75,6 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
   </div>
-  </div>
-
-  <!-- Profil + seviye şeridi: ana ekranın üst bandında durur, oyun
-       ekranında gizlenir (tahta alanı daralmasın). -->
-  <div class="topbar-profile" id="top-profile">
-    <section class="account-strip" id="account-strip" aria-label="Hesap">
-      <button class="account-avatar" id="account-avatar" type="button"
-              aria-label="Profil" aria-haspopup="dialog">
-        <span class="account-avatar-initial">?</span>
-      </button>
-      <div class="account-meta">
-        <label class="account-label" for="player-name">Adın</label>
-        <input id="player-name" class="account-input" name="name" type="text" maxlength="16"
-               autocomplete="nickname" placeholder="Misafir oyuncu" enterkeyhint="done">
-      </div>
-      <div class="account-actions">
-        <div class="google-slot" id="google-slot"></div>
-        <button class="btn btn-outline btn-sm" id="google-native" type="button" hidden>Google ile giriş</button>
-        <button class="btn btn-outline btn-sm" id="google-signout" type="button" hidden>Çıkış yap</button>
-      </div>
-    </section>
-
-    <section class="profile-strip" id="profile-strip" aria-label="Seviye">
-      <span class="level-badge" id="level-badge">1</span>
-      <div class="level-meta">
-        <span class="level-title">Seviye <b id="level-num">1</b></span>
-        <div class="xp-bar" aria-hidden="true"><i id="xp-fill"></i></div>
-        <span class="tiny xp-label" id="xp-label">0 / 80 XP</span>
-      </div>
-      <span class="profile-coin"><b id="stat-coins">0</b><em>coin</em></span>
-      <span class="profile-best"><b id="stat-best">0</b><em>rekor</em></span>
-    </section>
   </div>
 </header>
 
@@ -238,10 +191,10 @@
             <span class="mb c-coral" style="--mr:6;--mc:2"></span>
             <span class="mb c-coral" style="--mr:6;--mc:3"></span>
           </div>
-          <span class="tag tag-a">SOLO</span>
+          <span class="tag tag-a">P1</span>
         </div>
         <div class="mode-body">
-          <h2>Tek kişilik</h2>
+          <h2>Tek kişilik <span class="players-chip"><i>P1</i></span></h2>
           <p>Kendi tahtanda, kendi hızında. Satırları patlat, combo yap ve
             tahta tıkanana kadar rekorunu yükselt.</p>
           <div class="mode-actions">
@@ -269,7 +222,7 @@
           <span class="tag tag-b">P2</span>
         </div>
         <div class="mode-body">
-          <h2>Ortak tahta</h2>
+          <h2>Ortak tahta <span class="players-chip"><i>P1</i><i>P2</i></span></h2>
           <p>Tek tahta, tek skor. Sırayla blok koyun, satırları birlikte patlatın.
             Ne kadar dayanırsınız?</p>
           <div class="mode-actions">
@@ -283,36 +236,6 @@
         </div>
       </article>
 
-      <article class="mode-card versus">
-        <div class="mode-art versus-art" aria-hidden="true">
-          <div class="mini-board left">
-            <span class="mb c-cobalt" style="--mr:3;--mc:2"></span>
-            <span class="mb c-sky" style="--mr:4;--mc:2"></span>
-            <span class="mb c-cobalt" style="--mr:4;--mc:3"></span>
-            <span class="mb c-sky" style="--mr:5;--mc:2"></span>
-          </div>
-          <span class="vs-stamp">VS</span>
-          <div class="mini-board right">
-            <span class="mb c-coral" style="--mr:2;--mc:4"></span>
-            <span class="mb c-grape" style="--mr:3;--mc:4"></span>
-            <span class="mb c-coral" style="--mr:4;--mc:4"></span>
-            <span class="mb c-mustard" style="--mr:4;--mc:3"></span>
-          </div>
-        </div>
-        <div class="mode-body">
-          <h2>Rakip</h2>
-          <p>Herkesin kendi tahtası var, blok dizisi aynı. İlk tıkanan kaybeder;
-            skor tablosu seni bekliyor.</p>
-          <div class="mode-actions mode-actions-split">
-            <button class="btn btn-ink" type="button" data-local="versus" data-pace="turn">
-              <svg class="btn-play-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path d="M7 4.9 16.2 10 7 15.1Z" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
-              </svg>
-              <span class="btn-label">Sırayla oyna</span>
-            </button>
-          </div>
-        </div>
-      </article>
     </div>
 
     </div>
@@ -438,9 +361,9 @@
         <path class="em-line" d="M16 23l10 4M48 23l-10 4"/>
         <circle class="em-eye" cx="23" cy="33" r="3.4"/>
         <circle class="em-eye" cx="41" cy="33" r="3.4"/>
-        <path class="em-tear" d="M21 37c0 3.2-3.4 6.2-3.4 9.4a3.4 3.4 0 0 0 6.8 0c0-3.2-3.4-6.2-3.4-9.4z"/>
-        <path class="em-tear" d="M43 37c0 3.2-3.4 6.2-3.4 9.4a3.4 3.4 0 0 0 6.8 0c0-3.2-3.4-6.2-3.4-9.4z"/>
-        <path class="em-line" d="M24 51q8-9 16 0"/>
+        <path class="em-tear em-tear-a" d="M21 37c0 3.2-3.4 6.2-3.4 9.4a3.4 3.4 0 0 0 6.8 0c0-3.2-3.4-6.2-3.4-9.4z"/>
+        <path class="em-tear em-tear-b" d="M43 37c0 3.2-3.4 6.2-3.4 9.4a3.4 3.4 0 0 0 6.8 0c0-3.2-3.4-6.2-3.4-9.4z"/>
+        <path class="em-line em-mouth-sob" d="M24 51q8-9 16 0"/>
       </svg>
     </span>
     <span class="emote-chip-name">Ağlama</span>
