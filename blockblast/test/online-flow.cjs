@@ -657,6 +657,24 @@ async function main() {
     }
     const btn = document.getElementById('emote-btn');
     const visible = !!btn && !btn.hidden;
+    /* Düğme, kendi adımızın yazdığı skor kartının içinde bir rozet olmalı. */
+    const card = btn ? btn.closest('.score-card') : null;
+    const box = btn ? btn.getBoundingClientRect() : null;
+    const cardBox = card ? card.getBoundingClientRect() : null;
+    const nameBox = card ? card.querySelector('.score-name').getBoundingClientRect() : null;
+    const badge = {
+      inMine: !!card && card.classList.contains('is-mine'),
+      inScoreboard: !!card && !!card.closest('#scoreboard'),
+      overlapsName: !!(box && nameBox) &&
+        box.right > nameBox.left + 2 && box.left < nameBox.right - 2 &&
+        box.bottom > nameBox.top + 2 && box.top < nameBox.bottom - 2,
+      insideViewport: !!box && box.top >= -2 && box.right <= innerWidth + 2 &&
+        box.bottom <= innerHeight + 2 && box.left >= -2,
+      size: box ? Math.round(box.width) + "x" + Math.round(box.height) : "",
+      /* Rozet kartın dışına taşabilir; yine de kartın hemen yanında kalmalı. */
+      nearCard: !!(box && cardBox) && box.top >= cardBox.top - 12 &&
+        box.bottom <= cardBox.bottom + 12
+    };
     const debug = { screen: window.BlokDebug.snapshot().phase,
       overlay: !overlay.hidden,
       overlayText: overlay.hidden ? '' : overlay.innerText.slice(0, 80),
@@ -672,6 +690,7 @@ async function main() {
     tray.querySelector('[data-emote="laugh"]').click();
     await new Promise(r => setTimeout(r, 180));
     return { visible, debug, expanded, openBefore, chips, openAfter: !tray.hidden,
+      badge,
       mine: !!document.querySelector('.emote-bubble.emote-laugh'),
       status: document.getElementById('emote-status').textContent };
   })()`);
@@ -680,6 +699,10 @@ async function main() {
     !emoteSend.openAfter &&
     emoteSend.chips.join(",") === "laugh,clap,cry,angry" &&
     emoteSend.mine && /laugh|Gülme/i.test(emoteSend.status), emoteSend);
+  ok("emote rozeti kendi skor kartımızda, adı kapatmadan duruyor",
+    emoteSend.badge.inMine && emoteSend.badge.inScoreboard &&
+    !emoteSend.badge.overlapsName && emoteSend.badge.insideViewport &&
+    emoteSend.badge.nearCard, emoteSend.badge);
 
   const emoteSeen = await b.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 500));

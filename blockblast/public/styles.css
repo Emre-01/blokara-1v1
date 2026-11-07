@@ -449,6 +449,16 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   line-height: 1;
   letter-spacing: -0.02em;
 }
+.topbar-profile .profile-best-icon {
+  width: 12px;
+  height: 12px;
+  align-self: center;
+  fill: var(--mustard);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  flex: none;
+}
 .topbar-profile .profile-best em {
   font-style: normal;
   font-size: 8.5px;
@@ -465,7 +475,20 @@ body[data-screen="lobby"] .topbar-profile {
 }
 
 @media (max-width: 560px) {
-  .topbar-profile .profile-best em { display: none; }
+  /* Dar ekranda "rekor" sözcüğü yer kaplamasın; ama ekran okuyucu için
+     görünmez biçimde metinde kalsın. Yıldız ikonu sayının anlamını korur. */
+  .topbar-profile .profile-best em {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .topbar-profile .profile-best { gap: 3px; }
 }
 @media (max-width: 400px) {
   .topbar-profile { gap: 5px; }
@@ -1397,6 +1420,40 @@ body[data-screen="lobby"] .topbar-profile {
 .score-avatar.p2 { border-color: var(--cobalt); box-shadow: 1.5px 1.5px 0 var(--cobalt); }
 .score-avatar.has-photo { color: transparent; }
 .score-card.p2 .score-avatar.p2 { order: 2; }
+
+/* Çevrimiçi oyunda emote düğmesi, kendi adımızın yazdığı skor kartına
+   yapıştırılmış küçük bir rozet gibi durur. Kartın düzenini işgal etmez. */
+.score-card { position: relative; }
+.score-emote {
+  position: absolute;
+  top: -9px;
+  right: -7px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--mustard);
+  color: var(--ink);
+  box-shadow: 2px 2px 0 rgba(28, 27, 46, 0.22);
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.score-card.p2 .score-emote { right: auto; left: -7px; }
+/* Rozet kartın sağ üstüne taşar; adın altına girmemesi için o tarafta
+   biraz boşluk bırakılır. p2 kartında yön aynalanır. */
+.score-card.is-mine { padding-right: 26px; }
+.score-card.p2.is-mine { padding-right: 11px; padding-left: 26px; }
+.score-emote[hidden] { display: none; }
+.score-emote:hover,
+.score-emote:focus-visible { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.score-emote:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+.score-emote:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
+.score-emote[aria-expanded="true"] { background: var(--coral); color: var(--paper); }
+.score-emote-icon { width: 20px; height: 20px; display: block; }
 .score-value {
   font-family: var(--font-display);
   font-weight: 800;
@@ -4573,10 +4630,12 @@ body {
   border-radius: 9px;
   border: 1.5px solid var(--ink);
   background: var(--paper);
-  font-size: 17px;
   line-height: 1;
   overflow: hidden;
 }
+.fx-pick-icon svg { width: 24px; height: 24px; display: block; }
+.fx-pick:hover .fx-pick-icon svg { transform: scale(1.06); }
+.fx-pick-icon svg { transition: transform 0.16s ease; }
 .fx-pick-name {
   min-width: 0;
   overflow: hidden;
@@ -4740,4 +4799,8 @@ body {
   .profile-emote:focus-visible,
   .account-avatar:hover,
   .account-avatar:focus-visible { transform: none; }
+  .fx-pick-icon svg { transition: none; }
+  .fx-pick:hover .fx-pick-icon svg,
+  .score-emote:hover,
+  .score-emote:focus-visible { transform: none; }
 }

@@ -2470,8 +2470,10 @@
     var clock = s.timeMode === "turn" && !s.turnBased && s.phase === "playing"
       ? '<span class="score-time" data-clock="' + index + '">' + fmtTime(clockValue(s, index)) + "</span>"
       : "";
+    var mine = app.online && index === app.me;
     return '' +
-      '<div class="score-card p' + (index + 1) + (active ? " active" : "") + (mini ? " has-mini" : "") + '">' +
+      '<div class="score-card p' + (index + 1) + (active ? " active" : "") + (mini ? " has-mini" : "") +
+        (mine ? " is-mine" : "") + '">' +
         '<div class="score-main">' +
           '<span class="score-name">' +
             '<span class="score-avatar p' + (index + 1) + '" data-avatar-index="' + index + '" aria-hidden="true"></span>' +
@@ -2480,6 +2482,7 @@
           '<span class="score-value">' + fmt(player.score) + '</span>' +
           '<span class="score-sub">' + (offline ? '<span class="conn-flag">bağlantı yok</span>' : sub) + '</span>' +
         '</div>' +
+        (mine ? scoreEmoteButtonHTML() : "") +
         mini +
       '</div>';
   }
@@ -2995,16 +2998,31 @@
     return art ? art.innerHTML : "";
   }
 
+  function emoteFaceArtHTML(cls) {
+    return '<svg class="' + cls + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<circle cx="12" cy="12.5" r="8.4" fill="none" stroke="currentColor" stroke-width="1.9"/>' +
+      '<circle cx="8.9" cy="10.6" r="1.25" fill="currentColor"/>' +
+      '<circle cx="15.1" cy="10.6" r="1.25" fill="currentColor"/>' +
+      '<path d="M8.2 14.4q3.8 3.6 7.6 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>' +
+      '<path d="M18.6 4.2l.55 1.5 1.5.55-1.5.55-.55 1.5-.55-1.5-1.5-.55 1.5-.55z" fill="currentColor"/>' +
+      '</svg>';
+  }
+
+  /* Duel tepsisi için emote düğmesi. Çevrimiçi oyunda düğme skor kartına
+     taşındığı için burada üretilmez. */
   function emoteOpenButtonHTML() {
-    if (!emoteAllowed()) return "";
-    return '<button class="btn btn-outline btn-sm emote-open" id="emote-btn" type="button" ' +
+    if (!emoteAllowed() || app.online) return "";
+    return '<button class="btn btn-outline btn-sm emote-open" id="emote-btn" type="button" data-emote-open ' +
       'aria-label="Emote gönder" aria-expanded="false" aria-controls="emote-tray">' +
-      '<svg class="emote-open-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-        '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>' +
-        '<circle cx="8.6" cy="10" r="1.4" fill="currentColor"/>' +
-        '<circle cx="15.4" cy="10" r="1.4" fill="currentColor"/>' +
-        '<path d="M7.8 14q4.2 4 8.4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-      '</svg></button>';
+      emoteFaceArtHTML("emote-open-icon") + '</button>';
+  }
+
+  /* Çevrimiçi oyunda emote düğmesi kendi skor kartımızın içinde durur. */
+  function scoreEmoteButtonHTML() {
+    if (!emoteAllowed() || !app.online) return "";
+    return '<button class="score-emote" id="emote-btn" type="button" data-emote-open ' +
+      'aria-label="Emote gönder" aria-expanded="false" aria-controls="emote-tray">' +
+      emoteFaceArtHTML("score-emote-icon") + '</button>';
   }
 
   function updateEmoteButton() {
@@ -3157,13 +3175,8 @@
       tray.addEventListener("pointerdown", onTrayPointerDown);
       tray.addEventListener("keydown", onTrayKeyDown);
     }
-    var emoteBtn = $("#emote-btn");
-    if (emoteBtn) {
-      emoteBtn.addEventListener("click", function (event) {
-        event.stopPropagation();
-        toggleEmoteTray();
-      });
-    }
+    /* Emote düğmesinin tıklaması belge düzeyinde yakalanır (aşağıda);
+       düğme her skor tazelemesinde yeniden üretilir. */
     $$(".board").forEach(function (boardEl) {
       if (boardEl.classList.contains("readonly")) return;
       boardEl.addEventListener("pointermove", onBoardPointerMove);
@@ -4595,6 +4608,83 @@
       '</div></div>';
   }
 
+  /* Efekt seçim ikonları: emoji yerine oyunun çizgi diline uyan, kalın
+     konturlu küçük çizimler. Her efektin kendi silueti vardır. */
+  var FX_ICONS = {
+    classic:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M29 16l-7 2.5 3.2 6.7-6.7-3.2L16 29l-2.5-7-6.7 3.2 3.2-6.7L3 16l7-2.5-3.2-6.7 6.7 3.2L16 3l2.5 7 6.7-3.2-3.2 6.7z" fill="#ef6a5b" stroke="#171428" stroke-width="2" stroke-linejoin="round"/>' +
+        '<circle cx="16" cy="16" r="4.2" fill="#f4b72a" stroke="#171428" stroke-width="1.8"/>' +
+      '</svg>',
+    pixel:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<rect x="3.5" y="6" width="8" height="8" rx="1.6" fill="#ef6a5b" stroke="#171428" stroke-width="1.8"/>' +
+        '<rect x="12.5" y="3.5" width="8" height="8" rx="1.6" fill="#f4b72a" stroke="#171428" stroke-width="1.8"/>' +
+        '<rect x="21.5" y="7" width="7" height="7" rx="1.6" fill="#2da98d" stroke="#171428" stroke-width="1.8"/>' +
+        '<rect x="5" y="16" width="7" height="7" rx="1.6" fill="#3f5bd6" stroke="#171428" stroke-width="1.8"/>' +
+        '<rect x="13.5" y="13.5" width="8" height="8" rx="1.6" fill="#8a5bd6" stroke="#171428" stroke-width="1.8"/>' +
+        '<rect x="22.5" y="16.5" width="7" height="7" rx="1.6" fill="#ef6a5b" stroke="#171428" stroke-width="1.8"/>' +
+        '<rect x="7.5" y="25.5" width="6" height="5" rx="1.4" fill="#f4b72a" stroke="#171428" stroke-width="1.6"/>' +
+      '</svg>',
+    bubble:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M16 26.5c-.6 2.6 1.6 3.2 1.2 5.1" fill="none" stroke="#171428" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<ellipse cx="16" cy="13" rx="9" ry="10.4" fill="#ef6a5b" stroke="#171428" stroke-width="2"/>' +
+        '<path d="M13.6 22.6l2.4 3 2.4-3z" fill="#ef6a5b" stroke="#171428" stroke-width="1.8" stroke-linejoin="round"/>' +
+        '<ellipse cx="12.4" cy="8.8" rx="2.5" ry="3.2" fill="#fff8ec" opacity="0.7" transform="rotate(-22 12.4 8.8)"/>' +
+      '</svg>',
+    spark:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M19.4 2.5L6.8 18.2h6.2L13.2 29.5 25.8 13.8h-6.2z" fill="#f4b72a" stroke="#171428" stroke-width="2" stroke-linejoin="round"/>' +
+        '<path d="M17 8.6l-4.6 6.4h2.6" fill="none" stroke="#fff8ec" stroke-width="1.8" stroke-linecap="round"/>' +
+      '</svg>',
+    leaf:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M26.5 4.5C15 4 6.2 9.4 5.6 18.4c-.3 4.6 2.9 8.4 7.7 7.9 9.3-.9 13.6-10.9 13.2-21.8z" fill="#c9662f" stroke="#171428" stroke-width="2" stroke-linejoin="round"/>' +
+        '<path d="M7.4 27.6C11.6 19 16.6 13.4 23.5 8.6" fill="none" stroke="#f3ead8" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M12 20.4l-3.6.6M16.4 14.6l-.4-3.8M18.6 12.6l3.4-1" stroke="#f3ead8" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>' +
+      '</svg>',
+    confetti:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M4.2 28.4L11 14.8l6.6 6.6z" fill="#ef6a5b" stroke="#171428" stroke-width="2" stroke-linejoin="round"/>' +
+        '<path d="M7.6 21.6l4.4 4.4M9.8 17.2l5.8 5.8" stroke="#171428" stroke-width="1.4" opacity="0.45"/>' +
+        '<path d="M20.6 4.2c1.4 4-1.2 6-3.4 6.6M26.8 7.4c-1.8 3-4.6 3-6.2 2.4" fill="none" stroke="#f4b72a" stroke-width="2" stroke-linecap="round"/>' +
+        '<circle cx="24.6" cy="15.4" r="2.2" fill="#2da98d" stroke="#171428" stroke-width="1.5"/>' +
+        '<circle cx="16.6" cy="6.6" r="2" fill="#3f5bd6" stroke="#171428" stroke-width="1.5"/>' +
+        '<path d="M22.4 21.6l3.4 2.2-3.6 1.4z" fill="#8a5bd6" stroke="#171428" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '</svg>',
+    fireworks:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M16 2.6v6.2M16 23.2v6.2M2.6 16h6.2M23.2 16h6.2" stroke="#ef6a5b" stroke-width="2.6" stroke-linecap="round"/>' +
+        '<path d="M6.8 6.8l4.4 4.4M20.8 20.8l4.4 4.4M25.2 6.8l-4.4 4.4M11.2 20.8l-4.4 4.4" stroke="#f4b72a" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<circle cx="16" cy="16" r="3.6" fill="#8a5bd6" stroke="#171428" stroke-width="1.8"/>' +
+      '</svg>',
+    stars:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M13 3.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L13 18.4l-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9z" fill="#f4b72a" stroke="#171428" stroke-width="2" stroke-linejoin="round"/>' +
+        '<path d="M24 20.4l1.5 3.1 3.4.5-2.5 2.4.6 3.4-3-1.6-3 1.6.6-3.4-2.5-2.4 3.4-.5z" fill="#ef6a5b" stroke="#171428" stroke-width="1.7" stroke-linejoin="round"/>' +
+      '</svg>',
+    bubbles:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<circle cx="12.4" cy="19.4" r="8.6" fill="#8fd0ff" fill-opacity="0.55" stroke="#171428" stroke-width="2"/>' +
+        '<circle cx="23.4" cy="10.6" r="5.6" fill="#f7a8d4" fill-opacity="0.5" stroke="#171428" stroke-width="1.9"/>' +
+        '<circle cx="24.6" cy="25" r="4" fill="#a7e8c4" fill-opacity="0.6" stroke="#171428" stroke-width="1.8"/>' +
+        '<circle cx="9.4" cy="16.4" r="2.1" fill="#fff8ec" opacity="0.85"/>' +
+        '<circle cx="21.6" cy="8.8" r="1.4" fill="#fff8ec" opacity="0.85"/>' +
+      '</svg>',
+    galaxy:
+      '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+        '<path d="M17.6 12.8c2.4 1.6 1.6 5.4-1.4 6.4-3.6 1.2-7.4-1.6-6.6-5.4.9-4.4 6.4-6.4 10-4.2 4.2 2.6 4.4 8.4.8 11.4" fill="none" stroke="#8a5bd6" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<circle cx="16.6" cy="15.6" r="3" fill="#8fd0ff" stroke="#171428" stroke-width="1.7"/>' +
+        '<path d="M25 4.4l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z" fill="#f4b72a" stroke="#171428" stroke-width="1.2" stroke-linejoin="round"/>' +
+        '<path d="M5.6 23.4l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z" fill="#fff8ec" stroke="#171428" stroke-width="1.1" stroke-linejoin="round"/>' +
+      '</svg>'
+  };
+
+  function fxIconHTML(id) {
+    return FX_ICONS[id] || "";
+  }
+
   function fxPaneHTML() {
     function group(title, kind, list, active) {
       return '<div class="fx-group">' +
@@ -4608,7 +4698,7 @@
             ' aria-pressed="' + (on ? "true" : "false") + '"' +
             (locked && item.unlock ? ' data-fx-unlock="' + item.unlock + '"' : '') +
             (locked ? ' aria-label="' + esc(tr(item.name)) + ' · ' + esc(tr("Reklam izle")) + '"' : '') + '>' +
-            '<span class="fx-pick-icon" aria-hidden="true">' + item.icon + '</span>' +
+            '<span class="fx-pick-icon" aria-hidden="true">' + fxIconHTML(item.id) + '</span>' +
             '<span class="fx-pick-name">' + esc(tr(item.name)) +
               (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span></button>';
         }).join("") +
@@ -5979,6 +6069,15 @@
 
     var gameMenuBtn = $("#game-menu-btn");
     if (gameMenuBtn) gameMenuBtn.addEventListener("click", showMenu);
+
+    /* Emote düğmesi tepside ya da kendi skor kartımızda olabilir; ikisi de
+       aynı tepsisi açar. Düğme yeniden üretildiği için belge düzeyinde
+       dinlenir. */
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest("[data-emote-open]")) return;
+      event.stopPropagation();
+      toggleEmoteTray();
+    });
 
     $("#emote-tray").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-emote]");

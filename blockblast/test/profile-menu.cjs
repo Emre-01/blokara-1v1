@@ -334,6 +334,10 @@ async function main() {
       groups: [...document.querySelectorAll('[data-profile-pane="fx"] .fx-group-title')]
         .map((t) => t.textContent),
       locked: [...document.querySelectorAll('[data-fx-unlock]')].map((b) => b.dataset.fxUnlock),
+      icons: [...document.querySelectorAll('[data-profile-pane="fx"] .fx-pick-icon')].map((el) => ({
+        svg: el.querySelectorAll('svg').length,
+        text: el.textContent.trim()
+      })),
       saved: JSON.parse(localStorage.getItem('blokara.fx') || 'null')
     };
   })()`);
@@ -348,6 +352,8 @@ async function main() {
   ok("efekt seçimi kalıcı kaydediliyor",
     !!fx.saved && fx.saved.burst === "bubble" && fx.saved.win === "fireworks", fx.saved);
   ok("efektler iki gruba ayrılmış", fx.groups.length === 2, fx.groups);
+  ok("efekt ikonları emoji değil, çizgi SVG",
+    fx.icons.length === 10 && fx.icons.every((i) => i.svg === 1 && i.text === ""), fx.icons);
 
   /* ---- hazır avatar galerisi ---- */
   const gallery = await page.evaluate(`(async () => {

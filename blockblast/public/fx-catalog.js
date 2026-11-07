@@ -55,11 +55,12 @@
     COLORS.sky, COLORS.lime, COLORS.rose, COLORS.teal
   ];
 
+  /* Not: seçim ikonları burada tutulmaz; emoji yerine oyunun çizgi
+     diline uyan SVG'ler app.js içindeki FX_ICONS sözlüğünde tanımlıdır. */
   var BURST = [
     {
       id: "classic",
       name: "Klasik",
-      icon: "💥",
       group: "burst",
       free: true,
       sound: "classic",
@@ -74,7 +75,6 @@
     {
       id: "pixel",
       name: "Piksel",
-      icon: "🧱",
       group: "burst",
       free: true,
       sound: "pixel",
@@ -92,7 +92,6 @@
     {
       id: "bubble",
       name: "Balon",
-      icon: "🎈",
       group: "burst",
       free: true,
       sound: "bubble",
@@ -112,7 +111,6 @@
     {
       id: "spark",
       name: "Kıvılcım",
-      icon: "⚡",
       group: "burst",
       free: true,
       sound: "spark",
@@ -129,7 +127,6 @@
     {
       id: "leaf",
       name: "Yaprak",
-      icon: "🍂",
       group: "burst",
       free: false,
       unlock: "fx:burst:leaf",
@@ -148,7 +145,6 @@
     {
       id: "confetti",
       name: "Konfeti",
-      icon: "🎉",
       group: "win",
       free: true,
       sound: "confetti",
@@ -166,7 +162,6 @@
     {
       id: "fireworks",
       name: "Havai fişek",
-      icon: "🎆",
       group: "win",
       free: true,
       sound: "fireworks",
@@ -186,7 +181,6 @@
     {
       id: "stars",
       name: "Yıldız",
-      icon: "🌟",
       group: "win",
       free: true,
       sound: "stars",
@@ -206,7 +200,6 @@
     {
       id: "bubbles",
       name: "Baloncuk",
-      icon: "💧",
       group: "win",
       free: true,
       sound: "bubbles",
@@ -230,7 +223,6 @@
     {
       id: "galaxy",
       name: "Galaksi",
-      icon: "🌌",
       group: "win",
       free: false,
       unlock: "fx:win:galaxy",
