@@ -128,7 +128,7 @@ hesabınızı ve test edecek kişileri ekleyin. Aksi halde giriş penceresi
 | Tür | Önerilen ad | Kullanım |
 |---|---|---|
 | Interstitial | `Blokara 1v1 - Gecis` | Oyun sonucu kapandıktan sonra her turda bir |
-| Rewarded | `Blokara 1v1 - Odullu` | Sonuç ekranında “Reklam izle, 2× coin” |
+| Rewarded | `Blokara 1v1 - Odullu` | Emote, tema ve efekt kilidini açmak için |
 | Banner | `Blokara 1v1 - Alt Banner` | Oyun ekranının altında, oyun sırasında |
 
 Her birim için `ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ` biçiminde bir kimlik
