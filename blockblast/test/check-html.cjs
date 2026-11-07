@@ -44,3 +44,28 @@ if (problems.length) {
   process.exit(1);
 }
 console.log("index.html sağlıklı (" + ids.length + " id, " + refs.length + " varlık).");
+
+/* Emote animasyon laboratuvarı: ayrı bir geliştirici sayfası. Sunucu
+   satır içi betiği engellediği için mantığı emote-lab.js dosyasında olmalı. */
+const labFile = path.join(publicDir, "emote-lab.html");
+if (!fs.existsSync(labFile)) {
+  console.error("✗ emote-lab.html yok.");
+  process.exit(1);
+}
+const lab = fs.readFileSync(labFile, "utf8");
+const labProblems = [];
+if (/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/.test(lab)) {
+  labProblems.push("satır içi betik var; CSP engeller, emote-lab.js kullanılmalı.");
+}
+["emotes.js", "emote-lab.js", "styles.css"].forEach((ref) => {
+  if (!lab.includes('"' + ref + '"')) labProblems.push("emote-lab.html '" + ref + "' dosyasını yüklemiyor.");
+  if (!fs.existsSync(path.join(publicDir, ref))) labProblems.push("Eksik varlık: " + ref);
+});
+if (!fs.existsSync(path.join(publicDir, "emote-lab.js"))) {
+  labProblems.push("emote-lab.js yok.");
+}
+if (labProblems.length) {
+  labProblems.forEach((p) => console.error("✗ " + p));
+  process.exit(1);
+}
+console.log("emote laboratuvarı sağlıklı.");

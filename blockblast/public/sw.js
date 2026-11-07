@@ -1,13 +1,14 @@
 /* Blokara 1v1 — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v25";
+const VERSION = "blok-iki-v27";
 const SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/i18n-data.js",
   "/i18n.js",
+  "/emotes.js",
   "/app.js",
   "/game-core.js",
   "/progress.js",

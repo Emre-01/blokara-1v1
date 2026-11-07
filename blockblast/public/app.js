@@ -809,6 +809,10 @@
     app.sound = soundPref !== "0";
     updateSoundButton();
 
+    /* Emote çizimleri tek kaynaktan (emotes.js) gelir; tepsideki
+       taşıyıcıları ilk açılışta doldur. */
+    hydrateEmoteArt();
+
     if (PROGRESS) {
       app.profile = PROGRESS.load();
       PROGRESS.refreshDailyStreak(app.profile);
@@ -3021,8 +3025,21 @@
   }
 
   function emoteArtHTML(kind) {
+    /* Çizimlerin tek kaynağı emotes.js; orada yoksa eski yerleşik SVG'ye düş. */
+    if (window.BlokEmotes && typeof window.BlokEmotes.art === "function") {
+      var svg = window.BlokEmotes.art(kind);
+      if (svg) return svg;
+    }
     var art = $("#emote-tray [data-emote='" + kind + "'] .emote-chip-art");
     return art ? art.innerHTML : "";
+  }
+
+  /* Tepsideki boş taşıyıcıları tek kaynaktan gelen çizimle doldurur. */
+  function hydrateEmoteArt() {
+    $$("#emote-tray [data-emote-art]").forEach(function (slot) {
+      var html = emoteArtHTML(slot.dataset.emoteArt);
+      if (html) slot.innerHTML = html;
+    });
   }
 
   function emoteFaceArtHTML(cls) {

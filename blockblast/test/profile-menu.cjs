@@ -352,6 +352,38 @@ async function main() {
   ok("emote seçince balon canlanıyor", emotes.bubble === 1, emotes.bubble);
   ok("emote ekran okuyucuya duyuruluyor", !!emotes.status, emotes.status);
 
+  /* ---- emote çizimleri tek kaynaktan ve gerçekten animasyonlu ---- */
+  const emoteArt = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const E = window.BlokEmotes;
+    const kinds = E ? E.kinds : [];
+    const arts = kinds.map((k) => E.art(k));
+    const tray = [...document.querySelectorAll('#emote-tray [data-emote-art]')];
+    document.querySelector('[data-profile-emote="clap"]').click();
+    await sleep(160);
+    const bubbles = [...document.querySelectorAll('#emote-layer .emote-bubble-art')];
+    const bubbleArt = bubbles[bubbles.length - 1] || null;
+    const svg = bubbleArt && bubbleArt.querySelector('.emote-art');
+    const anims = bubbleArt ? bubbleArt.getAnimations({ subtree: true })
+      .map((a) => a.animationName || '').filter(Boolean) : [];
+    return {
+      kinds,
+      artsOk: arts.every((a) => a.indexOf('<svg') === 0 && a.indexOf('emote-art-') > 0),
+      unique: new Set(arts).size,
+      trayFilled: tray.length === 6 && tray.every((s) => s.querySelector('svg')),
+      hasArtClass: !!(svg && svg.getAttribute('class').indexOf('emote-art-clap') > 0),
+      anims: [...new Set(anims)].sort(),
+      clapHands: bubbleArt ? bubbleArt.querySelectorAll('.em-hand').length : 0
+    };
+  })()`);
+  ok("emote çizimleri tek kaynaktan geliyor (emotes.js)",
+    emoteArt.kinds.length === 6 && emoteArt.artsOk === true && emoteArt.unique === 6, emoteArt);
+  ok("tepsideki altı emote çizimi dolduruluyor", emoteArt.trayFilled === true, emoteArt);
+  ok("alkış iki el içeriyor", emoteArt.clapHands === 2, emoteArt.clapHands);
+  ok("alkışta el ve yüz animasyonları çalışıyor",
+    emoteArt.anims.indexOf("em-clap-l") >= 0 && emoteArt.anims.indexOf("em-clap-r") >= 0 &&
+    emoteArt.anims.indexOf("em-clap-face") >= 0, emoteArt.anims);
+
   /* ---- efekt seçimi ---- */
   const fx = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

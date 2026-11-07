@@ -2049,159 +2049,352 @@ body[data-screen="lobby"] .topbar-profile {
   75% { transform: translateX(3px) rotate(2deg); }
 }
 
+/* ------------------------------------------------------------------ */
+/* emote çizim dili                                                    */
+/* ------------------------------------------------------------------ */
+/* Yüz: sıcak sarı, kalın mürekkep konturu, üstte yumuşak parlama.
+   Tüm ifadeler aynı yüzü paylaşır; karakteri ağız, kaş ve aksesuarlar
+   taşır. Bu, küçük boyutta da anında okunur. */
 .emote-art { width: 100%; height: 100%; display: block; overflow: visible; }
-.emote-art .em-face { stroke: #171428; stroke-width: 2.6; }
-.emote-art .em-line {
-  fill: none;
+
+.emote-art .em-face {
+  fill: #f7c948;
   stroke: #171428;
-  stroke-width: 3.2;
+  stroke-width: 2.7;
+  stroke-linejoin: round;
+}
+.emote-art .em-gloss {
+  fill: none;
+  stroke: #fff3c4;
+  stroke-width: 4.6;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+/* --- ortak çizgiler --- */
+.emote-art .em-line,
+.emote-art .em-brow-thin,
+.emote-art .em-smirk,
+.emote-art .em-hand-line,
+.emote-art .em-vein,
+.emote-art .em-shades-bridge,
+.emote-art .em-lip,
+.emote-art .em-impact-line {
+  fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.emote-art .em-line.thin { stroke-width: 2.4; }
-.emote-art .em-mouth,
-.emote-art .em-eye { fill: #171428; }
-.emote-art .em-tear { fill: #8fd0ff; stroke: #171428; stroke-width: 1.4; }
-.emote-art .em-teeth { stroke: var(--paper); stroke-width: 2; stroke-linecap: round; }
-.emote-art .em-hand { transform-box: fill-box; transform-origin: center; }
-.emote-art .em-hand rect { fill: var(--coral); stroke: #171428; stroke-width: 1.8; }
-.emote-art .em-spark { fill: var(--paper); stroke: #171428; stroke-width: 1.8; }
-.emote-art .em-tear-flow {
-  fill: none;
-  stroke: #2f86d6;
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  opacity: 0.85;
-}
-.emote-art .em-steam {
-  fill: none;
+.emote-art .em-line { stroke: #171428; stroke-width: 3.3; }
+.emote-art .em-brow-thin { stroke: #171428; stroke-width: 2.5; }
+.emote-art .em-smirk { stroke: #171428; stroke-width: 3.1; }
+
+.emote-art .em-brow-heavy,
+.emote-art .em-eye,
+.emote-art .em-eye-sharp { fill: #171428; }
+.emote-art .em-eye-shine { fill: #fffdf6; }
+
+.emote-art .em-cheek { fill: #f27a58; opacity: 0.4; }
+.emote-art .em-cheek-hot { fill: #ec4a37; opacity: 0.55; }
+
+/* --- ağız --- */
+.emote-art .em-mouth-open {
+  fill: #3c1520;
   stroke: #171428;
   stroke-width: 2.2;
-  stroke-linecap: round;
-  opacity: 0.6;
+  stroke-linejoin: round;
 }
-.emote-art .em-vein {
-  fill: none;
+.emote-art .em-teeth-band { fill: #fffaf0; }
+.emote-art .em-tongue { fill: #f0695b; }
+.emote-art .em-clap-smile {
+  fill: #3c1520;
   stroke: #171428;
-  stroke-width: 2.4;
-  stroke-linecap: round;
+  stroke-width: 2;
+  stroke-linejoin: round;
 }
-.emote-laugh .em-face { fill: var(--mustard); }
-.emote-clap .em-face { fill: var(--mint); }
-.emote-cry .em-face { fill: #bfe4ff; }
-.emote-angry .em-face { fill: var(--coral); }
-.emote-love .em-face { fill: var(--rose); }
-.emote-cool .em-face { fill: var(--sky); }
+.emote-art .em-grit-mouth {
+  fill: #3c1520;
+  stroke: #171428;
+  stroke-width: 2.1;
+  stroke-linejoin: round;
+}
+.emote-art .em-grit-teeth { fill: #fffaf0; }
+.emote-art .em-grit-line { fill: none; stroke: #3c1520; stroke-width: 1.3; }
+.emote-art .em-lip { stroke: #171428; stroke-width: 1.6; opacity: 0.45; }
 
-.emote-art .em-heart { fill: #ff3d6e; stroke: #171428; stroke-width: 2; }
-.emote-art .em-float { fill: #ff6f96; opacity: 0.9; }
+/* --- gözyaşı --- */
+.emote-art .em-tear { fill: #8fd0ff; stroke: #171428; stroke-width: 1.6; }
+.emote-art .em-drop { fill: #8fd0ff; stroke: #171428; stroke-width: 1.2; }
+/* --- eller (alkış) --- */
+.emote-art .em-palm,
+.emote-art .em-finger,
+.emote-art .em-thumb {
+  fill: #fff6e2;
+  stroke: #171428;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+}
+.emote-art .em-hand-line { stroke: #171428; stroke-width: 1.3; opacity: 0.34; }
+.emote-art .em-impact-line { stroke: #f7c948; stroke-width: 2.5; }
+/* Durağan hâlde (tepsi, profil, sonuç) izler görünmez; yalnızca oyun içi
+   balonda ve laboratuvarda animasyonla belirir. */
+.emote-art .em-clap-impact { opacity: 0; }
+
+/* --- kızma --- */
+.emote-art .em-vein { stroke: #e8493a; stroke-width: 2.6; }
+/* Buhar yalnızca canlı animasyonda görünür; küçük simgede leke gibi durmasın. */
+
+/* --- sevgi --- */
+.emote-art .em-heart-eye { fill: #ff4f7e; stroke: #171428; stroke-width: 2.1; stroke-linejoin: round; }
+.emote-art .em-heart-float { fill: #ff86a6; stroke: #171428; stroke-width: 1.6; stroke-linejoin: round; }
+.emote-art .em-heart-shine { fill: none; stroke: #ffe6ee; stroke-width: 1.7; stroke-linecap: round; }
+
+/* --- havalı --- */
 .emote-art .em-shades { fill: #171428; }
-.emote-art .em-shine { fill: rgba(255, 255, 255, 0.55); }
-.emote-art .em-smirk {
-  fill: none;
-  stroke: #171428;
-  stroke-width: 3;
-  stroke-linecap: round;
+.emote-art .em-shades-bridge { stroke: #171428; stroke-width: 2.2; }
+.emote-art .em-shine { fill: #fffdf6; opacity: 0.6; }
+.emote-art .em-spark { fill: #fff6e2; stroke: #171428; stroke-width: 1.5; stroke-linejoin: round; }
+
+/* ------------------------------------------------------------------ */
+/* emote animasyonları                                                 */
+/* Yalnızca oyun içi balonda ve animasyon laboratuvarında çalışır;     */
+/* tepsideki küçük simgeler boşta kare harcamaz.                       */
+/* ------------------------------------------------------------------ */
+
+/* --- kahkaha: gövde zıplar, ağız açılıp kapanır --- */
+.emote-bubble-art .em-laugh-body,
+.emote-lab-stage .em-laugh-body {
+  transform-box: fill-box;
+  transform-origin: 50% 92%;
+  animation: em-laugh-hop 0.66s cubic-bezier(.36, .07, .19, .97) infinite;
+}
+@keyframes em-laugh-hop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  18% { transform: translateY(0.7px) scale(1.05, 0.94); }
+  42% { transform: translateY(-2.8px) scale(0.97, 1.06); }
+  62% { transform: translateY(-0.6px) scale(1.03, 0.97); }
+  82% { transform: translateY(0.4px) scale(1.01, 0.99); }
+}
+.emote-bubble-art .em-laugh-mouth,
+.emote-lab-stage .em-laugh-mouth {
+  transform-box: fill-box;
+  transform-origin: 50% 10%;
+  animation: em-laugh-mouth 0.66s ease-in-out infinite;
+}
+@keyframes em-laugh-mouth {
+  0%, 100% { transform: scaleY(0.8) translateY(-1px); }
+  42% { transform: scaleY(1.14) translateY(0.7px); }
 }
 
-/* Alkışta eller, ağlamada damlalar, kızmada buhar sürekli oynar. */
-.emote-bubble.emote-clap .em-hand-l { animation: emote-hand-l 0.6s ease-in-out infinite; }
-.emote-bubble.emote-clap .em-hand-r { animation: emote-hand-r 0.6s ease-in-out infinite; }
-@keyframes emote-hand-l {
-  0%, 100% { transform: translateX(0) rotate(0); }
-  50% { transform: translateX(4px) rotate(-7deg); }
-}
-@keyframes emote-hand-r {
-  0%, 100% { transform: translateX(0) rotate(0); }
-  50% { transform: translateX(-4px) rotate(7deg); }
-}
-/* Ağlamada gözyaşları gözden çeneye doğru akar; iki damla sırayla düşer. */
-.emote-art .em-tear {
+/* --- alkış: iki el açılır, ortada şaklar, kıvılcım patlar --- */
+/* SVG'de varsayılan transform-box view-box'dir; bu yüzden transform-origin
+   0 0 tuvalin sol üstüne denk gelir ve el ekran boyunca savrulur. Bilek
+   noktasından döndürmek için fill-box kullanılır. */
+.emote-bubble-art .em-hand,
+.emote-lab-stage .em-hand {
   transform-box: fill-box;
-  transform-origin: center top;
+  transform-origin: 50% 86%;
 }
-.emote-bubble.emote-cry .em-tear-a { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) infinite; }
-.emote-bubble.emote-cry .em-tear-b { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) 0.42s infinite; }
-/* Yanaklardaki ıslak iz, damlalarla birlikte aşağı akar. */
-.emote-bubble.emote-cry .em-tear-flow {
-  stroke-dasharray: 5 11;
-  animation: emote-tear-flow 1.15s linear infinite;
+.emote-bubble-art .em-hand-l,
+.emote-lab-stage .em-hand-l {
+  animation: em-clap-l 0.62s cubic-bezier(.4, .05, .25, 1) infinite;
 }
-@keyframes emote-tear-flow {
-  0% { stroke-dashoffset: 16; opacity: 0.35; }
-  55% { opacity: 0.9; }
-  100% { stroke-dashoffset: 0; opacity: 0.35; }
+.emote-bubble-art .em-hand-r,
+.emote-lab-stage .em-hand-r {
+  animation: em-clap-r 0.62s cubic-bezier(.4, .05, .25, 1) infinite;
 }
-@keyframes emote-drop {
-  0% { opacity: 0; transform: translateY(-3px) scaleY(0.55); }
-  18% { opacity: 1; transform: translateY(1px) scaleY(1); }
-  70% { opacity: 1; transform: translateY(9px) scaleY(1.15); }
-  100% { opacity: 0; transform: translateY(15px) scaleY(0.85); }
+@keyframes em-clap-l {
+  0%, 100% { transform: translate(-7.2px, 0.6px) rotate(-13deg); }
+  40% { transform: translate(0.6px, -0.4px) rotate(2deg); }
+  54% { transform: translate(-0.8px, 0.2px) rotate(-1deg); }
+  74% { transform: translate(-5.6px, 0.6px) rotate(-11deg); }
 }
-/* Ağız hıçkırarak titrer. */
-.emote-bubble.emote-cry .em-mouth-sob {
+@keyframes em-clap-r {
+  0%, 100% { transform: translate(7.2px, 0.6px) rotate(13deg); }
+  40% { transform: translate(-0.6px, -0.4px) rotate(-2deg); }
+  54% { transform: translate(0.8px, 0.2px) rotate(1deg); }
+  74% { transform: translate(5.6px, 0.6px) rotate(11deg); }
+}
+.emote-bubble-art .em-clap-impact,
+.emote-lab-stage .em-clap-impact {
   transform-box: fill-box;
   transform-origin: center;
-  animation: emote-sob-mouth 0.62s ease-in-out infinite;
+  animation: em-clap-impact 0.62s cubic-bezier(.4, .05, .25, 1) infinite;
 }
-@keyframes emote-sob-mouth {
-  0%, 100% { transform: translateY(0) scaleY(0.82); }
-  50% { transform: translateY(1.4px) scaleY(1.12); }
+@keyframes em-clap-impact {
+  0%, 30% { opacity: 0; transform: scale(0.25); }
+  40% { opacity: 1; transform: scale(1.12); }
+  50% { opacity: 0.95; transform: scale(1); }
+  66% { opacity: 0; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(0.25); }
 }
-/* Gülmede ağız açılıp kapanır, gözler kısılır: kahkaha gerçekten görünür. */
-.emote-art .em-mouth {
+.emote-bubble-art .em-clap-face,
+.emote-lab-stage .em-clap-face {
   transform-box: fill-box;
-  transform-origin: center top;
+  transform-origin: 50% 100%;
+  animation: em-clap-face 0.62s cubic-bezier(.4, .05, .25, 1) infinite;
 }
-.emote-bubble.emote-laugh .em-mouth { animation: emote-laugh-mouth 0.36s ease-in-out infinite; }
-@keyframes emote-laugh-mouth {
-  0%, 100% { transform: scaleY(0.6) translateY(-1px); }
-  45% { transform: scaleY(1.18) translateY(1px); }
+@keyframes em-clap-face {
+  0%, 30%, 100% { transform: scale(1, 1); }
+  42% { transform: scale(1.035, 0.965); }
+  54% { transform: scale(0.995, 1.008); }
 }
-.emote-bubble.emote-laugh .em-line {
+.emote-bubble-art .em-clap-mouth,
+.emote-lab-stage .em-clap-mouth {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: em-clap-mouth 0.62s cubic-bezier(.4, .05, .25, 1) infinite;
+}
+@keyframes em-clap-mouth {
+  0%, 30%, 100% { transform: scaleY(1); }
+  42% { transform: scaleY(1.5); }
+  60% { transform: scaleY(0.92); }
+}
+
+/* --- ağlama: damlalar düşer, gövde hıçkırır --- */
+.emote-bubble-art .emote-art-cry,
+.emote-lab-stage .emote-art-cry {
+  transform-origin: 50% 88%;
+  animation: em-sob-body 1.2s ease-in-out infinite;
+}
+@keyframes em-sob-body {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  22% { transform: translateY(1.4px) scale(1.02, 0.98); }
+  46% { transform: translateY(0) scale(0.99, 1.01); }
+  68% { transform: translateY(1px) scale(1.015, 0.985); }
+}
+.emote-bubble-art .em-tear,
+.emote-lab-stage .em-tear {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: em-tear-swell 1.2s ease-in-out infinite;
+}
+.emote-bubble-art .em-tear-b,
+.emote-lab-stage .em-tear-b { animation-delay: 0.34s; }
+@keyframes em-tear-swell {
+  0%, 100% { transform: scaleY(0.86) scaleX(0.94); }
+  40% { transform: scaleY(1.08) scaleX(1.02); }
+}
+.emote-bubble-art .em-drop,
+.emote-lab-stage .em-drop {
   transform-box: fill-box;
   transform-origin: center;
-  animation: emote-laugh-eyes 0.36s ease-in-out infinite;
+  animation: em-drop-fall 1.2s cubic-bezier(.33, .02, .62, 1) infinite;
 }
-@keyframes emote-laugh-eyes {
-  0%, 100% { transform: translateY(0) scaleY(1); }
-  50% { transform: translateY(1.4px) scaleY(0.72); }
+.emote-bubble-art .em-drop-b,
+.emote-lab-stage .em-drop-b { animation-delay: 0.47s; }
+@keyframes em-drop-fall {
+  0% { opacity: 0; transform: translateY(-2px) scale(0.4); }
+  20% { opacity: 1; transform: translateY(0) scale(1); }
+  66% { opacity: 0.9; transform: translateY(4.4px) scaleY(1.14) scaleX(0.94); }
+  100% { opacity: 0; transform: translateY(8.6px) scaleY(0.82) scaleX(0.72); }
 }
-.emote-bubble.emote-angry .em-steam { animation: emote-steam 0.9s ease-out infinite; }
-@keyframes emote-steam {
-  0% { opacity: 0.15; transform: translateY(2px); }
-  55% { opacity: 0.7; }
-  100% { opacity: 0.15; transform: translateY(-2px); }
+  60% { opacity: 0.95; }
+  100% { stroke-dashoffset: 0; opacity: 0.4; }
 }
-.emote-bubble.emote-angry .em-vein { animation: emote-vein 0.7s ease-in-out infinite; }
-@keyframes emote-vein {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+.emote-bubble-art .em-mouth-sob,
+.emote-lab-stage .em-mouth-sob {
+  transform-box: fill-box;
+  transform-origin: 50% 20%;
+  animation: em-sob-mouth 0.6s ease-in-out infinite;
 }
-.emote-bubble.emote-love .emote-bubble-art { animation: emote-love-beat 0.62s ease-in-out 4; }
-.emote-bubble.emote-cool .emote-bubble-art { animation: emote-cool-nod 0.5s ease-in-out 4; }
-@keyframes emote-love-beat {
-  0%, 100% { transform: scale(1) rotate(0); }
-  35% { transform: scale(1.12) rotate(-3deg); }
-  70% { transform: scale(0.98) rotate(2deg); }
+@keyframes em-sob-mouth {
+  0%, 100% { transform: scaleY(0.82) translateY(-0.6px); }
+  50% { transform: scaleY(1.12) translateY(0.8px); }
 }
-@keyframes emote-cool-nod {
-  0%, 100% { transform: translateY(0) rotate(0); }
-  45% { transform: translateY(-4px) rotate(-4deg); }
+
+/* --- kızma: sarsılır, damar atar --- */
+.emote-bubble-art .emote-art-angry,
+.emote-lab-stage .emote-art-angry {
+  animation: em-rage-shake 0.5s cubic-bezier(.36, .07, .19, .97) infinite;
 }
-.emote-bubble.emote-love .em-float { animation: emote-float 1.1s ease-in-out infinite; }
-.emote-bubble.emote-love .em-float + .em-float { animation-delay: 0.4s; }
-@keyframes emote-float {
-  0% { opacity: 0.25; transform: translateY(3px) scale(0.9); }
-  55% { opacity: 1; }
-  100% { opacity: 0.3; transform: translateY(-4px) scale(1.08); }
+@keyframes em-rage-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(-1.5px, 0.6px) rotate(-1.7deg); }
+  40% { transform: translate(1.5px, -0.5px) rotate(1.7deg); }
+  60% { transform: translate(-1.1px, 0.4px) rotate(-1.2deg); }
+  80% { transform: translate(0.9px, -0.4px) rotate(0.9deg); }
 }
-.emote-bubble.emote-cool .em-shine { animation: emote-shine 1.2s ease-in-out infinite; }
-@keyframes emote-shine {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.9; }
+.emote-bubble-art .em-vein,
+.emote-lab-stage .em-vein {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: em-vein 0.5s ease-in-out infinite;
 }
-.emote-bubble.emote-cool .em-spark { animation: emote-vein 0.8s ease-in-out infinite; }
+@keyframes em-vein {
+  0%, 100% { opacity: 0.55; transform: scale(0.9); }
+  45% { opacity: 1; transform: scale(1.12); }
+}
+.emote-bubble-art .emote-art-angry .em-cheek-hot,
+.emote-lab-stage .emote-art-angry .em-cheek-hot { animation: em-vein 0.5s ease-in-out infinite; }
+
+/* --- sevgi: kalpler uçar, gövde kalp atışıyla büyür --- */
+.emote-bubble-art .emote-art-love,
+.emote-lab-stage .emote-art-love {
+  transform-origin: 50% 70%;
+  animation: em-love-beat 0.9s cubic-bezier(.35, .1, .3, 1) infinite;
+}
+@keyframes em-love-beat {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  18% { transform: scale(1.07) rotate(-1.4deg); }
+  36% { transform: scale(1.01) rotate(0deg); }
+  54% { transform: scale(1.045) rotate(1.2deg); }
+}
+.emote-bubble-art .em-float,
+.emote-lab-stage .em-float {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: em-float-heart 1.7s ease-in-out infinite;
+}
+.emote-bubble-art .em-float-b,
+.emote-lab-stage .em-float-b { animation-delay: 0.8s; }
+@keyframes em-float-heart {
+  0% { opacity: 0; transform: translateY(4px) scale(0.6) rotate(-6deg); }
+  25% { opacity: 1; transform: translateY(1px) scale(1) rotate(0deg); }
+  70% { opacity: 0.9; transform: translateY(-4px) scale(1.06) rotate(5deg); }
+  100% { opacity: 0; transform: translateY(-8px) scale(1.12) rotate(9deg); }
+}
+.emote-bubble-art .em-heart-eye,
+.emote-lab-stage .em-heart-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: em-heart-eye 0.9s cubic-bezier(.35, .1, .3, 1) infinite;
+}
+@keyframes em-heart-eye {
+  0%, 100% { transform: scale(1); }
+  18% { transform: scale(1.09); }
+  36% { transform: scale(1); }
+}
+
+/* --- havalı: baş sallanır, camda ışık gezer --- */
+.emote-bubble-art .emote-art-cool,
+.emote-lab-stage .emote-art-cool {
+  transform-origin: 50% 85%;
+  animation: em-cool-nod 1.5s cubic-bezier(.4, 0, .3, 1) infinite;
+}
+@keyframes em-cool-nod {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  28% { transform: translateY(-2.4px) rotate(-2.4deg); }
+  52% { transform: translateY(0.6px) rotate(0.6deg); }
+  72% { transform: translateY(-1px) rotate(-1.2deg); }
+}
+.emote-bubble-art .em-shine,
+.emote-lab-stage .em-shine {
+  animation: em-shine 1.5s ease-in-out infinite;
+}
+@keyframes em-shine {
+  0%, 100% { opacity: 0.18; }
+  40% { opacity: 0.85; }
+}
+.emote-bubble-art .em-cool-spark,
+.emote-lab-stage .em-cool-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: em-cool-spark 1.5s ease-in-out infinite;
+}
+@keyframes em-cool-spark {
+  0%, 100% { opacity: 0.25; transform: scale(0.7) rotate(0deg); }
+  45% { opacity: 1; transform: scale(1.15) rotate(35deg); }
+}
 
 /* Gönderim tepsisi: alt çubuğun hemen üstünde dört büyük düğme. */
 .emote-tray {
@@ -2296,6 +2489,8 @@ body[data-screen="lobby"] .topbar-profile {
   }
   .emote-bubble-art,
   .emote-bubble-art *,
+  .emote-lab-stage,
+  .emote-lab-stage *,
   .emote-chip,
   .emote-chip-art * { animation: none !important; }
 }
