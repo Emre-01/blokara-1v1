@@ -62,6 +62,7 @@ if (untranslated.length) problems.push("'Çevrimiçi' çevrilmemiş: " + untrans
 const dynamic = [
   "Efektler", "Avatar", "Klasik", "Piksel", "Baloncuk", "Kıvılcım",
   "Konfeti", "Havai fişek", "Yıldız", "Kutu patlama efekti", "Kazanma efekti",
+  "Yaprak", "Galaksi",
   "Avatar seç", "Avatarı kaldır", "Avatar seçildi.", "Avatar kaldırıldı.",
   "Tilki", "Panda", "Kurbağa", "Kedi", "Ayı", "Penguen", "Aslan", "Tavşan",
   "Robot", "Uzaylı", "Kral", "Havalı",

@@ -1,7 +1,7 @@
 /* Blokara 1v1 — çevrimdışı kullanım için basit önbellek */
 "use strict";
 
-const VERSION = "blok-iki-v21";
+const VERSION = "blok-iki-v22";
 const SHELL = [
   "/",
   "/index.html",
@@ -11,6 +11,7 @@ const SHELL = [
   "/app.js",
   "/game-core.js",
   "/progress.js",
+  "/fx-catalog.js",
   "/fx.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",

@@ -195,19 +195,24 @@ async function main() {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     window.BlokDebug.start('solo', { timeMode: 'none' });
     await sleep(300);
-    const inGame = getComputedStyle(document.getElementById('top-profile')).display;
+    const gameStyle = getComputedStyle(document.getElementById('top-profile'));
+    const inGame = gameStyle.display;
+    const gameVis = gameStyle.visibility;
     const attr = document.body.dataset.screen;
     window.BlokDebug.finish(0, 'test');
     await sleep(300);
     const homeBtn = document.querySelector('#overlay [data-home]');
     if (homeBtn) homeBtn.click();
     await sleep(400);
-    const inHome = getComputedStyle(document.getElementById('top-profile')).display;
-    return { inGame, inHome, attr, backHome: document.body.dataset.screen };
+    const homeStyle = getComputedStyle(document.getElementById('top-profile'));
+    const inHome = homeStyle.display;
+    const homeVis = homeStyle.visibility;
+    return { inGame, gameVis, inHome, homeVis, attr, backHome: document.body.dataset.screen };
   })()`);
-  ok("oyuna girince üst profil gizleniyor", screenSwitch.inGame === "none" && screenSwitch.attr === "game", screenSwitch);
+  ok("oyuna girince üst profil gizleniyor ama yerini koruyor",
+    screenSwitch.gameVis === "hidden" && screenSwitch.inGame === "flex" && screenSwitch.attr === "game", screenSwitch);
   ok("ana menüye dönünce üst profil geri geliyor",
-    screenSwitch.inHome !== "none" && screenSwitch.backHome === "home", screenSwitch);
+    screenSwitch.homeVis === "visible" && screenSwitch.backHome === "home", screenSwitch);
 
   await page.evaluate(`document.getElementById('account-avatar').click(); new Promise(r => setTimeout(r, 300))`);
   const opened = await page.evaluate(`({
@@ -328,11 +333,16 @@ async function main() {
         .map((b) => b.dataset.fxPick),
       groups: [...document.querySelectorAll('[data-profile-pane="fx"] .fx-group-title')]
         .map((t) => t.textContent),
+      locked: [...document.querySelectorAll('[data-fx-unlock]')].map((b) => b.dataset.fxUnlock),
       saved: JSON.parse(localStorage.getItem('blokara.fx') || 'null')
     };
   })()`);
-  ok("dört patlama efekti var", fx.burstIds.join(",") === "classic,pixel,bubble,spark", fx.burstIds);
-  ok("dört kazanma efekti var", fx.winIds.join(",") === "confetti,fireworks,stars,bubbles", fx.winIds);
+  ok("beş patlama efekti var",
+    fx.burstIds.join(",") === "classic,pixel,bubble,spark,leaf", fx.burstIds);
+  ok("beş kazanma efekti var",
+    fx.winIds.join(",") === "confetti,fireworks,stars,bubbles,galaxy", fx.winIds);
+  ok("kilitli efektler reklam anahtarı taşıyor",
+    fx.locked.join(",") === "fx:burst:leaf,fx:win:galaxy", fx.locked);
   ok("seçilen efekt işaretleniyor",
     fx.activeBurst.join(",") === "bubble" && fx.activeWin.join(",") === "fireworks", fx);
   ok("efekt seçimi kalıcı kaydediliyor",

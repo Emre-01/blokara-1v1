@@ -56,20 +56,17 @@
     { id: "avatar", label: "Avatar" }
   ];
 
-  /* Kutu patlama ve kazanma efektleri. Görsel motor fx.js'te, sesler bu
-     dosyadaki sfxBurstFx / sfxWinFx içinde eşleştirilir. */
-  var BURST_EFFECTS = [
-    { id: "classic", name: "Klasik", icon: "💥" },
-    { id: "pixel", name: "Piksel", icon: "🧱" },
-    { id: "bubble", name: "Balon", icon: "🎈" },
-    { id: "spark", name: "Kıvılcım", icon: "⚡" }
-  ];
-  var WIN_EFFECTS = [
-    { id: "confetti", name: "Konfeti", icon: "🎉" },
-    { id: "fireworks", name: "Havai fişek", icon: "🎆" },
-    { id: "stars", name: "Yıldız", icon: "🌟" },
-    { id: "bubbles", name: "Baloncuk", icon: "💧" }
-  ];
+  /* Kutu patlama ve kazanma efektleri fx-catalog.js dosyasından gelir.
+     Yeni efekt eklemek için yalnızca kataloğa bir kayıt eklenir; bu dosya
+     listeyi, görsel motor ise tarifi okur. Sesler sfxBurstFx / sfxWinFx
+     içinde efekt kimliğine göre eşleştirilir. */
+  var FX_CATALOG = (window.BLOK_FX_CATALOG || { burst: [], win: [] });
+  var BURST_EFFECTS = FX_CATALOG.burst || [];
+  var WIN_EFFECTS = FX_CATALOG.win || [];
+
+  function fxUnlocked(item) {
+    return !!item && (item.free !== false || !item.unlock || isUnlocked(item.unlock));
+  }
 
   /* Hazır avatarlar: dosya seçmek yerine menüden seçilir. Her avatar
      yerleşik SVG olarak üretilir; böylece çevrimdışı da çalışır. */
@@ -561,6 +558,19 @@
         })(i);
       }
       tone(2200, 0.18, { type: "sine", to: 700, volume: 0.022 });
+      return;
+    }
+    if (kind === "leaf") {
+      /* Kuru yaprak hışırtısı: kısa gürültü ve alçalan sıcak tonlar. */
+      noiseBurst(0.14, 0.035, 2400);
+      [523.25, 440, 349.23].forEach(function (freq, index) {
+        setTimeout(function () {
+          tone(freq, 0.14, { type: "triangle", to: freq * 0.82, volume: 0.03 * power, pan: (index - 1) * 0.5 });
+        }, index * 46);
+      });
+      setTimeout(function () {
+        noiseBurst(0.1, 0.028, 1700);
+      }, 110);
     }
   }
 
@@ -597,6 +607,18 @@
             tone(base * 3.1, 0.06, { type: "sine", volume: 0.026 });
           }, 150);
         }, delay);
+      });
+      return;
+    }
+    if (kind === "galaxy") {
+      /* Uzay hissi: geniş bir süpürme, derin pedal ve yükselen kristal çanlar. */
+      noiseSweep(0.9, 0.018, 400, 7200, -0.9, 0.9);
+      tone(73.42, 1.1, { type: "sine", volume: 0.05, attack: 0.08 });
+      tone(110, 0.9, { type: "triangle", to: 164.81, volume: 0.028, attack: 0.12 });
+      [523.25, 783.99, 1046.5, 1318.51, 1567.98, 2093].forEach(function (freq, index) {
+        setTimeout(function () {
+          tone(freq, 0.42, { type: "sine", volume: 0.026, pan: -0.8 + index * 0.32 });
+        }, 160 + index * 120);
       });
       return;
     }
@@ -993,94 +1015,192 @@
   function avatarSVG(avatar) {
     var a = avatar;
     var ink = "#171428";
+    var white = "#fff8ec";
     var s = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'];
-    s.push('<rect width="64" height="64" rx="32" fill="' + a.bg + '"/>');
-    /* Kafanın arkasında kalan aksesuarlar. */
+    s.push('<defs><clipPath id="c"><circle cx="32" cy="32" r="32"/></clipPath></defs>');
+    s.push('<g clip-path="url(#c)">');
+    s.push('<rect width="64" height="64" fill="' + a.bg + '"/>');
+    s.push('<ellipse cx="32" cy="58" rx="21" ry="5" fill="rgba(23,20,40,0.12)"/>');
+
     if (a.acc === "ears") {
-      s.push('<path d="M14 26 17 11l11 8z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
-      s.push('<path d="M50 26 47 11 36 19z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
-      s.push('<path d="M18 22l1.4-6 4 3z" fill="#e8853f"/><path d="M46 22l-1.4-6-4 3z" fill="#e8853f"/>');
+      /* Tilki: sinsi bakış, yarı kapalı gözler ve yamuk gülüş. */
+      s.push('<path d="M13 27 15 8l13 10z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M51 27 49 8 36 18z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M17 20l1-6 4 3z" fill="#e8853f"/><path d="M47 20l-1-6-4 3z" fill="#e8853f"/>');
+      s.push('<circle cx="32" cy="35" r="18" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<path d="M14 35l-5 2 5 3M50 35l5 2-5 3" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2" stroke-linejoin="round"/>');
+      s.push('<ellipse cx="32" cy="43" rx="12" ry="8" fill="' + white + '"/>');
+      s.push('<path d="M18 26l7 2M46 26l-7 2" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<path d="M19.5 31.5q4-3 8.5 0M36 31.5q4-3 8.5 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<circle cx="23.5" cy="33.4" r="2" fill="' + ink + '"/><circle cx="40.5" cy="33.4" r="2" fill="' + ink + '"/>');
+      s.push('<circle cx="24.2" cy="32.7" r="0.7" fill="' + white + '"/><circle cx="41.2" cy="32.7" r="0.7" fill="' + white + '"/>');
+      s.push('<path d="M29 38h6l-3 3z" fill="' + ink + '"/>');
+      s.push('<path d="M25 42.5q5 5 13 .5" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<path d="M33 44l1.5 2.6 2-2.6z" fill="' + white + '" stroke="' + ink + '" stroke-width="1.3" stroke-linejoin="round"/>');
+      s.push('<path d="M13 40h6M13 45h6M51 40h-6M51 45h-6" stroke="' + ink + '" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>');
     } else if (a.acc === "panda") {
-      s.push('<circle cx="17" cy="20" r="6" fill="' + ink + '"/><circle cx="47" cy="20" r="6" fill="' + ink + '"/>');
+      /* Panda: rahat, yarı uykulu bakış ve ağzında bambu. */
+      s.push('<circle cx="16" cy="20" r="7" fill="' + ink + '"/><circle cx="48" cy="20" r="7" fill="' + ink + '"/>');
+      s.push('<circle cx="32" cy="35" r="19" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<ellipse cx="24" cy="33" rx="6" ry="7.4" fill="' + ink + '" transform="rotate(-14 24 33)"/>');
+      s.push('<ellipse cx="40" cy="33" rx="6" ry="7.4" fill="' + ink + '" transform="rotate(14 40 33)"/>');
+      s.push('<circle cx="24.5" cy="32.6" r="2.3" fill="' + white + '"/><circle cx="40.5" cy="32.6" r="2.3" fill="' + white + '"/>');
+      s.push('<circle cx="25.2" cy="32" r="1.1" fill="' + ink + '"/><circle cx="41.2" cy="32" r="1.1" fill="' + ink + '"/>');
+      s.push('<path d="M18 26q6-2 11 .5M46 25q-4 2-8 2" fill="none" stroke="' + ink + '" stroke-width="1.9" stroke-linecap="round" opacity="0.75"/>');
+      s.push('<path d="M29 40h6l-3 2.6z" fill="' + ink + '"/>');
+      s.push('<path d="M26 44q6 3.5 11-.5" fill="none" stroke="' + ink + '" stroke-width="2.1" stroke-linecap="round"/>');
+      s.push('<rect x="45" y="41" width="3.2" height="15" rx="1.6" fill="#4fae8b" stroke="' + ink + '" stroke-width="1.2"/>');
+      s.push('<path d="M46.5 43q-6-3-8 .5 4 2.5 8-.5zM46.5 48q6-3 8 .5-4 2.5-8-.5z" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.1" stroke-linejoin="round"/>');
+      s.push('<circle cx="16" cy="41" r="3" fill="#f2553d" opacity="0.3"/><circle cx="48" cy="41" r="3" fill="#f2553d" opacity="0.3"/>');
     } else if (a.acc === "frog") {
-      s.push('<circle cx="21" cy="18" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
-      s.push('<circle cx="43" cy="18" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      /* Kurbağa: fırlamış gözler ve koca sırıtış. */
+      s.push('<circle cx="21" cy="19" r="9" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<circle cx="43" cy="19" r="9" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<circle cx="32" cy="36" r="20" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<circle cx="21" cy="19" r="6" fill="' + white + '"/><circle cx="43" cy="19" r="6" fill="' + white + '"/>');
+      s.push('<circle cx="22.8" cy="20" r="3" fill="' + ink + '"/><circle cx="44.8" cy="20" r="3" fill="' + ink + '"/>');
+      s.push('<circle cx="23.8" cy="19" r="1" fill="' + white + '"/><circle cx="45.8" cy="19" r="1" fill="' + white + '"/>');
+      s.push('<path d="M13 15q8-3 14 2M37 17q6-5 14-2" fill="none" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<path d="M17 37q15 14 30 0" fill="none" stroke="' + ink + '" stroke-width="2.5" stroke-linecap="round"/>');
+      s.push('<path d="M23 41q9 6 18 0" fill="#7c4a2d" opacity="0.55"/>');
+      s.push('<circle cx="25" cy="34" r="1.1" fill="' + ink + '"/><circle cx="39" cy="34" r="1.1" fill="' + ink + '"/>');
+      s.push('<circle cx="17" cy="35" r="2.4" fill="#5f9c3a" opacity="0.7"/><circle cx="47" cy="35" r="2.4" fill="#5f9c3a" opacity="0.7"/>');
+      s.push('<circle cx="28" cy="28" r="1.6" fill="#5f9c3a" opacity="0.6"/><circle cx="38" cy="27" r="1.2" fill="#5f9c3a" opacity="0.6"/>');
     } else if (a.acc === "cat") {
-      s.push('<path d="M16 25 18 11l10 7z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
-      s.push('<path d="M48 25 46 11 36 18z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
-      s.push('<path d="M19 21l.9-5 3.4 2.4z" fill="#f7a8d4"/><path d="M45 21l-.9-5-3.4 2.4z" fill="#f7a8d4"/>');
+      /* Kedi: kendinden emin yarı kapalı gözler ve kırık gülüş. */
+      s.push('<path d="M15 26 17 10l11 8z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M49 26 47 10 36 18z" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<path d="M18 21l.9-5 3.4 2.4z" fill="#f7a8d4"/><path d="M46 21l-.9-5-3.4 2.4z" fill="#f7a8d4"/>');
+      s.push('<circle cx="32" cy="35" r="18.5" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<path d="M19 31q4.5-3 9 0M36 31q4.5-3 9 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<circle cx="23.5" cy="32.8" r="2.1" fill="' + ink + '"/><circle cx="40.5" cy="32.8" r="2.1" fill="' + ink + '"/>');
+      s.push('<circle cx="24.2" cy="32" r="0.7" fill="' + white + '"/><circle cx="41.2" cy="32" r="0.7" fill="' + white + '"/>');
+      s.push('<path d="M17.5 26l-2.5-2.5M46.5 26l2.5-2.5" stroke="' + ink + '" stroke-width="1.6" stroke-linecap="round"/>');
+      s.push('<path d="M29 38h6l-3 3z" fill="#e8488f" stroke="' + ink + '" stroke-width="1.2" stroke-linejoin="round"/>');
+      s.push('<path d="M32 41v3M32 44q-4 3.5-7 .5M32 44q4 3.5 7 .5" fill="none" stroke="' + ink + '" stroke-width="1.9" stroke-linecap="round"/>');
+      s.push('<path d="M12 37h6M12 41h6M52 37h-6M52 41h-6" stroke="' + ink + '" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>');
+      s.push('<path d="M20 25q4-2 8-.5" fill="none" stroke="' + ink + '" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>');
     } else if (a.acc === "bear") {
-      s.push('<circle cx="17" cy="21" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
-      s.push('<circle cx="47" cy="21" r="7" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      /* Ayı: çatık kaşlı, homurdanan ama sevecen yüz. */
+      s.push('<circle cx="16" cy="20" r="7.5" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<circle cx="48" cy="20" r="7.5" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<circle cx="16" cy="20" r="3.4" fill="#8a5b3a"/><circle cx="48" cy="20" r="3.4" fill="#8a5b3a"/>');
+      s.push('<circle cx="32" cy="35" r="19" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<ellipse cx="32" cy="42" rx="11" ry="8" fill="#f0c98a"/>');
+      s.push('<path d="M18 26q5-1 9 2M46 26q-5-1-9 2" fill="none" stroke="' + ink + '" stroke-width="2.6" stroke-linecap="round"/>');
+      s.push('<circle cx="24" cy="32.5" r="2.2" fill="' + ink + '"/><circle cx="40" cy="32.5" r="2.2" fill="' + ink + '"/>');
+      s.push('<circle cx="24.7" cy="31.8" r="0.7" fill="' + white + '"/><circle cx="40.7" cy="31.8" r="0.7" fill="' + white + '"/>');
+      s.push('<ellipse cx="32" cy="39" rx="4" ry="3" fill="' + ink + '"/>');
+      s.push('<ellipse cx="33" cy="38" rx="1.2" ry="0.8" fill="' + white + '" opacity="0.5"/>');
+      s.push('<path d="M32 42v2.5M32 44.5q-4 3-6.5 0M32 44.5q4 3 6.5 0" fill="none" stroke="' + ink + '" stroke-width="1.9" stroke-linecap="round"/>');
+      s.push('<circle cx="16" cy="41" r="3" fill="#f2553d" opacity="0.3"/><circle cx="48" cy="41" r="3" fill="#f2553d" opacity="0.3"/>');
+    } else if (a.acc === "penguin") {
+      /* Penguen: papyonlu, kararlı bakışlı küçük beyefendi. */
+      s.push('<circle cx="32" cy="35" r="20" fill="#2b2f45" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<ellipse cx="32" cy="37" rx="14" ry="16.5" fill="' + a.skin + '"/>');
+      s.push('<path d="M10 37q4 10 8 8M54 37q-4 10-8 8" fill="none" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<circle cx="25.5" cy="31" r="3" fill="' + white + '"/><circle cx="38.5" cy="31" r="3" fill="' + white + '"/>');
+      s.push('<circle cx="26.5" cy="31.4" r="1.6" fill="' + ink + '"/><circle cx="39.5" cy="31.4" r="1.6" fill="' + ink + '"/>');
+      s.push('<path d="M20 25l7 2M44 25l-7 2" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<path d="M27.5 37h9l-4.5 4.5z" fill="#f4a12a" stroke="' + ink + '" stroke-width="1.6" stroke-linejoin="round"/>');
+      s.push('<path d="M32 41.5v2" stroke="' + ink + '" stroke-width="1.3" stroke-linecap="round"/>');
+      s.push('<path d="M25 48l7 4 7-4-7-2z" fill="#f2553d" stroke="' + ink + '" stroke-width="1.5" stroke-linejoin="round"/>');
+      s.push('<circle cx="32" cy="48.5" r="1.4" fill="#f4b72a"/>');
+      s.push('<circle cx="18" cy="40" r="2.6" fill="#f2553d" opacity="0.3"/><circle cx="46" cy="40" r="2.6" fill="#f2553d" opacity="0.3"/>');
     } else if (a.acc === "lion") {
-      s.push('<circle cx="32" cy="33" r="25" fill="#d98a2b"/>');
-      for (var l = 0; l < 12; l++) {
-        var ang = (Math.PI * 2 * l) / 12;
-        s.push('<circle cx="' + (32 + Math.cos(ang) * 21).toFixed(1) + '" cy="' + (33 + Math.sin(ang) * 21).toFixed(1) + '" r="5" fill="#e8a33a"/>');
+      /* Aslan: gür yeleli, kendinden emin gülüş. */
+      s.push('<circle cx="32" cy="34" r="25" fill="#d98a2b"/>');
+      for (var l = 0; l < 14; l++) {
+        var ang = (Math.PI * 2 * l) / 14;
+        s.push('<circle cx="' + (32 + Math.cos(ang) * 22).toFixed(1) + '" cy="' + (34 + Math.sin(ang) * 22).toFixed(1) + '" r="5.4" fill="#e8a33a"/>');
       }
+      s.push('<circle cx="32" cy="35" r="17.5" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<ellipse cx="32" cy="42" rx="9" ry="6.5" fill="#fff0c9"/>');
+      s.push('<path d="M19 27q5-2 9 1M45 27q-5-2-9 1" fill="none" stroke="' + ink + '" stroke-width="2.4" stroke-linecap="round"/>');
+      s.push('<circle cx="24.5" cy="32" r="2.1" fill="' + ink + '"/><circle cx="39.5" cy="32" r="2.1" fill="' + ink + '"/>');
+      s.push('<circle cx="25.2" cy="31.3" r="0.7" fill="' + white + '"/><circle cx="40.2" cy="31.3" r="0.7" fill="' + white + '"/>');
+      s.push('<path d="M29 38h6l-3 3z" fill="' + ink + '"/>');
+      s.push('<path d="M24 42q8 6 16 0" fill="none" stroke="' + ink + '" stroke-width="2.1" stroke-linecap="round"/>');
+      s.push('<path d="M27 44.5l2 3 2-2.5M35 44.5l2 3 2-2.5" fill="' + white + '" stroke="' + ink + '" stroke-width="1.2" stroke-linejoin="round"/>');
+      s.push('<circle cx="14" cy="41" r="3" fill="#f2553d" opacity="0.28"/><circle cx="50" cy="41" r="3" fill="#f2553d" opacity="0.28"/>');
     } else if (a.acc === "bunny") {
-      s.push('<ellipse cx="23" cy="12" rx="5" ry="12" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
-      s.push('<ellipse cx="41" cy="12" rx="5" ry="12" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2"/>');
-      s.push('<ellipse cx="23" cy="12" rx="2.2" ry="7" fill="#f7a8d4"/><ellipse cx="41" cy="12" rx="2.2" ry="7" fill="#f7a8d4"/>');
+      /* Tavşan: kocaman meraklı gözler ve ön dişler. */
+      s.push('<ellipse cx="22" cy="13" rx="5" ry="12" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" transform="rotate(-8 22 13)"/>');
+      s.push('<ellipse cx="41" cy="14" rx="5" ry="12" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.2" transform="rotate(20 41 14)"/>');
+      s.push('<ellipse cx="22" cy="13" rx="2.1" ry="7" fill="#f7a8d4" transform="rotate(-8 22 13)"/>');
+      s.push('<ellipse cx="41" cy="14" rx="2.1" ry="7" fill="#f7a8d4" transform="rotate(20 41 14)"/>');
+      s.push('<circle cx="32" cy="36" r="18.5" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<circle cx="24.5" cy="32" r="4.4" fill="' + white + '" stroke="' + ink + '" stroke-width="1.4"/>');
+      s.push('<circle cx="39.5" cy="32" r="4.4" fill="' + white + '" stroke="' + ink + '" stroke-width="1.4"/>');
+      s.push('<circle cx="25.3" cy="32.8" r="2.2" fill="' + ink + '"/><circle cx="40.3" cy="32.8" r="2.2" fill="' + ink + '"/>');
+      s.push('<circle cx="26.2" cy="31.8" r="0.9" fill="' + white + '"/><circle cx="41.2" cy="31.8" r="0.9" fill="' + white + '"/>');
+      s.push('<path d="M29.5 38h5l-2.5 2.6z" fill="#f7a8d4" stroke="' + ink + '" stroke-width="1.2" stroke-linejoin="round"/>');
+      s.push('<path d="M32 40.6v2M32 42.6q4 2 5.5 0M32 42.6q-4 2-5.5 0" fill="none" stroke="' + ink + '" stroke-width="1.7" stroke-linecap="round"/>');
+      s.push('<rect x="28.6" y="44.5" width="3" height="4.4" rx="1" fill="' + white + '" stroke="' + ink + '" stroke-width="1.1"/>');
+      s.push('<rect x="32.4" y="44.5" width="3" height="4.4" rx="1" fill="' + white + '" stroke="' + ink + '" stroke-width="1.1"/>');
+      s.push('<circle cx="18" cy="41" r="3" fill="#f2553d" opacity="0.32"/><circle cx="46" cy="41" r="3" fill="#f2553d" opacity="0.32"/>');
     } else if (a.acc === "robot") {
-      s.push('<path d="M32 9v7" stroke="' + ink + '" stroke-width="2.4" stroke-linecap="round"/>');
-      s.push('<circle cx="32" cy="8" r="3" fill="#f2553d" stroke="' + ink + '" stroke-width="1.8"/>');
-      s.push('<rect x="13" y="18" width="38" height="34" rx="9" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      /* Robot: LED gözler, anten ve ekolayzer ağız. */
+      s.push('<path d="M32 8v8" stroke="' + ink + '" stroke-width="2.4" stroke-linecap="round"/>');
+      s.push('<circle cx="32" cy="7" r="3.6" fill="#f2553d" stroke="' + ink + '" stroke-width="1.8"/>');
+      s.push('<circle cx="32" cy="7" r="1.5" fill="#ffd0c8"/>');
+      s.push('<rect x="12" y="17" width="40" height="36" rx="10" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<rect x="15" y="20" width="34" height="21" rx="6" fill="#2b2f45"/>');
+      s.push('<rect x="20" y="26" width="9" height="8" rx="2.4" fill="#23c3b0"/>');
+      s.push('<rect x="35" y="26" width="9" height="8" rx="2.4" fill="#23c3b0"/>');
+      s.push('<rect x="21.5" y="27.5" width="6" height="5" rx="1.4" fill="#b8fff6"/>');
+      s.push('<rect x="36.5" y="27.5" width="6" height="5" rx="1.4" fill="#b8fff6"/>');
+      s.push('<path d="M25 45h14" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<path d="M25 40v3M29 39v4M33 40v3M37 39v4M41 40v3" stroke="#4aa3d8" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<circle cx="12" cy="33" r="2.2" fill="#8c8677" stroke="' + ink + '" stroke-width="1.4"/>');
+      s.push('<circle cx="52" cy="33" r="2.2" fill="#8c8677" stroke="' + ink + '" stroke-width="1.4"/>');
     } else if (a.acc === "alien") {
-      s.push('<path d="M23 15c-2-4-5-4-5-1M41 15c2-4 5-4 5-1" stroke="' + ink + '" stroke-width="2.2" fill="none" stroke-linecap="round"/>');
-      s.push('<circle cx="18" cy="12" r="2.6" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.6"/><circle cx="46" cy="12" r="2.6" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.6"/>');
+      /* Uzaylı: antenli, iri badem gözler ve minik gülümseme. */
+      s.push('<path d="M24 16c-3-5-7-5-7-1M40 16c3-5 7-5 7-1" stroke="' + ink + '" stroke-width="2.2" fill="none" stroke-linecap="round"/>');
+      s.push('<circle cx="16" cy="13" r="3" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.6"/><circle cx="48" cy="13" r="3" fill="#8fc93a" stroke="' + ink + '" stroke-width="1.6"/>');
+      s.push('<ellipse cx="32" cy="36" rx="18" ry="21" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<ellipse cx="24" cy="34" rx="5.4" ry="8" fill="' + ink + '" transform="rotate(-18 24 34)"/>');
+      s.push('<ellipse cx="40" cy="34" rx="5.4" ry="8" fill="' + ink + '" transform="rotate(18 40 34)"/>');
+      s.push('<circle cx="25.6" cy="31.5" r="1.6" fill="' + white + '"/><circle cx="41.6" cy="31.5" r="1.6" fill="' + white + '"/>');
+      s.push('<circle cx="23" cy="36.5" r="0.9" fill="' + white + '" opacity="0.7"/><circle cx="39" cy="36.5" r="0.9" fill="' + white + '" opacity="0.7"/>');
+      s.push('<path d="M28 45q4 3 8 0" fill="none" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<circle cx="20" cy="43" r="1.8" fill="#5f9c3a" opacity="0.6"/><circle cx="44" cy="43" r="1.8" fill="#5f9c3a" opacity="0.6"/>');
+      s.push('<path d="M19 51q13 6 26 0" fill="none" stroke="#3f5bd6" stroke-width="2.4" stroke-linecap="round"/>');
     } else if (a.acc === "crown") {
-      s.push('<path d="M19 18 18 8l7 5 7-8 7 8 7-5-1 10z" fill="#f4b72a" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
-      s.push('<circle cx="32" cy="12" r="2" fill="#f2553d"/><circle cx="20" cy="14" r="1.6" fill="#2da98d"/><circle cx="44" cy="14" r="1.6" fill="#3f5bd6"/>');
-    }
-    /* Yüz. */
-    if (a.acc === "penguin") {
-      s.push('<ellipse cx="32" cy="36" rx="20" ry="21" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
-      s.push('<ellipse cx="32" cy="40" rx="13" ry="15" fill="#fff"/>');
-    } else if (a.acc === "frog") {
-      s.push('<circle cx="32" cy="35" r="20" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      /* Kral: kürk pelerin, mağrur bakış ve kıvrık bıyık. */
+      s.push('<path d="M9 62q1-13 11-16l12 7 12-7q10 3 11 16z" fill="#f7f2e8" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<circle cx="18" cy="55" r="1.7" fill="' + ink + '"/><circle cx="32" cy="58" r="1.7" fill="' + ink + '"/><circle cx="46" cy="55" r="1.7" fill="' + ink + '"/>');
+      s.push('<path d="M12 60q6 3 12 0M28 61q4 2 8 0M44 60q6 3 8-1" fill="none" stroke="#d9cdb8" stroke-width="1.6"/>');
+      s.push('<circle cx="32" cy="34" r="18" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<path d="M19 17 18 6l7 5 7-8 7 8 7-5-1 11z" fill="#f4b72a" stroke="' + ink + '" stroke-width="2.2" stroke-linejoin="round"/>');
+      s.push('<circle cx="32" cy="10" r="2.2" fill="#f2553d"/><circle cx="20" cy="13" r="1.8" fill="#2da98d"/><circle cx="44" cy="13" r="1.8" fill="#3f5bd6"/>');
+      s.push('<path d="M18 26q6-3 11 0M46 26q-6-3-11 0" fill="none" stroke="' + ink + '" stroke-width="2" stroke-linecap="round"/>');
+      s.push('<path d="M20 31.5q4-3 9 .5M35 32q5-3.5 9-.5" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<circle cx="24" cy="33" r="1.9" fill="' + ink + '"/><circle cx="40" cy="33" r="1.9" fill="' + ink + '"/>');
+      s.push('<circle cx="24.7" cy="32.3" r="0.7" fill="' + white + '"/><circle cx="40.7" cy="32.3" r="0.7" fill="' + white + '"/>');
+      s.push('<path d="M29.5 38h5l-2.5 2.6z" fill="' + ink + '"/>');
+      s.push('<path d="M32 41q-6 1-9-2M32 41q6 1 9-2" fill="none" stroke="' + ink + '" stroke-width="2.1" stroke-linecap="round"/>');
+      s.push('<path d="M23 39q-2 2 0 3M41 39q2 2 0 3" fill="none" stroke="' + ink + '" stroke-width="1.7" stroke-linecap="round"/>');
+      s.push('<path d="M30 45h4" stroke="' + ink + '" stroke-width="1.8" stroke-linecap="round"/>');
+      s.push('<circle cx="51" cy="39" r="2.2" fill="#f4b72a" stroke="' + ink + '" stroke-width="1.2"/>');
+    } else if (a.acc === "shades") {
+      /* Havalı: koyu gözlük, kalkık yaka ve yan gülüş. */
+      s.push('<path d="M11 60q1-11 10-14l11 6 11-6q9 3 10 14z" fill="#2b2f45" stroke="' + ink + '" stroke-width="2.2"/>');
+      s.push('<path d="M25 48l7 5 7-5-7-3z" fill="' + white + '" stroke="' + ink + '" stroke-width="1.4" stroke-linejoin="round"/>');
+      s.push('<circle cx="32" cy="35" r="18" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
+      s.push('<path d="M19 24q6-3 12 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<path d="M13 30h38l-2 7c-1 3.4-3.8 5.4-7.2 5-3-.4-5.2-2.5-6-5.4L34 31h-4l-1.8 5.6c-.8 2.9-3 5-6 5.4-3.4.4-6.2-1.6-7.2-5z" fill="' + ink + '"/>');
+      s.push('<path d="M17 32h7l-1 3.4h-7zM40 32h7l1 3.4h-7z" fill="rgba(255,255,255,0.45)"/>');
+      s.push('<path d="M25 46q6 4 13-1" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
+      s.push('<path d="M36 44l1.4 2.4 1.8-2.4z" fill="' + white + '" stroke="' + ink + '" stroke-width="1.2" stroke-linejoin="round"/>');
     } else {
       s.push('<circle cx="32" cy="34" r="19" fill="' + a.skin + '" stroke="' + ink + '" stroke-width="2.4"/>');
-    }
-    /* Gözler ve ağız. */
-    if (a.acc === "panda") {
-      s.push('<ellipse cx="25" cy="32" rx="5" ry="6" fill="' + ink + '" transform="rotate(-16 25 32)"/>');
-      s.push('<ellipse cx="39" cy="32" rx="5" ry="6" fill="' + ink + '" transform="rotate(16 39 32)"/>');
-      s.push('<circle cx="26" cy="31" r="1.7" fill="#fff"/><circle cx="40" cy="31" r="1.7" fill="#fff"/>');
-    } else if (a.acc === "alien") {
-      s.push('<ellipse cx="25" cy="34" rx="4.4" ry="6" fill="' + ink + '"/><ellipse cx="39" cy="34" rx="4.4" ry="6" fill="' + ink + '"/>');
-      s.push('<circle cx="26.4" cy="32" r="1.3" fill="#fff"/><circle cx="40.4" cy="32" r="1.3" fill="#fff"/>');
-    } else if (a.acc === "robot") {
-      s.push('<rect x="21" y="29" width="8" height="8" rx="2" fill="' + ink + '"/><rect x="35" y="29" width="8" height="8" rx="2" fill="' + ink + '"/>');
-      s.push('<circle cx="25" cy="33" r="1.5" fill="#8fd0ff"/><circle cx="39" cy="33" r="1.5" fill="#8fd0ff"/>');
-    } else if (a.acc === "shades") {
-      s.push('<path d="M15 29h34l-1.6 6.4c-.8 3-3.4 4.8-6.4 4.4-2.6-.3-4.6-2.2-5.4-4.8L34 30h-4l-1.6 5c-.8 2.6-2.8 4.5-5.4 4.8-3 .4-5.6-1.4-6.4-4.4z" fill="' + ink + '"/>');
-      s.push('<path d="M18 31h6l-1 3h-6zM40 31h6l1 3h-6z" fill="rgba(255,255,255,0.5)"/>');
-    } else if (a.acc === "frog") {
-      s.push('<circle cx="25" cy="30" r="4.4" fill="' + ink + '"/><circle cx="39" cy="30" r="4.4" fill="' + ink + '"/>');
-      s.push('<circle cx="26.4" cy="28.4" r="1.5" fill="#fff"/><circle cx="40.4" cy="28.4" r="1.5" fill="#fff"/>');
-    } else {
       s.push('<circle cx="25" cy="32" r="2.8" fill="' + ink + '"/><circle cx="39" cy="32" r="2.8" fill="' + ink + '"/>');
-      s.push('<circle cx="26" cy="31" r="1" fill="#fff"/><circle cx="40" cy="31" r="1" fill="#fff"/>');
-    }
-    if (a.acc === "penguin") {
-      s.push('<path d="M28 43l4 4 4-4z" fill="#f4a12a" stroke="' + ink + '" stroke-width="1.6" stroke-linejoin="round"/>');
-    } else if (a.acc === "robot") {
-      s.push('<rect x="26" y="42" width="12" height="4" rx="2" fill="' + ink + '"/>');
-    } else if (a.acc === "cat") {
-      s.push('<path d="M27 42q5 4 10 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
-      s.push('<path d="M11 35h6M47 35h6M12 40h6M46 40h6" stroke="' + ink + '" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>');
-    } else if (a.acc === "shades") {
-      s.push('<path d="M26 43q6 4 12 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
-    } else {
       s.push('<path d="M26 41q6 5 12 0" fill="none" stroke="' + ink + '" stroke-width="2.2" stroke-linecap="round"/>');
     }
-    /* Yanak allığı. */
-    s.push('<circle cx="18" cy="39" r="3" fill="#f2553d" opacity="0.28"/><circle cx="46" cy="39" r="3" fill="#f2553d" opacity="0.28"/>');
-    s.push('</svg>');
+    s.push('</g></svg>');
     return s.join("");
   }
-
   function avatarImage(id) {
     var avatar = avatarById(id);
     return avatar ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(avatarSVG(avatar)) : "";
@@ -1105,13 +1225,20 @@
   /* efekt seçimi                                                        */
   /* ------------------------------------------------------------------ */
 
+  function firstUnlocked(list) {
+    for (var i = 0; i < list.length; i++) {
+      if (fxUnlocked(list[i])) return list[i].id;
+    }
+    return list.length ? list[0].id : "";
+  }
+
   function loadFxSettings() {
     var data = {};
     try { data = JSON.parse(read(LS_FX) || "{}") || {}; } catch (error) { data = {}; }
-    app.fxBurst = BURST_EFFECTS.some(function (item) { return item.id === data.burst; })
-      ? data.burst : BURST_EFFECTS[0].id;
-    app.fxWin = WIN_EFFECTS.some(function (item) { return item.id === data.win; })
-      ? data.win : WIN_EFFECTS[0].id;
+    var burst = BURST_EFFECTS.filter(function (item) { return item.id === data.burst; })[0];
+    var win = WIN_EFFECTS.filter(function (item) { return item.id === data.win; })[0];
+    app.fxBurst = burst && fxUnlocked(burst) ? burst.id : firstUnlocked(BURST_EFFECTS);
+    app.fxWin = win && fxUnlocked(win) ? win.id : firstUnlocked(WIN_EFFECTS);
   }
 
   function applyFxSettings() {
@@ -1127,7 +1254,12 @@
 
   function selectFx(kind, id) {
     var list = kind === "win" ? WIN_EFFECTS : BURST_EFFECTS;
-    if (!list.some(function (item) { return item.id === id; })) return;
+    var picked = list.filter(function (item) { return item.id === id; })[0];
+    if (!picked) return;
+    if (!fxUnlocked(picked)) {
+      if (picked.unlock) watchRewardedUnlock(picked.unlock);
+      return;
+    }
     if (kind === "win") app.fxWin = id;
     else app.fxBurst = id;
     saveFxSettings();
@@ -4466,11 +4598,15 @@
         '<div class="fx-grid" role="group" aria-label="' + esc(tr(title)) + '">' +
         list.map(function (item) {
           var on = item.id === active;
-          return '<button class="fx-pick' + (on ? " is-active" : "") + '" type="button"' +
+          var locked = !fxUnlocked(item);
+          return '<button class="fx-pick' + (on ? " is-active" : "") + (locked ? " is-locked" : "") + '" type="button"' +
             ' data-fx-kind="' + kind + '" data-fx-pick="' + item.id + '"' +
-            ' aria-pressed="' + (on ? "true" : "false") + '">' +
+            ' aria-pressed="' + (on ? "true" : "false") + '"' +
+            (locked && item.unlock ? ' data-fx-unlock="' + item.unlock + '"' : '') +
+            (locked ? ' aria-label="' + esc(tr(item.name)) + ' · ' + esc(tr("Reklam izle")) + '"' : '') + '>' +
             '<span class="fx-pick-icon" aria-hidden="true">' + item.icon + '</span>' +
-            '<span class="fx-pick-name">' + esc(tr(item.name)) + '</span></button>';
+            '<span class="fx-pick-name">' + esc(tr(item.name)) +
+              (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span></button>';
         }).join("") +
         '</div></div>';
     }
@@ -5022,6 +5158,10 @@
           if (unlockKey.indexOf("theme:") === 0) {
             var themeId = unlockKey.slice(6);
             applyTheme(themeId);
+          }
+          if (unlockKey.indexOf("fx:") === 0) {
+            var parts = unlockKey.split(":");
+            if (parts.length === 3) selectFx(parts[1], parts[2]);
           }
         } else {
           toast("Bu içerik zaten açık.");
@@ -5892,6 +6032,10 @@
         applyAvatar("");
         refreshProfileSheet();
         toast(tr("Avatar kaldırıldı."));
+        return;
+      }
+      if (target.hasAttribute("data-fx-unlock")) {
+        watchRewardedUnlock(target.dataset.fxUnlock);
         return;
       }
       if (target.hasAttribute("data-fx-pick")) {

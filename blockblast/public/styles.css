@@ -456,9 +456,13 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   color: var(--ink-soft);
 }
 
-/* Oyun ve lobide tahtaya yer açmak için profil şeridi gizlenir. */
+/* Oyun ve lobide profil şeridi görünmez olur; yerini korur, böylece sağdaki
+   menü düğmeleri ekran değişince yerinden kaymaz. */
 body[data-screen="game"] .topbar-profile,
-body[data-screen="lobby"] .topbar-profile { display: none; }
+body[data-screen="lobby"] .topbar-profile {
+  visibility: hidden;
+  pointer-events: none;
+}
 
 @media (max-width: 560px) {
   .topbar-profile .profile-best em { display: none; }
@@ -4649,7 +4653,8 @@ body {
 
 .lock-badge { font-size: 10px; line-height: 1; }
 .theme-pick.is-locked,
-.profile-emote.is-locked { border-style: dashed; }
+.profile-emote.is-locked,
+.fx-pick.is-locked { border-style: dashed; }
 .theme-pick.is-locked .theme-swatch { filter: saturate(0.35); }
 
 /* Profil fotoğrafı */
