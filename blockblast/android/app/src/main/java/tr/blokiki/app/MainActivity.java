@@ -278,6 +278,13 @@ public class MainActivity extends Activity {
     }
 
     public class AdsBridge {
+        /* Reklamsız test derlemesinde false döner; web katmanı kilitli
+           içerikleri bu durumda açık gösterir. */
+        @JavascriptInterface
+        public boolean enabled() {
+            return BuildConfig.ADS_ENABLED;
+        }
+
         @JavascriptInterface
         public boolean available() {
             return ads != null && (ads.hasInterstitial() || ads.hasRewarded());

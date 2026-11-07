@@ -78,6 +78,9 @@ android {
         resValue("string", "admob_rewarded", admobRewarded)
         resValue("string", "admob_banner", admobBanner)
         resValue("string", "remove_ads_product", removeAdsProduct)
+        /* Web katmanı reklamsız test derlemesini bu bayraktan anlar: kilitli
+           içerikler test sırasında açık kalır. */
+        buildConfigField("boolean", "ADS_ENABLED", adsEnabled.toString())
     }
 
     signingConfigs {

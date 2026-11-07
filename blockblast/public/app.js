@@ -955,6 +955,9 @@
 
   function isUnlocked(key) {
     if (!key) return true;
+    /* Reklamsız test derlemesinde kilitli içerikler açık kalır; test edenler
+       her efekti, temayı ve emote'u deneyebilir. */
+    if (ads && ads.enabled === false) return true;
     if (!app.profile) return false;
     return !!(app.profile.unlocks && app.profile.unlocks[key]) ||
       !!(app.profile.unlocked && app.profile.unlocked[key]);
@@ -4421,6 +4424,7 @@
   var playGames = { available: false, player: null };
   var ads = {
     available: false,
+    enabled: true,
     rewarded: false,
     banner: false,
     shown: 0,
@@ -5100,6 +5104,7 @@
       return;
     }
     try {
+      if (typeof bridge.enabled === "function") ads.enabled = !!bridge.enabled();
       if (typeof bridge.available === "function") ads.available = !!bridge.available();
       if (typeof bridge.hasRewarded === "function") ads.rewarded = !!bridge.hasRewarded();
       if (typeof bridge.hasBanner === "function") ads.banner = !!bridge.hasBanner();
