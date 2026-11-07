@@ -78,7 +78,9 @@ async function openPage(url) {
     ws.send(JSON.stringify({ id: msgId, method, params: params || {} }));
   });
   await call("Runtime.enable");
-  await call("Emulation.setDeviceMetricsOverride", { width: 420, height: 900, deviceScaleFactor: 1, mobile: true });
+  const vw = Number(process.env.BLOK_VW || 420);
+  const vh = Number(process.env.BLOK_VH || 900);
+  await call("Emulation.setDeviceMetricsOverride", { width: vw, height: vh, deviceScaleFactor: 1, mobile: true });
   const evaluate = async (expression) => {
     const result = await call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
     if (result.exceptionDetails) throw new Error("JS: " + JSON.stringify(result.exceptionDetails.exception || result.exceptionDetails));
