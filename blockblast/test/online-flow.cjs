@@ -922,7 +922,7 @@ async function main() {
     return {
       score: s.players[0].score,
       texts: [...document.querySelectorAll('.fx-text')].map((el) => el.textContent),
-      shaking: document.documentElement.classList.contains('screen-shake'),
+      shaking: (document.getElementById('screen-game') || document.documentElement).classList.contains('screen-shake'),
       flashing: !!document.querySelector('.fx-flash'),
       hasShakeFn: typeof window.BlokFx.screenShake === 'function',
       hasFlashFn: typeof window.BlokFx.flash === 'function',
@@ -956,7 +956,7 @@ async function main() {
     return {
       score: s.players[0].score,
       texts: [...document.querySelectorAll('.fx-text')].map((el) => el.textContent),
-      shaking: document.documentElement.classList.contains('screen-shake'),
+      shaking: (document.getElementById('screen-game') || document.documentElement).classList.contains('screen-shake'),
       crossFlash: !!document.querySelector('.fx-flash.cross'),
       perfectText: !!document.querySelector('.fx-text.perfect')
     };
@@ -965,6 +965,54 @@ async function main() {
     crossFeedback.score >= 100 && crossFeedback.shaking && crossFeedback.crossFlash &&
     crossFeedback.perfectText &&
     crossFeedback.texts.indexOf("PERFECT!") >= 0, crossFeedback);
+
+  /* Combo sürerken de seçili patlama efekti çalışmalı. */
+  const comboFx = await a.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const calls = [];
+    const original = window.BlokFx.clearBurst;
+    window.BlokFx.clearBurst = function (x, y, strong) {
+      calls.push(!!strong);
+      return original.call(window.BlokFx, x, y, strong);
+    };
+    window.BlokFx.setFxPack({ burst: 'spark' });
+    const g = window.BlokDebug.game();
+    const boardRef = g.shared ? g.shared.board : g.players[0].board;
+    const trayRef = g.shared ? g.shared.tray : g.players[0].tray;
+    g.players[0].score = 0;
+    if (g.shared) g.shared.combo = 0;
+    g.players[0].combo = 0;
+
+    async function clearOneLine() {
+      trayRef[0] = { shape: 0, name: 'nokta', cells: [[0, 0]], w: 1, h: 1, color: 'coral' };
+      window.BlokDebug.fillRegion(7, 0, 1, 7, 'mint');
+      await sleep(60);
+      const piece = document.querySelector('.piece[data-piece="0"]');
+      const r = piece.getBoundingClientRect();
+      const o = { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', isPrimary: true,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+      piece.dispatchEvent(new PointerEvent('pointerdown', o));
+      await sleep(70);
+      document.dispatchEvent(new PointerEvent('pointerup', o));
+      await sleep(120);
+      document.querySelector('.cell[data-r="7"][data-c="7"]').click();
+      await sleep(350);
+      return window.BlokDebug.snapshot();
+    }
+
+    const first = await clearOneLine();
+    const second = await clearOneLine();
+    window.BlokFx.clearBurst = original;
+    return {
+      calls,
+      firstCombo: first.shared ? first.shared.combo : first.players[0].combo,
+      secondCombo: second.shared ? second.shared.combo : second.players[0].combo
+    };
+  })()`);
+  ok("combo'lu hamlede de seçili patlama efekti çalışıyor",
+    comboFx.calls.length >= 2 && comboFx.secondCombo >= 2, comboFx);
+  ok("combo patlaması güçlü modda tetikleniyor",
+    comboFx.calls[comboFx.calls.length - 1] === true, comboFx.calls);
 
   await a.evaluate(`(async () => {
     document.getElementById('exit-btn').click();

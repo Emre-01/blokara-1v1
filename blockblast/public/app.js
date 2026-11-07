@@ -42,12 +42,24 @@
      html[data-theme="…"] bloklarında tanımlıdır. Yeni temalar reklam
      izleyerek açılır. */
   var THEMES = [
-    { id: "workshop", name: "Atölye", meta: "#F3EAD8", swatch: ["#f3ead8", "#f2553d", "#f4b72a"] },
-    { id: "mint", name: "Nane", meta: "#E2F5EB", swatch: ["#e2f5eb", "#2da98d", "#f4b72a"] },
-    { id: "ocean", name: "Okyanus", meta: "#E2ECF9", swatch: ["#e2ecf9", "#2f55e8", "#23c3b0"] },
-    { id: "sunset", name: "Gün Batımı", meta: "#FBE7D8", swatch: ["#fbe7d8", "#e8485b", "#f4a12a"] },
-    { id: "autumn", name: "Sonbahar", meta: "#F4E3C8", swatch: ["#f4e3c8", "#c9662f", "#7c4a2d"], unlock: "theme:autumn" },
-    { id: "cotton", name: "Pamuk Şeker", meta: "#FCE4F1", swatch: ["#fce4f1", "#ef79b9", "#8fd6f2"], unlock: "theme:cotton" }
+    { id: "workshop", name: "Atölye", meta: "#F3EAD8", swatch: ["#f3ead8", "#f2553d", "#f4b72a"],
+      board: "#171b31", cell: "#2a3054",
+      blocks: ["#f2553d", "#2f55e8", "#f4b72a", "#2da98d", "#8c5bff", "#3aa6d8"] },
+    { id: "mint", name: "Nane", meta: "#E2F5EB", swatch: ["#e2f5eb", "#12b886", "#fcc419"],
+      board: "#0f2a24", cell: "#1e4a3f",
+      blocks: ["#12b886", "#2f8fe8", "#fcc419", "#63e6be", "#5f7bd6", "#4dabf7"] },
+    { id: "ocean", name: "Okyanus", meta: "#E2ECF9", swatch: ["#e2ecf9", "#1c7ed6", "#22b8cf"],
+      board: "#0b1c30", cell: "#1b3452",
+      blocks: ["#1c7ed6", "#5c7cfa", "#fcc419", "#22b8cf", "#748ffc", "#4dabf7"] },
+    { id: "sunset", name: "Gün Batımı", meta: "#FBE7D8", swatch: ["#fbe7d8", "#f03e3e", "#ff922b"],
+      board: "#2a1424", cell: "#4a2740",
+      blocks: ["#f03e3e", "#9775fa", "#ffd43b", "#ff922b", "#c77dff", "#ff6b6b"] },
+    { id: "autumn", name: "Sonbahar", meta: "#F4E3C8", swatch: ["#f4e3c8", "#d9480f", "#f08c00"], unlock: "theme:autumn",
+      board: "#2a1a12", cell: "#4a2f22",
+      blocks: ["#d9480f", "#8b6b4a", "#f08c00", "#6b8e23", "#8b4513", "#a0522d"] },
+    { id: "cotton", name: "Pamuk Şeker", meta: "#FCE4F1", swatch: ["#fce4f1", "#f0489e", "#74c0fc"], unlock: "theme:cotton",
+      board: "#f1b6d6", cell: "#fbd9ea",
+      blocks: ["#f0489e", "#b197fc", "#ffd43b", "#63e6be", "#d0bfff", "#74c0fc"] }
   ];
   var PROFILE_TABS = [
     { id: "theme", label: "Tema" },
@@ -1627,6 +1639,11 @@
     var dt = (now - app.lastClockAt) / 1000;
     app.lastClockAt = now;
     if (!app.state || app.screen !== "game" || app.state.phase !== "playing") return;
+    /* Süre yoksa her 200 ms'de durum kopyalamaya gerek yok. */
+    if (!app.state.timeMode || app.state.timeMode === "none") {
+      updateClock();
+      return;
+    }
     /* Yerel oyunda menü açıkken ya da uygulama arkadayken sayaç işlemez.
        Çevrimiçi oyunda süre sunucuda işlediği için durdurulmaz. */
     if (localPaused()) return;
@@ -3834,6 +3851,9 @@
         : (last.lines === 2 ? "great" : "good");
       var rowsCleared = last.rows ? last.rows.length : 0;
       var colsCleared = last.cols ? last.cols.length : 0;
+      /* Combo da güçlü sayılır: seçili patlama efekti her combo
+         hamlesinde aynen çalışır, yalnızca yoğunluğu artar. */
+      var comboPower = !!(cross || last.lines >= 3 || (last.combo || 0) >= 2);
       /* Yön duyusu: yatay satır, dikey sütun ve ikisi birden ayrı seslerle
          duyurulur; böylece oyuncu neyin patladığını gözü kapalı anlar. */
       if (rowsCleared && colsCleared) sfxCrossClear(rowsCleared + colsCleared);
@@ -3841,13 +3861,13 @@
       else if (rowsCleared) sfxRowClear(rowsCleared);
       else sfxClear(last.lines);
       sfxBass(last.lines, !!cross);
-      sfxBurstFx(app.fxBurst, cross || last.lines >= 3);
+      sfxBurstFx(app.fxBurst, comboPower);
       if (app.vibrate && FX) {
-        FX.vibrate(cross ? [22, 30, 22, 30, 34] : (last.lines > 1 ? [18, 35, 18] : 14));
+        FX.vibrate(cross ? [22, 30, 22, 30, 34] : (comboPower ? [20, 30, 24] : 14));
       }
       if (FX) {
-        FX.screenShake(cross ? 3 : (last.lines >= 2 ? 2 : 1));
-        FX.flash(cross ? "cross" : (last.lines >= 2 ? "great" : "good"));
+        FX.screenShake(cross ? 3 : (comboPower ? 2 : 1));
+        FX.flash(cross ? "cross" : (comboPower ? "great" : "good"));
         FX.pulse($("#scoreboard"));
       }
       if (gradeClass === "perfect" || gradeClass === "great") speakGrade(grade);
@@ -3856,6 +3876,9 @@
         var pitch = rect.width / SIZE;
         var cells = last.cleared && last.cleared.length ? last.cleared : [];
         var cellColors = last.clearedColors || [];
+        /* Çok hücreli patlamalarda her hücre için ayrı DOM hayaleti
+           üretmek mobilde ağır; büyük temizlemelerde seyreltilir. */
+        var ghostStep = cells.length > 12 ? 2 : 1;
         /* Patlama merkezden dışa doğru yayılsın: hücrenin merkeze uzaklığı
            gecikmeyi belirler. Böylece satır/sütun bir dalga gibi dağılır. */
         var midRow = (SIZE - 1) / 2;
@@ -3866,8 +3889,10 @@
           var colorName = cellColors[index] || last.piece.color || "coral";
           var distance = Math.sqrt(Math.pow(cell[0] - midRow, 2) + Math.pow(cell[1] - midCol, 2));
           var delay = Math.min(240, distance * 22);
-          FX.ghostCell(cx, cy, pitch * 1.02, colorName, delay);
-          FX.debris(cx, cy, [colorName, "paper"], cross ? 9 : 6,
+          if (index % ghostStep === 0) {
+            FX.ghostCell(cx, cy, pitch * 1.02, colorName, delay);
+          }
+          FX.debris(cx, cy, [colorName, "paper"], cross ? 9 : (comboPower ? 8 : 6),
             cross ? 1.1 : 0.8, pitch * 0.52, delay / 1000);
           if (Math.random() < 0.35) FX.burst(cx, cy, "mustard", 2, 0.9);
         });
@@ -3882,6 +3907,10 @@
           FX.shockwave(rect.left + (first[1] + 0.5) * pitch,
             rect.top + (first[0] + 0.5) * pitch, "paper", pitch * 0.5, pitch * 2.4, 0.45);
         }
+        /* Seçili patlama efekti her satır/sütun temizliğinde, combo
+           dahil, aynen çalışır. Merkez hücrelerden, yoksa tahtadan. */
+        var burstX = rect.left + rect.width / 2;
+        var burstY = rect.top + rect.height / 2;
         if (cells.length) {
           var sumX = 0;
           var sumY = 0;
@@ -3889,9 +3918,11 @@
             sumX += rect.left + (cell[1] + 0.5) * pitch;
             sumY += rect.top + (cell[0] + 0.5) * pitch;
           });
-          if (typeof FX.clearBurst === "function") {
-            FX.clearBurst(sumX / cells.length, sumY / cells.length, cross || last.lines >= 3);
-          }
+          burstX = sumX / cells.length;
+          burstY = sumY / cells.length;
+        }
+        if (typeof FX.clearBurst === "function") {
+          FX.clearBurst(burstX, burstY, comboPower);
         }
         FX.floatText(rect.left + rect.width / 2, rect.top + rect.height * 0.28,
           grade, gradeClass);
@@ -4573,6 +4604,19 @@
 
   function themePaneHTML() {
     var active = currentTheme();
+    /* 4x4 mini tahta deseni: dolu hücreler tema paletinden renk alır. */
+    var pattern = [0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0];
+    function boardPreview(theme) {
+      var colorIndex = 0;
+      var cells = pattern.map(function (on) {
+        if (!on) return '<i style="background:' + theme.cell + '"></i>';
+        var color = theme.blocks[colorIndex % theme.blocks.length];
+        colorIndex += 1;
+        return '<i class="on" style="background:' + color + '"></i>';
+      }).join("");
+      return '<span class="theme-board" aria-hidden="true" style="background:' + theme.board + '">' +
+        cells + '</span>';
+    }
     return '<div class="profile-pane" role="tabpanel" data-profile-pane="theme" aria-label="' + esc(tr("Tema")) + '">' +
       '<div class="theme-grid">' +
       THEMES.map(function (theme) {
@@ -4581,11 +4625,7 @@
         return '<button class="theme-pick' + (on ? " is-active" : "") + (locked ? " is-locked" : "") + '" type="button"' +
           ' data-theme-pick="' + theme.id + '" aria-pressed="' + (on ? "true" : "false") + '"' +
           (locked ? ' data-theme-unlock="' + theme.unlock + '"' : '') + '>' +
-          '<span class="theme-swatch" aria-hidden="true">' +
-            theme.swatch.map(function (color) {
-              return '<i style="background:' + color + '"></i>';
-            }).join("") +
-          '</span>' +
+          boardPreview(theme) +
           '<span class="theme-name">' + esc(tr(theme.name)) + (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span>' +
           '</button>';
       }).join("") +
@@ -4741,11 +4781,13 @@
       ? tr("{k} rekor", { k: fmt(p.bestAny || 0) })
       : tr("Misafir oyuncu");
     openOverlay(
-      '<span class="result-badge">Profil</span>' +
-      '<h2 class="profile-name">' + esc(name) + '</h2>' +
-      '<p class="profile-meta">' + esc(meta) + '</p>' +
-      '<div class="profile-photo-row">' + profilePhotoHTML() +
-        '<p class="profile-note profile-photo-hint">' + esc(tr("Avatarını menüden seç.")) + '</p>' +
+      '<div class="profile-head">' +
+        profilePhotoHTML() +
+        '<div class="profile-head-copy">' +
+          '<span class="result-badge">Profil</span>' +
+          '<h2 class="profile-name">' + esc(name) + '</h2>' +
+          '<p class="profile-meta">' + esc(meta) + '</p>' +
+        '</div>' +
       '</div>' +
       profileTabsHTML(active) +
       themePaneHTML() +

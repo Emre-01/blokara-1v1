@@ -287,6 +287,48 @@ async function main() {
   ok("seçim kalıcı kaydediliyor", themes.saved === "sunset", themes.saved);
   ok("tarayıcı çubuğu rengi güncelleniyor", /^#[0-9A-F]{6}$/i.test(themes.meta), themes.meta);
 
+  /* ---- tema kutuları ve tahtayı gerçekten değiştiriyor ---- */
+  const themeBlocks = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:-999px;top:0';
+    probe.innerHTML = '<div class="cell on c-coral" id="probe-coral"></div>' +
+      '<div class="board" id="probe-board"></div>';
+    document.body.appendChild(probe);
+    const out = { block: {}, boardBg: {}, boardTex: {}, cell: {} };
+    for (const theme of ['workshop', 'mint', 'ocean', 'sunset']) {
+      document.documentElement.setAttribute('data-theme', theme);
+      await sleep(60);
+      out.block[theme] = getComputedStyle(document.getElementById('probe-coral')).backgroundColor;
+      const board = getComputedStyle(document.getElementById('probe-board'));
+      out.boardBg[theme] = board.backgroundColor;
+      out.boardTex[theme] = board.backgroundImage;
+    }
+    probe.remove();
+    return out;
+  })()`);
+  ok("tema kutu rengini değiştiriyor",
+    new Set(Object.values(themeBlocks.block)).size === 4, themeBlocks.block);
+  ok("tema tahta zeminini değiştiriyor",
+    new Set(Object.values(themeBlocks.boardBg)).size === 4, themeBlocks.boardBg);
+  ok("tema tahta dokusunu değiştiriyor",
+    new Set(Object.values(themeBlocks.boardTex)).size === 4, themeBlocks.boardTex);
+
+  /* Tema kartları gerçek mini tahta önizlemesi göstermeli. */
+  const themePreviews = await page.evaluate(`(() => {
+    const picks = [...document.querySelectorAll('[data-theme-pick]')];
+    const previews = picks.map((p) => p.querySelector('.theme-board'));
+    return {
+      count: previews.filter(Boolean).length,
+      cells: previews.filter(Boolean).every((p) => p.children.length === 16),
+      colors: previews.filter(Boolean).map((p) => getComputedStyle(p).backgroundColor)
+    };
+  })()`);
+  ok("her tema kartında mini tahta önizlemesi var",
+    themePreviews.count === 6 && themePreviews.cells === true, themePreviews);
+  ok("tema önizlemeleri birbirinden farklı",
+    new Set(themePreviews.colors).size >= 5, themePreviews.colors);
+
   /* ---- emote önizlemesi ---- */
   const emotes = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

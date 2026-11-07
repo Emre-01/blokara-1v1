@@ -64,6 +64,22 @@
   --teal: #23c3b0;
   --board: #171b31;
   --cell: #2a3054;
+  /* Blok paleti: her tema kutuların renklerini baştan kurar. */
+  --b-coral: #f2553d;
+  --b-cobalt: #2f55e8;
+  --b-mustard: #f4b72a;
+  --b-mint: #2da98d;
+  --b-grape: #8c5bff;
+  --b-sky: #3aa6d8;
+  --b-lime: #8fc93a;
+  --b-rose: #e8488f;
+  --b-teal: #23c3b0;
+  /* Tema dokuları: tahta, boş hücre ve dolu blok ayrı ayrı dokunur. */
+  --board-tex: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1.4px);
+  --board-size: 14px 14px;
+  --cell-tex: linear-gradient(145deg, rgba(255, 255, 255, 0.05), transparent 62%);
+  --block-tex: linear-gradient(150deg, rgba(255, 255, 255, 0.3), transparent 56%);
+  --board-glow: rgba(244, 183, 42, 0.18);
   --line: #1c1b2e;
   --radius: 18px;
   --shadow-hard: 5px 5px 0 var(--ink);
@@ -99,6 +115,20 @@ html[data-theme="mint"] {
   --teal: #1fae9b;
   --board: #0f2a24;
   --cell: #1e4a3f;
+  --b-coral: #12b886;
+  --b-cobalt: #2f8fe8;
+  --b-mustard: #fcc419;
+  --b-mint: #63e6be;
+  --b-grape: #5f7bd6;
+  --b-sky: #4dabf7;
+  --b-lime: #a9e34b;
+  --b-rose: #ff8cc8;
+  --b-teal: #38d9a9;
+  --board-tex: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.045) 0 6px, transparent 6px 14px);
+  --board-size: auto;
+  --cell-tex: radial-gradient(rgba(150, 240, 205, 0.10), transparent 72%);
+  --block-tex: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.17) 0 2px, transparent 2px 7px);
+  --board-glow: rgba(79, 214, 176, 0.22);
   --line: #12312a;
   --topbar: rgba(226, 245, 235, 0.88);
   --dot: rgba(18, 49, 42, 0.10);
@@ -121,6 +151,21 @@ html[data-theme="ocean"] {
   --teal: #1fa8c9;
   --board: #0b1c30;
   --cell: #1b3452;
+  --b-coral: #1c7ed6;
+  --b-cobalt: #5c7cfa;
+  --b-mustard: #fcc419;
+  --b-mint: #22b8cf;
+  --b-grape: #748ffc;
+  --b-sky: #4dabf7;
+  --b-lime: #66d9e8;
+  --b-rose: #e599f7;
+  --b-teal: #38d9a9;
+  --board-tex: radial-gradient(rgba(140, 210, 255, 0.11) 1.2px, transparent 1.6px);
+  --board-size: 16px 16px;
+  --cell-tex: linear-gradient(160deg, rgba(140, 210, 255, 0.10), transparent 68%);
+  --block-tex: linear-gradient(145deg, rgba(255, 255, 255, 0.32), transparent 55%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0 3px, transparent 3px 9px);
+  --board-glow: rgba(74, 163, 216, 0.24);
   --line: #10243d;
   --topbar: rgba(226, 236, 249, 0.88);
   --dot: rgba(16, 36, 61, 0.10);
@@ -143,6 +188,21 @@ html[data-theme="sunset"] {
   --teal: #23c3b0;
   --board: #2a1424;
   --cell: #4a2740;
+  --b-coral: #f03e3e;
+  --b-cobalt: #9775fa;
+  --b-mustard: #ffd43b;
+  --b-mint: #ff922b;
+  --b-grape: #c77dff;
+  --b-sky: #ff6b6b;
+  --b-lime: #ffc078;
+  --b-rose: #f06595;
+  --b-teal: #ffa94d;
+  --board-tex: radial-gradient(circle at 50% 112%, rgba(244, 161, 42, 0.30), transparent 58%),
+    linear-gradient(180deg, rgba(232, 72, 91, 0.18), transparent 68%);
+  --board-size: auto, auto;
+  --cell-tex: linear-gradient(180deg, rgba(255, 180, 120, 0.12), transparent 72%);
+  --block-tex: linear-gradient(160deg, rgba(255, 255, 255, 0.32), transparent 55%);
+  --board-glow: rgba(244, 161, 42, 0.28);
   --line: #3a1c2c;
   --topbar: rgba(251, 231, 216, 0.88);
   --dot: rgba(58, 28, 44, 0.10);
@@ -166,6 +226,22 @@ html[data-theme="autumn"] {
   --teal: #4f8a7a;
   --board: #2a1a12;
   --cell: #4a2f22;
+  --b-coral: #d9480f;
+  --b-cobalt: #8b6b4a;
+  --b-mustard: #f08c00;
+  --b-mint: #6b8e23;
+  --b-grape: #8b4513;
+  --b-sky: #a0522d;
+  --b-lime: #cd853f;
+  --b-rose: #b8860b;
+  --b-teal: #9c6b30;
+  --board-tex: repeating-linear-gradient(135deg, rgba(255, 220, 160, 0.065) 0 3px, transparent 3px 11px),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.10) 0 3px, transparent 3px 11px);
+  --board-size: auto, auto;
+  --cell-tex: radial-gradient(rgba(255, 210, 150, 0.10), transparent 74%);
+  --block-tex: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.15) 0 2px, transparent 2px 6px),
+    linear-gradient(160deg, rgba(255, 235, 190, 0.18), transparent 60%);
+  --board-glow: rgba(224, 161, 58, 0.26);
   --line: #38241a;
   --topbar: rgba(244, 227, 200, 0.90);
   --dot: rgba(56, 36, 26, 0.10);
@@ -189,22 +265,28 @@ html[data-theme="cotton"] {
   --teal: #45c9bd;
   --board: #f1b6d6;
   --cell: #fbd9ea;
+  --b-coral: #f0489e;
+  --b-cobalt: #b197fc;
+  --b-mustard: #ffd43b;
+  --b-mint: #63e6be;
+  --b-grape: #d0bfff;
+  --b-sky: #74c0fc;
+  --b-lime: #b2f2bb;
+  --b-rose: #ffa8c8;
+  --b-teal: #96f2d7;
+  --board-tex: radial-gradient(rgba(255, 255, 255, 0.62) 1.6px, transparent 1.9px);
+  --board-size: 12px 12px;
+  --cell-tex: linear-gradient(150deg, rgba(255, 255, 255, 0.5), transparent 66%);
+  --block-tex: radial-gradient(rgba(255, 255, 255, 0.55) 1.4px, transparent 1.5px);
+  --block-size: 8px 8px;
+  --board-glow: rgba(255, 255, 255, 0.5);
   --line: #4a1c3a;
   --topbar: rgba(252, 228, 241, 0.90);
   --dot: rgba(74, 28, 58, 0.10);
 }
 
-/* Tema dokuları: blokların yüzeyi temasına göre ayrışır. */
-html[data-theme="autumn"] .cell.on {
-  background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 6px);
-}
-html[data-theme="cotton"] .cell.on {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.55) 1.4px, transparent 1.5px);
-  background-size: 8px 8px;
-}
-html[data-theme="ocean"] .cell.on {
-  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.22), transparent 55%);
-}
+/* Tema dokuları artık her temanın kendi --board-tex / --cell-tex /
+   --block-tex değişkenlerinden gelir; aşağıdaki tek kurallar yeter. */
 
 
 * { box-sizing: border-box; }
@@ -236,7 +318,9 @@ body {
   transition: background-color 0.24s ease, color 0.24s ease;
 }
 
-/* Yumuşak renk bulutları: sayfaya derinlik verir, içeriği engellemez. */
+/* Yumuşak renk bulutları: sayfaya derinlik verir, içeriği engellemez.
+   Eskiden sonsuz animasyonluydu; mobilde her karede tam ekran yeniden
+   çizim demek olduğu için sabit tutuluyor. */
 body::before {
   content: "";
   position: fixed;
@@ -248,11 +332,6 @@ body::before {
     radial-gradient(34% 30% at 86% 20%, rgba(58, 166, 216, 0.16), transparent 72%),
     radial-gradient(42% 34% at 72% 88%, rgba(244, 183, 42, 0.16), transparent 74%),
     radial-gradient(36% 30% at 12% 82%, rgba(35, 195, 176, 0.14), transparent 72%);
-  animation: aurora-drift 22s ease-in-out infinite alternate;
-}
-@keyframes aurora-drift {
-  from { transform: translate3d(-1.2%, -0.8%, 0) scale(1); }
-  to { transform: translate3d(1.4%, 1.1%, 0) scale(1.06); }
 }
 
 h1, h2, h3, p { margin: 0; }
@@ -303,8 +382,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   gap: 7px;
   padding: calc(8px + var(--safe-top)) clamp(8px, 3vw, 28px) 8px;
   background: var(--topbar);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* backdrop-filter mobilde kaydırma sırasında pahalıdır; yarı saydam
+     zemin tek başına yeterli derinliği veriyor. */
   border-bottom: 2px solid rgba(28, 27, 46, 0.12);
   max-width: 100%;
 }
@@ -1593,10 +1672,13 @@ body[data-screen="lobby"] .topbar-profile {
   grid-template-rows: repeat(8, 1fr);
   gap: clamp(2px, 0.55vw, 4px);
   padding: clamp(5px, 1.2vw, 8px);
-  background: var(--board);
+  background-color: var(--board);
+  background-image: var(--board-tex);
+  background-size: var(--board-size, auto);
   border: 3px solid var(--ink);
   border-radius: clamp(12px, 2.4vw, 18px);
-  box-shadow: 0 8px 0 rgba(28, 27, 46, 0.16), 6px 6px 0 var(--ink);
+  box-shadow: 0 8px 0 rgba(28, 27, 46, 0.16), 6px 6px 0 var(--ink),
+    inset 0 0 34px var(--board-glow);
   touch-action: manipulation;
   position: relative;
   user-select: none;
@@ -1606,11 +1688,14 @@ body[data-screen="lobby"] .topbar-profile {
 .cell {
   position: relative;
   border-radius: clamp(3px, 0.8vw, 6px);
-  background: var(--cell);
+  background-color: var(--cell);
+  background-image: var(--cell-tex);
   transition: background 0.12s ease;
 }
 .cell.on {
-  background: var(--c);
+  background-color: var(--c);
+  background-image: var(--block-tex);
+  background-size: var(--block-size, auto);
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
 }
 .cell.on::after {
@@ -1644,17 +1729,19 @@ body[data-screen="lobby"] .topbar-profile {
   100% { background: var(--cell); box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }
 }
 
-.c-red { --c: #f2553d; --soft: rgba(242, 85, 61, 0.3); }
-.c-coral { --c: #f2553d; --soft: rgba(242, 85, 61, 0.3); }
-.c-cobalt { --c: #3d63f5; --soft: rgba(61, 99, 245, 0.3); }
-.c-mustard { --c: #f4b72a; --soft: rgba(244, 183, 42, 0.3); }
-.c-mint { --c: #2da98d; --soft: rgba(45, 169, 141, 0.3); }
-.c-grape { --c: #8c5bff; --soft: rgba(140, 91, 255, 0.3); }
-.c-sky { --c: #3aa6d8; --soft: rgba(58, 166, 216, 0.3); }
-.c-lime { --c: #8fc93a; --soft: rgba(143, 201, 58, 0.3); }
-.c-rose { --c: #e8488f; --soft: rgba(232, 72, 143, 0.3); }
-.c-teal { --c: #23c3b0; --soft: rgba(35, 195, 176, 0.3); }
-.c-blank { --c: #2a3054; --soft: rgba(255, 255, 255, 0.08); }
+/* Blok renkleri tema paletine bağlıdır: tema seçimi kutuların rengini,
+   tahtanın zeminini ve dokusunu birlikte değiştirir. */
+.c-red,
+.c-coral { --c: var(--b-coral); --soft: color-mix(in srgb, var(--b-coral) 32%, transparent); }
+.c-cobalt { --c: var(--b-cobalt); --soft: color-mix(in srgb, var(--b-cobalt) 32%, transparent); }
+.c-mustard { --c: var(--b-mustard); --soft: color-mix(in srgb, var(--b-mustard) 32%, transparent); }
+.c-mint { --c: var(--b-mint); --soft: color-mix(in srgb, var(--b-mint) 32%, transparent); }
+.c-grape { --c: var(--b-grape); --soft: color-mix(in srgb, var(--b-grape) 32%, transparent); }
+.c-sky { --c: var(--b-sky); --soft: color-mix(in srgb, var(--b-sky) 32%, transparent); }
+.c-lime { --c: var(--b-lime); --soft: color-mix(in srgb, var(--b-lime) 32%, transparent); }
+.c-rose { --c: var(--b-rose); --soft: color-mix(in srgb, var(--b-rose) 32%, transparent); }
+.c-teal { --c: var(--b-teal); --soft: color-mix(in srgb, var(--b-teal) 32%, transparent); }
+.c-blank { --c: var(--cell); --soft: color-mix(in srgb, var(--paper) 12%, transparent); }
 
 .tray-wrap {
   position: relative;
@@ -1722,7 +1809,9 @@ body[data-screen="lobby"] .topbar-profile {
   background: transparent;
 }
 .pcell.on {
-  background: var(--c);
+  background-color: var(--c);
+  background-image: var(--block-tex);
+  background-size: var(--block-size, auto);
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.32), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
 }
 
@@ -1737,7 +1826,6 @@ body[data-screen="lobby"] .topbar-profile {
   opacity: 0.95;
   transform-origin: top left;
   will-change: transform;
-  filter: drop-shadow(0 10px 14px rgba(28, 27, 46, 0.35));
 }
 .drag-ghost .pcell {
   position: absolute;
@@ -1747,8 +1835,11 @@ body[data-screen="lobby"] .topbar-profile {
   will-change: transform;
 }
 .drag-ghost .pcell.on {
-  background: var(--c);
-  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.32), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
+  background-color: var(--c);
+  background-image: var(--block-tex);
+  background-size: var(--block-size, auto);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.32), inset 0 -3px 0 rgba(0, 0, 0, 0.16),
+    0 6px 10px rgba(28, 27, 46, 0.28);
 }
 
 /* Arkadaşın canlı sürüklediği blok: soluk, adlı, tıklamayı geçirir. */
@@ -1764,7 +1855,6 @@ body[data-screen="lobby"] .topbar-profile {
   transform-origin: top left;
   will-change: transform;
   transition: transform 60ms linear;
-  filter: drop-shadow(0 6px 10px rgba(28, 27, 46, 0.28));
 }
 .peer-ghost .pcell {
   position: absolute;
@@ -1774,9 +1864,11 @@ body[data-screen="lobby"] .topbar-profile {
   will-change: transform;
 }
 .peer-ghost .pcell.on {
-  background: var(--c);
+  background-color: var(--c);
+  background-image: var(--block-tex);
+  background-size: var(--block-size, auto);
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.34), inset 0 -3px 0 rgba(0, 0, 0, 0.16),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55), 0 5px 9px rgba(28, 27, 46, 0.24);
 }
 .peer-ghost.bad .pcell.on {
   box-shadow: inset 0 0 0 2px rgba(242, 85, 61, 0.95),
@@ -1818,7 +1910,9 @@ body[data-screen="lobby"] .topbar-profile {
   will-change: transform;
 }
 .drop-preview .dp.on {
-  background: var(--c);
+  background-color: var(--c);
+  background-image: var(--block-tex);
+  background-size: var(--block-size, auto);
   opacity: 0.92;
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.4), inset 0 -3px 0 rgba(0, 0, 0, 0.18),
     inset 0 0 0 2px rgba(255, 255, 255, 0.35);
@@ -2011,8 +2105,8 @@ body[data-screen="lobby"] .topbar-profile {
 }
 
 /* Alkışta eller, ağlamada damlalar, kızmada buhar sürekli oynar. */
-.emote-clap .em-hand-l { animation: emote-hand-l 0.6s ease-in-out infinite; }
-.emote-clap .em-hand-r { animation: emote-hand-r 0.6s ease-in-out infinite; }
+.emote-bubble.emote-clap .em-hand-l { animation: emote-hand-l 0.6s ease-in-out infinite; }
+.emote-bubble.emote-clap .em-hand-r { animation: emote-hand-r 0.6s ease-in-out infinite; }
 @keyframes emote-hand-l {
   0%, 100% { transform: translateX(0) rotate(0); }
   50% { transform: translateX(4px) rotate(-7deg); }
@@ -2026,10 +2120,10 @@ body[data-screen="lobby"] .topbar-profile {
   transform-box: fill-box;
   transform-origin: center top;
 }
-.emote-cry .em-tear-a { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) infinite; }
-.emote-cry .em-tear-b { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) 0.42s infinite; }
+.emote-bubble.emote-cry .em-tear-a { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) infinite; }
+.emote-bubble.emote-cry .em-tear-b { animation: emote-drop 1.15s cubic-bezier(.35, .05, .55, 1) 0.42s infinite; }
 /* Yanaklardaki ıslak iz, damlalarla birlikte aşağı akar. */
-.emote-cry .em-tear-flow {
+.emote-bubble.emote-cry .em-tear-flow {
   stroke-dasharray: 5 11;
   animation: emote-tear-flow 1.15s linear infinite;
 }
@@ -2045,7 +2139,7 @@ body[data-screen="lobby"] .topbar-profile {
   100% { opacity: 0; transform: translateY(15px) scaleY(0.85); }
 }
 /* Ağız hıçkırarak titrer. */
-.emote-cry .em-mouth-sob {
+.emote-bubble.emote-cry .em-mouth-sob {
   transform-box: fill-box;
   transform-origin: center;
   animation: emote-sob-mouth 0.62s ease-in-out infinite;
@@ -2059,12 +2153,12 @@ body[data-screen="lobby"] .topbar-profile {
   transform-box: fill-box;
   transform-origin: center top;
 }
-.emote-laugh .em-mouth { animation: emote-laugh-mouth 0.36s ease-in-out infinite; }
+.emote-bubble.emote-laugh .em-mouth { animation: emote-laugh-mouth 0.36s ease-in-out infinite; }
 @keyframes emote-laugh-mouth {
   0%, 100% { transform: scaleY(0.6) translateY(-1px); }
   45% { transform: scaleY(1.18) translateY(1px); }
 }
-.emote-laugh .em-line {
+.emote-bubble.emote-laugh .em-line {
   transform-box: fill-box;
   transform-origin: center;
   animation: emote-laugh-eyes 0.36s ease-in-out infinite;
@@ -2073,13 +2167,13 @@ body[data-screen="lobby"] .topbar-profile {
   0%, 100% { transform: translateY(0) scaleY(1); }
   50% { transform: translateY(1.4px) scaleY(0.72); }
 }
-.emote-angry .em-steam { animation: emote-steam 0.9s ease-out infinite; }
+.emote-bubble.emote-angry .em-steam { animation: emote-steam 0.9s ease-out infinite; }
 @keyframes emote-steam {
   0% { opacity: 0.15; transform: translateY(2px); }
   55% { opacity: 0.7; }
   100% { opacity: 0.15; transform: translateY(-2px); }
 }
-.emote-angry .em-vein { animation: emote-vein 0.7s ease-in-out infinite; }
+.emote-bubble.emote-angry .em-vein { animation: emote-vein 0.7s ease-in-out infinite; }
 @keyframes emote-vein {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
@@ -2095,19 +2189,19 @@ body[data-screen="lobby"] .topbar-profile {
   0%, 100% { transform: translateY(0) rotate(0); }
   45% { transform: translateY(-4px) rotate(-4deg); }
 }
-.emote-love .em-float { animation: emote-float 1.1s ease-in-out infinite; }
-.emote-love .em-float + .em-float { animation-delay: 0.4s; }
+.emote-bubble.emote-love .em-float { animation: emote-float 1.1s ease-in-out infinite; }
+.emote-bubble.emote-love .em-float + .em-float { animation-delay: 0.4s; }
 @keyframes emote-float {
   0% { opacity: 0.25; transform: translateY(3px) scale(0.9); }
   55% { opacity: 1; }
   100% { opacity: 0.3; transform: translateY(-4px) scale(1.08); }
 }
-.emote-cool .em-shine { animation: emote-shine 1.2s ease-in-out infinite; }
+.emote-bubble.emote-cool .em-shine { animation: emote-shine 1.2s ease-in-out infinite; }
 @keyframes emote-shine {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.9; }
 }
-.emote-cool .em-spark { animation: emote-vein 0.8s ease-in-out infinite; }
+.emote-bubble.emote-cool .em-spark { animation: emote-vein 0.8s ease-in-out infinite; }
 
 /* Gönderim tepsisi: alt çubuğun hemen üstünde dört büyük düğme. */
 .emote-tray {
@@ -2588,9 +2682,7 @@ body[data-screen="lobby"] .topbar-profile {
   place-items: center;
   padding: 18px;
   overflow: hidden;
-  background: rgba(23, 27, 49, 0.58);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(23, 27, 49, 0.76);
   animation: fade-in 0.18s ease both;
 }
 .overlay > .sheet { position: relative; z-index: 1; }
@@ -3477,7 +3569,11 @@ body[data-screen="lobby"] .topbar-profile {
   height: 100%;
   pointer-events: none;
   z-index: 55;
+  /* Efekt yokken tam ekran katman bileşime girmesin. */
+  display: none;
+  contain: paint;
 }
+#fx-canvas.is-live { display: block; }
 .fx-text {
   position: fixed;
   z-index: 56;
@@ -3629,7 +3725,9 @@ body[data-screen="lobby"] .topbar-profile {
   100% { opacity: 0; }
 }
 /* Tüm ekranı saran hafif sarsıntı; gücü JS'den --shake-power ile gelir. */
-html.screen-shake { animation: screen-shake 0.46s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+/* Tüm ekran yerine yalnızca oyun ekranı sarsılır; tam sayfa dönüşümü
+   mobilde ağır bir yeniden çizim demekti. */
+.screen.screen-shake { animation: screen-shake 0.46s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
 @keyframes screen-shake {
   0%, 100% { transform: translate(0, 0); }
   10% { transform: translate(calc(-1 * var(--shake-power, 2.5px)), calc(0.4 * var(--shake-power, 2.5px))); }
@@ -4517,19 +4615,29 @@ body {
   box-shadow: 2px 2px 0 var(--ink);
 }
 .theme-pick:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
-.theme-swatch {
+/* Tema önizlemesi gerçek mini tahtadır: zemin, boş hücre ve bloklar
+   seçilecek temanın kendi renklerini gösterir. */
+.theme-board {
   flex: none;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  width: 26px;
-  height: 26px;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 2px;
+  width: 44px;
+  height: 44px;
+  padding: 3px;
   border: 1.5px solid var(--ink);
-  border-radius: 8px;
+  border-radius: 9px;
+  box-shadow: 1.5px 1.5px 0 color-mix(in srgb, var(--ink) 22%, transparent);
   overflow: hidden;
 }
-.theme-swatch i { display: block; }
-.theme-swatch i:first-child { grid-row: 1 / -1; }
+.theme-board i {
+  display: block;
+  border-radius: 2px;
+  min-width: 0;
+  min-height: 0;
+}
+.theme-board i.on { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
 .theme-name {
   min-width: 0;
   overflow: hidden;
@@ -4643,21 +4751,21 @@ body {
   white-space: nowrap;
 }
 
-/* Hazır avatar galerisi. */
+/* Hazır avatar galerisi: büyük, karakterli portreler. */
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 .avatar-pick {
   position: relative;
   display: grid;
   justify-items: center;
-  gap: 3px;
-  padding: 6px 3px 4px;
+  gap: 4px;
+  padding: 8px 4px 6px;
   background: var(--paper);
   border: 2px solid color-mix(in srgb, var(--ink) 32%, transparent);
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--ink);
   font: inherit;
   cursor: pointer;
@@ -4687,23 +4795,23 @@ body {
   font-weight: 800;
 }
 .avatar-pick-art {
-  width: 42px;
-  height: 42px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  border: 1.5px solid var(--ink);
+  border: 2px solid var(--ink);
   background-size: cover;
   background-position: center;
   background-color: var(--card);
-  box-shadow: 1.5px 1.5px 0 color-mix(in srgb, var(--ink) 24%, transparent);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ink) 26%, transparent);
 }
 .avatar-pick-name {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 .avatar-reset {
   margin-top: 8px;
@@ -4714,19 +4822,32 @@ body {
 .theme-pick.is-locked,
 .profile-emote.is-locked,
 .fx-pick.is-locked { border-style: dashed; }
-.theme-pick.is-locked .theme-swatch { filter: saturate(0.35); }
+.theme-pick.is-locked .theme-board { filter: saturate(0.35); }
 
-/* Profil fotoğrafı */
-.profile-photo-row {
+/* Profil başlığı: büyük avatar, ad ve rekor tek kartta. */
+.profile-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--card) 70%, var(--paper));
+  border: 2px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 16px;
 }
+.profile-head-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.profile-head .result-badge { margin: 0; }
+.profile-head .profile-name { margin: 0; }
+.profile-head .profile-meta { margin: 0; }
 .profile-photo {
   flex: none;
-  width: 54px;
-  height: 54px;
+  width: 64px;
+  height: 64px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -4736,7 +4857,7 @@ body {
   background-position: center;
   box-shadow: 3px 3px 0 var(--ink);
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
   overflow: hidden;
 }
@@ -4774,7 +4895,13 @@ body {
   }
   .theme-grid { gap: 5px; }
   .theme-pick { padding: 4px 6px; font-size: 11.5px; gap: 6px; }
-  .theme-swatch { width: 22px; height: 22px; border-radius: 6px; }
+  .theme-board { width: 34px; height: 34px; gap: 1.5px; padding: 2px; border-radius: 7px; }
+  .profile-head { padding: 6px 8px; gap: 10px; margin-bottom: 8px; border-radius: 12px; }
+  .profile-head .profile-photo { width: 46px; height: 46px; font-size: 20px; }
+  .avatar-grid { gap: 6px; }
+  .avatar-pick { padding: 5px 3px 4px; }
+  .avatar-pick-art { width: 42px; height: 42px; }
+  .avatar-pick-name { font-size: 10px; }
   .profile-pane[data-profile-pane="emote"] .profile-note { display: none; }
   .profile-emote { padding: 4px 2px 3px; }
   .profile-emote .emote-chip-art { width: 32px; height: 32px; }
@@ -4786,6 +4913,9 @@ body {
   .profile-emotes { gap: 4px; }
   .profile-emote .emote-chip-art { width: 34px; height: 34px; }
   .theme-pick { font-size: 11px; }
+  .theme-board { width: 36px; height: 36px; }
+  .avatar-grid { gap: 6px; }
+  .avatar-pick-art { width: 48px; height: 48px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4793,8 +4923,11 @@ body {
   .account-avatar,
   .profile-tab,
   .theme-pick,
+  .avatar-pick,
   .profile-emote { transition: none; }
-  .theme-pick:hover { transform: none; }
+  .theme-pick:hover,
+  .avatar-pick:hover,
+  .avatar-pick:focus-visible { transform: none; }
   .profile-emote:hover,
   .profile-emote:focus-visible,
   .account-avatar:hover,

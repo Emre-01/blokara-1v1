@@ -32,13 +32,24 @@
     white: "#ffffff"
   };
 
+  /* Tema paletleri: "theme" renk listesi ve tema blok renkleri aynı
+     kaynaktan gelir; böylece parçacıklar da temayla değişir. */
+  var THEME_BLOCKS = {
+    workshop: { coral: "#f2553d", cobalt: "#2f55e8", mustard: "#f4b72a", mint: "#2da98d", grape: "#8c5bff", sky: "#3aa6d8", lime: "#8fc93a", rose: "#e8488f", teal: "#23c3b0" },
+    mint: { coral: "#12b886", cobalt: "#2f8fe8", mustard: "#fcc419", mint: "#63e6be", grape: "#5f7bd6", sky: "#4dabf7", lime: "#a9e34b", rose: "#ff8cc8", teal: "#38d9a9" },
+    ocean: { coral: "#1c7ed6", cobalt: "#5c7cfa", mustard: "#fcc419", mint: "#22b8cf", grape: "#748ffc", sky: "#4dabf7", lime: "#66d9e8", rose: "#e599f7", teal: "#38d9a9" },
+    sunset: { coral: "#f03e3e", cobalt: "#9775fa", mustard: "#ffd43b", mint: "#ff922b", grape: "#c77dff", sky: "#ff6b6b", lime: "#ffc078", rose: "#f06595", teal: "#ffa94d" },
+    autumn: { coral: "#d9480f", cobalt: "#8b6b4a", mustard: "#f08c00", mint: "#6b8e23", grape: "#8b4513", sky: "#a0522d", lime: "#cd853f", rose: "#b8860b", teal: "#9c6b30" },
+    cotton: { coral: "#f0489e", cobalt: "#b197fc", mustard: "#ffd43b", mint: "#63e6be", grape: "#d0bfff", sky: "#74c0fc", lime: "#b2f2bb", rose: "#ffa8c8", teal: "#96f2d7" }
+  };
+
   var THEME_COLORS = {
-    workshop: ["#f2553d", "#f4b72a", "#2da98d"],
-    mint: ["#2da98d", "#7fd6b8", "#f4b72a"],
-    ocean: ["#2f55e8", "#23c3b0", "#8fd6f2"],
-    sunset: ["#e8485b", "#f4a12a", "#8c5bff"],
-    autumn: ["#c9662f", "#e0a13a", "#7c4a2d", "#a8442a", "#d9b46a"],
-    cotton: ["#ef79b9", "#f7a8d4", "#8fd6f2", "#fbe4f1", "#c9a6f2"]
+    workshop: ["#f2553d", "#2f55e8", "#f4b72a", "#2da98d", "#8c5bff", "#3aa6d8"],
+    mint: ["#12b886", "#2f8fe8", "#fcc419", "#63e6be", "#5f7bd6", "#4dabf7"],
+    ocean: ["#1c7ed6", "#5c7cfa", "#fcc419", "#22b8cf", "#748ffc", "#4dabf7"],
+    sunset: ["#f03e3e", "#9775fa", "#ffd43b", "#ff922b", "#c77dff", "#ff6b6b"],
+    autumn: ["#d9480f", "#8b6b4a", "#f08c00", "#6b8e23", "#8b4513", "#a0522d"],
+    cotton: ["#f0489e", "#b197fc", "#ffd43b", "#63e6be", "#d0bfff", "#74c0fc"]
   };
 
   var canvas = null;
@@ -62,6 +73,10 @@
 
   function color(name) {
     if (!name) return COLORS.ink;
+    /* Blok adları (coral, mint…) temanın kendi paletinden çözülür ki
+       kırıntılar ve hâleler tahtadaki kutularla aynı rengi kullansın. */
+    var blocks = THEME_BLOCKS[theme];
+    if (blocks && blocks[name]) return blocks[name];
     return COLORS[name] || name;
   }
 
@@ -126,8 +141,12 @@
   function resize() {
     if (!canvas) return;
     /* Yüksek DPR ekranlarda tam çözünürlük, parçacık çiziminde gereksiz
-       maliyet demek; 1.5 ile keskinlik ve hız dengelenir. */
-    dpr = Math.min(1.5, window.devicePixelRatio || 1);
+       maliyet demek; 1.5 ile keskinlik ve hız dengelenir. Zayıf cihazlarda
+       çözünürlük ve parçacık bütçesi daha da düşürülür. */
+    var memory = Number(navigator.deviceMemory || 0);
+    var cores = Number(navigator.hardwareConcurrency || 0);
+    var weak = (memory && memory <= 4) || (cores && cores <= 4);
+    dpr = Math.min(weak ? 1.25 : 1.5, window.devicePixelRatio || 1);
     var w = window.innerWidth;
     var h = window.innerHeight;
     canvas.width = Math.floor(w * dpr);
@@ -135,12 +154,18 @@
     canvas.style.width = w + "px";
     canvas.style.height = h + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    maxParticles = w * h > 520000 ? 380 : 280;
+    if (weak) maxParticles = 170;
+    else maxParticles = w * h > 520000 ? 380 : 280;
   }
 
   function clear() {
     particles.length = 0;
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
     if (ctx) ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    if (canvas) canvas.classList.remove("is-live");
   }
 
   /* ---------------- parçacık havuzu ---------------- */
@@ -549,6 +574,7 @@
 
   function start() {
     if (raf) return;
+    if (canvas) canvas.classList.add("is-live");
     var last = performance.now();
     raf = requestAnimationFrame(function frame(now) {
       var dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
@@ -559,6 +585,7 @@
       } else {
         raf = 0;
         if (ctx) ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        if (canvas) canvas.classList.remove("is-live");
       }
     });
   }
@@ -627,31 +654,47 @@
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.globalAlpha *= 0.55;
+      /* İkinci ve üçüncü halka dalgaya derinlik verir. */
+      ctx.globalAlpha *= 0.5;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius * 0.68, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha *= 0.55;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius * 1.2, 0, Math.PI * 2);
       ctx.stroke();
       return;
     }
 
     if (p.shape === "bubble") {
       var br = p.size * 0.5;
+      /* Yarı saydam gövde, parlak kenar ve iki ışık noktası. */
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.fade * 0.2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, br * 0.96, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = p.fade * 0.9;
       ctx.strokeStyle = p.color;
-      ctx.lineWidth = 1.6;
-      ctx.globalAlpha *= 0.85;
+      ctx.lineWidth = Math.max(1.4, br * 0.09);
       ctx.beginPath();
       ctx.arc(p.x, p.y, br, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.globalAlpha *= 0.22;
-      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.fade * 0.8;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = Math.max(1, br * 0.07);
       ctx.beginPath();
-      ctx.arc(p.x, p.y, br * 0.94, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = p.fade * 0.7;
+      ctx.arc(p.x, p.y, br * 0.8, -2.5, -1.15);
+      ctx.stroke();
+      ctx.globalAlpha = p.fade * 0.88;
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.arc(p.x - br * 0.34, p.y - br * 0.36, Math.max(1, br * 0.22), 0, Math.PI * 2);
+      ctx.arc(p.x - br * 0.34, p.y - br * 0.36, Math.max(1, br * 0.2), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = p.fade * 0.55;
+      ctx.beginPath();
+      ctx.arc(p.x + br * 0.3, p.y + br * 0.34, Math.max(0.8, br * 0.1), 0, Math.PI * 2);
       ctx.fill();
       return;
     }
@@ -672,6 +715,15 @@
       }
       ctx.closePath();
       ctx.fill();
+      /* Kontur ve iç ışıltı yıldızı düz bir lekeden ayırır. */
+      ctx.strokeStyle = "rgba(28, 27, 46, 0.42)";
+      ctx.lineWidth = Math.max(1, outer * 0.08);
+      ctx.stroke();
+      ctx.globalAlpha = p.fade * 0.55;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(1, inner * 0.5), 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
       return;
     }
@@ -688,6 +740,14 @@
       ctx.moveTo(p.x, p.y);
       ctx.lineTo(p.x - ux * len, p.y - uy * len);
       ctx.stroke();
+      /* Beyaz çekirdek, izi ışık gibi parlatır. */
+      ctx.globalAlpha = p.fade * 0.72;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = Math.max(0.8, p.size * 0.42);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - ux * len * 0.62, p.y - uy * len * 0.62);
+      ctx.stroke();
       return;
     }
 
@@ -699,7 +759,17 @@
       ctx.beginPath();
       ctx.ellipse(0, 0, p.size * 0.5, p.size * 0.26, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(28, 27, 46, 0.22)";
+      ctx.strokeStyle = "rgba(28, 27, 46, 0.32)";
+      ctx.lineWidth = Math.max(0.8, p.size * 0.05);
+      ctx.stroke();
+      /* Üst yarıya düşen ışık ve orta damar. */
+      ctx.globalAlpha = p.fade * 0.3;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(-p.size * 0.08, -p.size * 0.07, p.size * 0.3, p.size * 0.12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = p.fade * 0.7;
+      ctx.strokeStyle = "rgba(28, 27, 46, 0.42)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(-p.size * 0.46, 0);
@@ -714,15 +784,30 @@
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot || 0);
       ctx.fillStyle = p.color;
-      ctx.fillRect(-p.size * 0.5, -p.size * 0.5, p.size, p.size * 0.62);
+      var rw = p.size;
+      var rh = p.size * 0.62;
+      ctx.fillRect(-rw * 0.5, -rh * 0.5, rw, rh);
+      ctx.strokeStyle = "rgba(28, 27, 46, 0.26)";
+      ctx.lineWidth = Math.max(0.7, p.size * 0.07);
+      ctx.strokeRect(-rw * 0.5, -rh * 0.5, rw, rh);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
+      ctx.fillRect(-rw * 0.5, -rh * 0.5, rw, Math.max(0.8, rh * 0.18));
       ctx.restore();
       return;
     }
 
+    /* Kıvılcım: renkli gövde + beyaz çekirdek. */
     ctx.fillStyle = p.color;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
     ctx.fill();
+    if (p.size >= 4) {
+      ctx.globalAlpha = p.fade * 0.6;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   /* ---------------- DOM yardımcıları ---------------- */
@@ -768,7 +853,8 @@
   }
 
   function screenShake(power) {
-    var rootEl = document.documentElement;
+    if (reducedMotion()) return;
+    var rootEl = document.getElementById("screen-game") || document.documentElement;
     if (!rootEl) return;
     power = Math.max(1, Math.min(3, Number(power) || 1));
     rootEl.style.setProperty("--shake-power", (power * 2.5) + "px");
