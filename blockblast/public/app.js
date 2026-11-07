@@ -1267,7 +1267,7 @@
     applyFxSettings();
   }
 
-  function selectFx(kind, id) {
+  function selectFx(kind, id, origin) {
     var list = kind === "win" ? WIN_EFFECTS : BURST_EFFECTS;
     var picked = list.filter(function (item) { return item.id === id; })[0];
     if (!picked) return;
@@ -1282,10 +1282,20 @@
       if (kind === "win") sfxWinFx(id);
       else sfxBurstFx(id, true);
     }
+    /* Önizleme dokunulan kartın üzerinde başlar; kazanma efektleri tüm
+       ekranı kullandığı için merkezden oynar. */
     var cx = window.innerWidth / 2;
     var cy = window.innerHeight * 0.46;
+    if (kind === "burst" && origin && origin.getBoundingClientRect) {
+      var rect = origin.getBoundingClientRect();
+      cx = rect.left + rect.width / 2;
+      cy = rect.top + rect.height / 2;
+    } else if (kind === "win") {
+      cy = window.innerHeight * 0.36;
+    }
     if (FX) {
-      if (kind === "win") FX.victory();
+      if (typeof FX.preview === "function") FX.preview(kind, id, cx, cy);
+      else if (kind === "win") FX.victory();
       else FX.clearBurst(cx, cy, true);
     }
   }
@@ -4077,6 +4087,8 @@
 
   function closeOverlay() {
     var overlay = $("#overlay");
+    /* Menüdeki efekt önizlemesi açık kaldıysa pencere kapanırken temizle. */
+    if (FX && typeof FX.previewActive === "function" && FX.previewActive()) FX.clear();
     overlay.hidden = true;
     overlay.className = "overlay";
     app.profileOpen = false;
@@ -4740,7 +4752,10 @@
             (locked ? ' aria-label="' + esc(tr(item.name)) + ' · ' + esc(tr("Reklam izle")) + '"' : '') + '>' +
             '<span class="fx-pick-icon" aria-hidden="true">' + fxIconHTML(item.id) + '</span>' +
             '<span class="fx-pick-name">' + esc(tr(item.name)) +
-              (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span></button>';
+              (locked ? ' <span class="lock-badge" aria-hidden="true">🔒</span>' : '') + '</span>' +
+            '<span class="fx-pick-play" aria-hidden="true">' +
+              '<svg viewBox="0 0 16 16" focusable="false"><path d="M5.4 3.1 12.4 8l-7 4.9z"/></svg>' +
+            '</span></button>';
         }).join("") +
         '</div></div>';
     }
@@ -5358,6 +5373,9 @@
   /* ------------------------------------------------------------------ */
 
   function refreshBillingState() {
+    /* Reklam ve satın alma durumu aynı yerel köprüden gelir; ikisini
+       birlikte tazele ki üst çubuktaki düğme doğru hâli göstersin. */
+    refreshAdsState();
     var bridge = window.BlokBilling;
     if (!bridge) {
       ads.billing = false;
@@ -5382,22 +5400,23 @@
   function updatePurchaseStrip() {
     var button = $("#buy-remove-ads");
     if (!button) return;
-    /* Düğme yalnızca reklamlar hâlâ açıkken, reklam köprüsü gerçekten
-       çalışırken ve uygulama satın alma köprüsüne sahipken görünür.
-       Reklamsız test derlemesinde SDK başlamaz (available=false) ve düğme
-       hiç görünmez; satın alma tamamlanınca da kaybolur. */
-    var adsReady = false;
-    if (window.BlokAds && typeof window.BlokAds.available === "function") {
-      try { adsReady = !!window.BlokAds.available(); } catch (error) { adsReady = false; }
-    }
-    var canBuy = !!window.BlokBilling && adsReady;
-    button.hidden = ads.free || !canBuy;
-    button.classList.toggle("is-owned", !!ads.free);
-    button.setAttribute("aria-pressed", ads.free ? "true" : "false");
+    /* Düğme üst çubukta durur. Görünürlük:
+       - Android'de satın alma köprüsü varsa her zaman görünür (reklam
+         SDK'sı hazır olmasa da kullanıcı düğmeyi bulabilir).
+       - Reklamsız test derlemesinde yeşil "sahipsin" hâlinde görünür.
+       - Satın alma tamamlanınca düğme kaybolur.
+       - Tarayıcıda köprü yoksa hiç görünmez. */
+    var hasBilling = !!window.BlokBilling && typeof window.BlokBilling.purchase === "function";
+    var adFreeBuild = ads.enabled === false;
+    var owned = !!ads.free || adFreeBuild;
+    var show = !ads.free && (hasBilling || adFreeBuild);
+    button.hidden = !show;
+    button.classList.toggle("is-owned", owned);
+    button.setAttribute("aria-pressed", owned ? "true" : "false");
   }
 
   function showRemoveAdsSheet() {
-    if (ads.free) {
+    if (ads.free || ads.enabled === false) {
       toast("Reklamlar zaten kaldırılmış.");
       return;
     }
@@ -5420,7 +5439,7 @@
   }
 
   function startRemoveAdsPurchase() {
-    if (ads.free) {
+    if (ads.free || ads.enabled === false) {
       toast("Reklamlar zaten kaldırılmış.");
       return;
     }
@@ -6185,7 +6204,7 @@
         return;
       }
       if (target.hasAttribute("data-fx-pick")) {
-        selectFx(target.dataset.fxKind, target.dataset.fxPick);
+        selectFx(target.dataset.fxKind, target.dataset.fxPick, target);
         refreshProfileSheet();
         return;
       }

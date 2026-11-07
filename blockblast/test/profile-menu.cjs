@@ -397,6 +397,51 @@ async function main() {
   ok("efekt ikonları emoji değil, çizgi SVG",
     fx.icons.length === 10 && fx.icons.every((i) => i.svg === 1 && i.text === ""), fx.icons);
 
+  /* ---- efekt önizlemesi: dokununca pencere üstünde oynar ---- */
+  const fxPreview = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const calls = [];
+    const original = window.BlokFx.preview;
+    window.BlokFx.preview = function (group, id, x, y) {
+      calls.push({ group, id, x: Math.round(x), y: Math.round(y) });
+      return original.call(window.BlokFx, group, id, x, y);
+    };
+    document.querySelector('[data-fx-kind="burst"][data-fx-pick="classic"]').click();
+    await sleep(140);
+    const canvas = document.getElementById('fx-canvas');
+    const overlay = document.getElementById('overlay');
+    const burstState = {
+      previewClass: canvas.classList.contains('is-preview'),
+      live: canvas.classList.contains('is-live'),
+      depth: Number(getComputedStyle(canvas).zIndex),
+      overlayDepth: Number(getComputedStyle(overlay).zIndex),
+      htmlClass: document.documentElement.classList.contains('fx-previewing')
+    };
+    document.querySelector('[data-fx-kind="win"][data-fx-pick="confetti"]').click();
+    await sleep(160);
+    const winState = {
+      previewClass: canvas.classList.contains('is-preview'),
+      htmlClass: document.documentElement.classList.contains('fx-previewing'),
+      playBadges: document.querySelectorAll('.fx-pick .fx-pick-play').length,
+      lockedHidden: [...document.querySelectorAll('.fx-pick.is-locked .fx-pick-play')]
+        .filter((el) => getComputedStyle(el).display === 'none').length
+    };
+    window.BlokFx.preview = original;
+    return { calls, burstState, winState };
+  })()`);
+  ok("efekte dokununca önizleme çağrılıyor",
+    fxPreview.calls.length >= 2 && fxPreview.calls[fxPreview.calls.length - 1].group === "win",
+    fxPreview.calls);
+  ok("patlama önizlemesi açık pencerenin üstünde görünüyor",
+    fxPreview.burstState.previewClass === true && fxPreview.burstState.live === true &&
+    fxPreview.burstState.depth > fxPreview.burstState.overlayDepth, fxPreview.burstState);
+  ok("kazanma önizlemesi de pencere üstünde oynuyor",
+    fxPreview.winState.previewClass === true && fxPreview.winState.htmlClass === true,
+    fxPreview.winState);
+  ok("her efek kartında oynat işareti var, kilitlilerde gizli",
+    fxPreview.winState.playBadges === 10 && fxPreview.winState.lockedHidden === 2,
+    fxPreview.winState);
+
   /* ---- hazır avatar galerisi ---- */
   const gallery = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -472,6 +517,32 @@ async function main() {
     adFreePlacement.inTopActions && adFreePlacement.afterBrand && adFreePlacement.index >= 0, adFreePlacement);
   ok("satın alma yolu yokken düğme gizli", adFreePlacement.hiddenWithoutBilling === true, adFreePlacement);
 
+  /* Reklamsız test derlemesi: reklam SDK'sı kapalı ama satın alma köprüsü
+     var. Düğme üst çubukta yeşil "sahipsin" hâlinde görünür. */
+  const billingOnly = await page.evaluate(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    window.BlokAds = {
+      available: () => false,
+      enabled: () => false,
+      hasRewarded: () => false,
+      hasBanner: () => false
+    };
+    window.BlokBilling = { available: () => false, owned: () => false, purchase: () => {} };
+    /* Menüyü açmak reklam durumunu köprüden yeniden okur. */
+    document.getElementById('account-avatar').click();
+    await sleep(180);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(180);
+    const button = document.getElementById('buy-remove-ads');
+    return {
+      hidden: button.hidden,
+      owned: button.classList.contains('is-owned'),
+      pressed: button.getAttribute('aria-pressed')
+    };
+  })()`);
+  ok("reklamsız test derlemesinde de düğme üst çubukta görünür",
+    billingOnly.hidden === false && billingOnly.owned === true && billingOnly.pressed === "true", billingOnly);
+
   const purchaseFlow = await page.evaluate(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const calls = [];
@@ -480,6 +551,7 @@ async function main() {
     window.__banner = [];
     window.BlokAds = {
       available: () => true,
+      enabled: () => true,
       hasRewarded: () => true,
       hasBanner: () => true,
       showBanner: () => window.__banner.push('show'),
@@ -519,6 +591,7 @@ async function main() {
     /* Yeni köprü nesnesi: uygulama banner durumunu yeniden uygular. */
     window.BlokAds = {
       available: () => true,
+      enabled: () => true,
       hasRewarded: () => true,
       hasBanner: () => true,
       showBanner: () => banner.push('show'),

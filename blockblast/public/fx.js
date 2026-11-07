@@ -158,6 +158,21 @@
     else maxParticles = w * h > 520000 ? 380 : 280;
   }
 
+  var previewTimer = 0;
+
+  /* Profil menüsünden yapılan önizleme, kaplamanın (overlay) üstünde
+     görünmek zorunda; bu yüzden geçici olarak yükseltilir. */
+  function stopPreview() {
+    if (previewTimer) {
+      clearTimeout(previewTimer);
+      previewTimer = 0;
+    }
+    if (canvas) canvas.classList.remove("is-preview");
+    if (document.documentElement) {
+      document.documentElement.classList.remove("fx-previewing");
+    }
+  }
+
   function clear() {
     particles.length = 0;
     if (raf) {
@@ -165,6 +180,7 @@
       raf = 0;
     }
     if (ctx) ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    stopPreview();
     if (canvas) canvas.classList.remove("is-live");
   }
 
@@ -498,6 +514,29 @@
   /* Patlama anında seçilen efekti çalıştırır. */
   function clearBurst(x, y, strong) {
     return playEffect("burst", fxPack.burst, { x: x, y: y, strong: !!strong });
+  }
+
+  /* Menüdeki efekt kartına dokunulunca çağrılır: seçilen efekt, açık
+     pencerenin üstünde kısa bir gösteri olarak oynar. Kaplama (z-index 70)
+     parçacıkları örtmesin diye canvas geçici olarak yükseltilir. */
+  function preview(group, id, x, y) {
+    init();
+    clear();
+    if (canvas) canvas.classList.add("is-preview");
+    if (document.documentElement) {
+      document.documentElement.classList.add("fx-previewing");
+    }
+    var ok = playEffect(group, id, { x: x, y: y, strong: true });
+    if (!ok) {
+      stopPreview();
+      return false;
+    }
+    previewTimer = setTimeout(stopPreview, 3000);
+    return true;
+  }
+
+  function previewActive() {
+    return !!previewTimer;
   }
 
   function victory() {
@@ -886,6 +925,8 @@
     ghostCell: ghostCell,
     confetti: confetti,
     clearBurst: clearBurst,
+    preview: preview,
+    previewActive: previewActive,
     playEffect: playEffect,
     setTheme: setTheme,
     setUnlocks: setUnlocks,

@@ -3574,6 +3574,13 @@ body[data-screen="lobby"] .topbar-profile {
   contain: paint;
 }
 #fx-canvas.is-live { display: block; }
+/* Profil menüsünde efekt önizlemesi: parçacıklar açık pencerenin üstünde
+   görünür, dokunuşu engellemez. Kapanınca normal katmana döner. */
+#fx-canvas.is-preview { z-index: 88; }
+html.fx-previewing .fx-text,
+html.fx-previewing .fx-flash,
+html.fx-previewing .fx-rays,
+html.fx-previewing .fx-ghost { z-index: 89; }
 .fx-text {
   position: fixed;
   z-index: 56;
@@ -4700,11 +4707,12 @@ body {
   gap: 6px;
 }
 .fx-pick {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 7px 8px;
+  padding: 7px 26px 7px 8px;
   background: var(--paper);
   border: 2px solid color-mix(in srgb, var(--ink) 32%, transparent);
   border-radius: 12px;
@@ -4750,6 +4758,30 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Kartın sağ üstündeki küçük oynat işareti: dokununca önizleme oynar. */
+.fx-pick-play {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  margin-top: -7.5px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  opacity: 0.55;
+  transition: opacity 0.14s ease, transform 0.14s ease, background 0.14s ease;
+}
+.fx-pick-play svg { width: 9px; height: 9px; display: block; }
+.fx-pick-play path { fill: var(--ink); }
+.fx-pick:hover .fx-pick-play,
+.fx-pick:focus-visible .fx-pick-play {
+  opacity: 1;
+  transform: scale(1.12);
+  background: var(--mustard);
+}
+.fx-pick.is-locked .fx-pick-play { display: none; }
 
 /* Hazır avatar galerisi: büyük, karakterli portreler. */
 .avatar-grid {
